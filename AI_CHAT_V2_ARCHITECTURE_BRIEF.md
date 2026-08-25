@@ -50,6 +50,7 @@ V2 不允许退化成普通的 Next.js Route 转发模型请求。以下复杂�
 | UI | shadcn/ui、Tailwind CSS |
 | 表单 | React Hook Form；与运行时 Schema resolver 集成 |
 | 服务端状态 | TanStack Query，负责查询、缓存、失效与刷新 |
+| 长列表 | TanStack Virtual，负责消息列表虚拟化 |
 | 客户端状态 | Zustand，只保存适合浏览器的临时交互状态和 Generation Projection |
 | 数据库 | PostgreSQL、Drizzle ORM 与 migration |
 | Markdown | React Markdown；remark/rehype 插件按真实渲染需求增加 |
