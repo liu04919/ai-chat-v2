@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { createConversationRequestSchema } from "./conversation";
-import { chatRuntimeStateSchema } from "./generation";
+import {
+  conversationDetailResponseSchema,
+  conversationListResponseSchema,
+} from "./conversation";
 
 function readExample(name: string): unknown {
   const url = new URL(`../examples/${name}`, import.meta.url);
@@ -11,15 +13,15 @@ function readExample(name: string): unknown {
 }
 
 describe("contract examples", () => {
-  it("create-conversation request 与 Schema 保持一致", () => {
-    const example = readExample("create-conversation.request.json");
+  it("conversation list response 与 Schema 保持一致", () => {
+    const example = readExample("conversation-list.response.json");
 
-    expect(createConversationRequestSchema.parse(example)).toEqual(example);
+    expect(conversationListResponseSchema.parse(example)).toEqual(example);
   });
 
-  it("chat runtime state response 与 Schema 保持一致", () => {
-    const example = readExample("chat-runtime-state.response.json");
+  it("conversation detail response 与 Schema 保持一致", () => {
+    const example = readExample("conversation-detail.response.json");
 
-    expect(chatRuntimeStateSchema.parse(example)).toEqual(example);
+    expect(conversationDetailResponseSchema.parse(example)).toEqual(example);
   });
 });

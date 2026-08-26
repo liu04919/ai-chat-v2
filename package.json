@@ -25,7 +25,7 @@
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run --exclude **/*.integration.test.ts",
-    "test:integration": "vitest run --no-file-parallelism packages/db/src/schema.integration.test.ts apps/web/src/lib/auth.integration.test.ts",
+    "test:integration": "vitest run --no-file-parallelism packages/db/src/schema.integration.test.ts packages/db/src/conversation-reader.integration.test.ts apps/web/src/lib/auth.integration.test.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration && pnpm build"
   },
   "devDependencies": {

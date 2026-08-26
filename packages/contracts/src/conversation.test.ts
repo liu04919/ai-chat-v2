@@ -1,14 +1,51 @@
 import { describe, expect, it } from "vitest";
 
-import { createConversationRequestSchema } from "./conversation";
+import {
+  conversationDetailResponseSchema,
+  conversationListResponseSchema,
+} from "./conversation";
 
-describe("createConversationRequestSchema", () => {
-  it.each(["chat", "image"])("接受已定义的 %s mode", (mode) => {
-    expect(createConversationRequestSchema.parse({ mode })).toEqual({ mode });
+const conversation = {
+  id: "conversation_example",
+  mode: "chat",
+  title: "ReadableStream 如何工作",
+  createdAt: "2026-08-26T10:00:00.000Z",
+  updatedAt: "2026-08-26T10:05:00.000Z",
+};
+
+describe("Conversation response schemas", () => {
+  it("接受列表响应", () => {
+    expect(
+      conversationListResponseSchema.parse({ conversations: [conversation] }),
+    ).toEqual({ conversations: [conversation] });
   });
 
-  it("拒绝未知字段和未知 mode", () => {
-    expect(() => createConversationRequestSchema.parse({ mode: "audio" })).toThrow();
-    expect(() => createConversationRequestSchema.parse({ mode: "chat", model: "gpt" })).toThrow();
+  it("接受包含 Active Generation 的详情响应", () => {
+    const detail = {
+      conversation,
+      activeGeneration: { id: "generation_example", status: "running" },
+    };
+
+    expect(conversationDetailResponseSchema.parse(detail)).toEqual(detail);
+  });
+
+  it("拒绝未知 mode、无效时间与额外字段", () => {
+    expect(() =>
+      conversationListResponseSchema.parse({
+        conversations: [{ ...conversation, mode: "audio" }],
+      }),
+    ).toThrow();
+    expect(() =>
+      conversationListResponseSchema.parse({
+        conversations: [{ ...conversation, updatedAt: "刚刚" }],
+      }),
+    ).toThrow();
+    expect(() =>
+      conversationDetailResponseSchema.parse({
+        conversation,
+        activeGeneration: null,
+        model: "gpt-5.6-sol",
+      }),
+    ).toThrow();
   });
 });

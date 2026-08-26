@@ -42,23 +42,25 @@ V2 不允许退化成普通的 Next.js Route 转发模型请求。以下复杂�
 
 当前不解决 PostgreSQL、Redis、BullMQ 或 Worker 宕机后的自动修复。不得为假设中的故障提前引入 Outbox、分布式事务、补偿任务、复杂重试、Kafka、Temporal、Kubernetes、CQRS 或通用事件总线。
 
+当前产品范围仅包含桌面 Web，不做移动端布局与交互适配；除非开发者以后明确新增需求，否则不得自行扩展到移动端。
+
 ### 已确认技术栈
 
-| 领域 | 技术与用途 |
-| --- | --- |
-| Web | Next.js、React、TypeScript |
-| UI | shadcn/ui、Tailwind CSS |
-| 表单 | React Hook Form；与运行时 Schema resolver 集成 |
-| 服务端状态 | TanStack Query，负责查询、缓存、失效与刷新 |
-| 长列表 | TanStack Virtual，负责消息列表虚拟化 |
-| 客户端状态 | Zustand，只保存适合浏览器的临时交互状态和 Generation Projection |
-| 数据库 | PostgreSQL、Drizzle ORM 与 migration |
-| Markdown | React Markdown；remark/rehype 插件按真实渲染需求增加 |
-| 后台与事件 | BullMQ、Redis、Redis Streams、独立 Node Worker |
-| 本地基础设施与架构验证 | Docker、Docker Compose |
-| LLM | AI SDK Core，经自有 Adapter 接入模型服务 |
+| 领域                   | 技术与用途                                           |
+| ---------------------- | ---------------------------------------------------- |
+| Web                    | Next.js、React、TypeScript                           |
+| UI                     | shadcn/ui、Tailwind CSS                              |
+| 表单                   | React Hook Form；与运行时 Schema resolver 集成       |
+| 服务端状态             | TanStack Query，负责查询、缓存、失效与刷新           |
+| 长列表                 | TanStack Virtual，负责消息列表虚拟化                 |
+| 客户端状态             | Zustand                                              |
+| 数据库                 | PostgreSQL、Drizzle ORM 与 migration                 |
+| Markdown               | React Markdown；remark/rehype 插件按真实渲染需求增加 |
+| 后台与事件             | BullMQ、Redis、Redis Streams、独立 Node Worker       |
+| 本地基础设施与架构验证 | Docker、Docker Compose                               |
+| LLM                    | AI SDK Core，经自有 Adapter 接入模型服务             |
 
-技术用途已经拍板，具体版本在初始化或真正使用时根据兼容性确认，不照抄 V1 的版本。`D:\code\Next\ai-chat` 可用于理解前端交互和既有用法；其后端、Docker、数据库、队列、鉴权与部署方案不是 V2 的架构依据。
+技术用途已经拍板，具体版本在初始化或真正使用时根据兼容性确认，不照抄 V1 的版本。`D:\code\Next\ai-chat` 可用于理解使用过的技术栈和知晓旧版本为什么需要重新设计的原因；其后端、Docker、数据库、队列、鉴权与部署方案不是 V2 的架构依据，不能直接偷懒而复用v1的代码，需要自己认真思考并设计。
 
 ## 3. 系统拓扑
 
@@ -86,7 +88,9 @@ Web 与 Worker 位于同一 workspace，但拥有独立运行生命周期。是�
 
 ### Conversation
 
-Conversation 创建时选择 `chat` 或 `image`，之后不可修改。产品层不提供聊天模型动态切换；Provider、Base URL 和模型路由属于服务端基础设施配置。
+未持久化的草稿页允许选择 `chat` 或 `image`；第一次提交内容时将 mode 写入 Conversation，已有 Conversation 的界面不显示模式切换，服务端也不提供修改入口。产品层不提供聊天模型动态切换；Provider、Base URL 和模型路由属于服务端基础设施配置。
+
+思考等级不是模型选择，也不属于 Conversation。它是单次 Chat Generation 的执行配置，草稿页和已有 Chat Conversation 都允许在发送前选择，并记录该次执行实际使用的值；正式 UI 只展示经上游接口验证可用的等级。
 
 同一个 Conversation 同时最多存在一个 `queued` 或 `running` Generation。该约束必须由服务器和数据库保证，不能只依赖前端按钮禁用。
 
@@ -239,12 +243,12 @@ Adapter 必须小而明确，并有 contract tests。实现 AI SDK 功能时先�
 
 当前模型配置：
 
-| 配置 | 当前值 |
-| --- | --- |
-| Chat Model | GPT-5.6 Sol |
-| Provider | CatAPI OpenAI-compatible relay |
-| Base URL | `https://maomiapi.com/v1` |
-| Provider model ID | `gpt-5.6-sol` |
+| 配置              | 当前值                         |
+| ----------------- | ------------------------------ |
+| Chat Model        | GPT-5.6 Sol                    |
+| Provider          | CatAPI OpenAI-compatible relay |
+| Base URL          | `https://maomiapi.com/v1`      |
+| Provider model ID | `gpt-5.6-sol`                  |
 
 密钥只通过服务端环境变量注入，不写入仓库、浏览器 bundle、日志或文档。
 
@@ -370,8 +374,8 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 以下决定不得由 Codex 在实现中自行绕过：
 
 1. V1 只读参考，V2 独立实现
-2. Conversation mode 创建后不可变
-3. 产品层不支持聊天模型动态切换
+2. Conversation mode 只在草稿页选择，创建后不可变
+3. 产品层不支持聊天模型动态切换；思考等级归属于单次 Generation
 4. Web/API 与 Worker 生命周期分离
 5. 自有 Message、Generation 与 GenerationEvent 协议
 6. `packages/contracts` 是跨 runtime wire contract 的唯一入口
@@ -429,7 +433,8 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 
 每轮工作遵守以下规则：
 
-- 开工前阅读本文档、当前代码和相关 V1 行为
+- 开工前阅读本文档、当前代码。
+- V1 你闲得没事干，想了解为什么需要重构就读。
 - 每轮只处理一个清晰范围，避免一次生成大量难以研读的代码
 - 实现后运行与风险相称的验证，并清楚报告未验证内容
 - 未经开发者明确确认，不修改架构决定，不提交，不推送

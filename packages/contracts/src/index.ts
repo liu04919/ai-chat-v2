@@ -1,8 +1,12 @@
 export {
+  conversationDetailResponseSchema,
+  conversationListResponseSchema,
   conversationModeSchema,
-  createConversationRequestSchema,
+  conversationSummarySchema,
+  type ConversationDetailResponse,
+  type ConversationListResponse,
   type ConversationModeDto,
-  type CreateConversationRequest,
+  type ConversationSummaryDto,
 } from "./conversation";
 export {
   activeGenerationSchema,
