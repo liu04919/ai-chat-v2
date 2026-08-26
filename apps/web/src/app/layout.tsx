@@ -5,7 +5,10 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Chat V2",
+  title: {
+    default: "AI Chat V2",
+    template: "%s",
+  },
   description: "可恢复、可测试的 AI 对话系统",
 };
 

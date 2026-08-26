@@ -286,6 +286,8 @@ Context Builder 统一组合 Summary、近期 Messages、Retrieval 结果和 Att
 
 ## 9. 产品行为约束
 
+面向用户的界面只呈现产品信息与操作反馈，不展示架构、技术栈、开发进度或教学式说明。
+
 ### Regenerate
 
 Regenerate 只针对最后一条 Assistant Message，并创建新的 Generation。运行时可以隐藏旧回答，但不能提前删除：
@@ -356,7 +358,7 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 - Route Handler 保持短小，但不为每个操作机械创建 controller/service/repository/interface
 - 只在存在真实替换点或测试边界时抽象接口
 - 新增依赖前说明用途，优先使用成熟基础设施，不重写 BullMQ、AI SDK 或认证系统
-- 数据库 schema 必须使用 migration，并以数据库约束保证关键不变量
+- 数据库 schema 必须能通过 migration 从空库复现，并以数据库约束保证关键不变量；当前开发数据均可丢弃，schema 变更不承担历史数据兼容、迁移或双写，必要时直接重建数据库与 migration 基线
 - 修改跨边界协议时，同一轮更新 Schema、类型、fixtures、contract tests 和消费者
 - 关键领域规则、EventStore、LLM Adapter 与完整主链需要相应层级的测试
 - 日志使用 `generationId` 等稳定关联 ID，不记录密钥或不必要的完整敏感输入

@@ -45,7 +45,7 @@ afterAll(async () => {
 });
 
 describe("Better Auth PostgreSQL adapter", () => {
-  it("使用 email/password 创建用户和凭据账户", async () => {
+  it("创建邮箱账户，并通过 HttpOnly Cookie 恢复服务端 Session", async () => {
     const { auth } = await import("./auth");
     const result = await auth.api.signUpEmail({
       body: {
@@ -81,5 +81,33 @@ describe("Better Auth PostgreSQL adapter", () => {
     expect(credentialAccount?.issuer).toBeTruthy();
     expect(credentialAccount?.password).toBeTruthy();
     expect(persistedSession?.id).toBeTruthy();
+
+    const signInResponse = await auth.handler(
+      new Request("http://localhost:3000/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          email,
+          password: "integration-test-password",
+        }),
+      }),
+    );
+
+    expect(signInResponse.status).toBe(200);
+
+    const setCookie = signInResponse.headers.get("set-cookie");
+    expect(setCookie).toContain("HttpOnly");
+
+    const sessionCookie = setCookie?.split(";", 1)[0];
+    expect(sessionCookie).toBeTruthy();
+
+    const restoredSession = await auth.api.getSession({
+      headers: new Headers({ cookie: sessionCookie ?? "" }),
+    });
+
+    expect(restoredSession?.user.email).toBe(email);
   });
 });
