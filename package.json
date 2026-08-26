@@ -9,19 +9,28 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "unrs-resolver"
-    ]
+    ],
+    "overrides": {
+      "@esbuild-kit/core-utils>esbuild": "0.25.12"
+    }
   },
   "scripts": {
     "dev:web": "pnpm --filter @ai-chat/web dev",
     "dev:worker": "pnpm --filter @ai-chat/worker dev",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx packages/db/src/migrate.ts",
     "build": "pnpm --filter @ai-chat/web build",
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "vitest run",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "test": "vitest run --exclude **/*.integration.test.ts",
+    "test:integration": "vitest run --no-file-parallelism packages/db/src/schema.integration.test.ts apps/web/src/lib/auth.integration.test.ts",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration && pnpm build"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
+    "drizzle-kit": "0.31.10",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.2",
     "tsx": "4.23.12",

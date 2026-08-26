@@ -321,7 +321,7 @@ Chat 与 Image 共享账户、Conversation 外壳和基础设施，但拥有独�
 
 ## 10. Auth 与安全边界
 
-Web、API 与 SSE 保持同源。认证使用成熟方案提供的 HttpOnly Session Cookie；原生 EventSource 自然携带同源 Cookie。
+Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和存放在 PostgreSQL 的 Session，通过 HttpOnly Session Cookie 识别用户；原生 EventSource 自然携带同源 Cookie。当前不接入社交登录。
 
 禁止：
 
@@ -329,8 +329,6 @@ Web、API 与 SSE 保持同源。认证使用成熟方案提供的 HttpOnly Sess
 - 以 localStorage JWT 作为主认证方案
 - 把 relay/API key 返回浏览器
 - 只靠前端隐藏按钮实现 ownership
-
-具体认证库和 Session 存储尚未拍板。
 
 ## 11. 正常运行假设与非目标
 
@@ -405,12 +403,11 @@ Web、API 与 SSE 保持同源。认证使用成熟方案提供的 HttpOnly Sess
 5. BullMQ concurrency
 6. cancel signal 的跨进程实现
 7. Cancel 后 partial Assistant Message 是否持久化
-8. 认证库与 Session 存储
-9. object storage
-10. embedding provider、Chunk Strategy 与 Pinecone index schema
-11. 是否持久化完整 Tool input/output
-12. reasoning 的展示形态
-13. 最终部署拓扑
+8. object storage
+9. embedding provider、Chunk Strategy 与 Pinecone index schema
+10. 是否持久化完整 Tool input/output
+11. reasoning 的展示形态
+12. 最终部署拓扑
 
 ## 15. 协作规则
 

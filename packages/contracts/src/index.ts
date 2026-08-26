@@ -11,3 +11,11 @@ export {
   type ChatRuntimeStateDto,
   type GenerationStatusDto,
 } from "./generation";
+export {
+  attachmentMessagePartSchema,
+  messagePartSchema,
+  messagePartsSchema,
+  textMessagePartSchema,
+  type MessagePartDto,
+  type MessagePartsDto,
+} from "./message";
