@@ -4,6 +4,12 @@ export {
   getDatabase,
 } from "./client";
 export {
+  createPendingAttachmentRecord,
+  getAttachmentRecordForOwner,
+  markAttachmentReady,
+  type AttachmentRecord,
+} from "./attachments";
+export {
   getConversationRecordForOwner,
   listConversationRecordsForOwner,
 } from "./conversation-reader";

@@ -1,3 +1,4 @@
+export { attachments, attachmentStatus } from "./attachment";
 export {
   account,
   authSchema,

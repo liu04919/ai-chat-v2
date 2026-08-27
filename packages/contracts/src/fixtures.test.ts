@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
+  completeAttachmentUploadResponseSchema,
+  createAttachmentUploadRequestSchema,
+  createAttachmentUploadResponseSchema,
+} from "./attachment";
+import {
   conversationDetailResponseSchema,
   conversationListResponseSchema,
 } from "./conversation";
@@ -23,5 +28,21 @@ describe("contract examples", () => {
     const example = readExample("conversation-detail.response.json");
 
     expect(conversationDetailResponseSchema.parse(example)).toEqual(example);
+  });
+
+  it("attachment upload request/response 与 Schema 保持一致", () => {
+    const request = readExample("attachment-upload.request.json");
+    const response = readExample("attachment-upload.response.json");
+
+    expect(createAttachmentUploadRequestSchema.parse(request)).toEqual(request);
+    expect(createAttachmentUploadResponseSchema.parse(response)).toEqual(response);
+  });
+
+  it("attachment complete response 与 Schema 保持一致", () => {
+    const response = readExample("attachment-complete.response.json");
+
+    expect(completeAttachmentUploadResponseSchema.parse(response)).toEqual(
+      response,
+    );
   });
 });

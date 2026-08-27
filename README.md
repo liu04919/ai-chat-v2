@@ -12,6 +12,7 @@ apps/worker         独立 Node Worker runtime
 packages/contracts  跨 runtime 的运行时 Schema 与 wire types
 packages/core       不依赖框架的领域规则
 packages/db         Drizzle schema、PostgreSQL client 与 migrations
+packages/storage    Web/Worker 共享的薄 R2 对象存储边界
 ```
 
 ## 本地运行
@@ -26,12 +27,13 @@ pnpm dev:web
 pnpm dev:worker
 ```
 
-Worker 的模型环境变量参考 `apps/worker/.env.example`。真实密钥写入 `apps/worker/.env.local`，该文件不会进入 Git。
+Web 与 Worker 的环境变量分别参考各自的 `.env.example`。真实密钥写入对应的 `.env.local`，这些文件不会进入 Git。
 
 ## 验证
 
 ```bash
 pnpm check
+pnpm test:r2
 ```
 
-该命令依次执行 ESLint、TypeScript、领域/契约测试、真实 PostgreSQL 集成测试和 Next.js production build。
+`pnpm check` 依次执行 ESLint、TypeScript、领域/契约测试、真实 PostgreSQL 集成测试和 Next.js production build。`pnpm test:r2` 使用本地 R2 配置执行会自动清理测试对象的外部集成测试，不包含在默认检查中。

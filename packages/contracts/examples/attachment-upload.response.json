@@ -1,0 +1,19 @@
+{
+  "attachment": {
+    "id": "attachment_example",
+    "originalName": "architecture.png",
+    "mediaType": "image/png",
+    "sizeBytes": 2048,
+    "status": "pending",
+    "createdAt": "2026-08-27T09:00:00.000Z",
+    "updatedAt": "2026-08-27T09:00:00.000Z"
+  },
+  "upload": {
+    "method": "PUT",
+    "url": "https://example.r2.cloudflarestorage.com/ai-chat-v2/attachments/attachment_example?signature=example",
+    "headers": {
+      "Content-Type": "image/png"
+    },
+    "expiresAt": "2026-08-27T09:05:00.000Z"
+  }
+}

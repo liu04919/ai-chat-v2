@@ -1,0 +1,11 @@
+{
+  "attachment": {
+    "id": "attachment_example",
+    "originalName": "architecture.png",
+    "mediaType": "image/png",
+    "sizeBytes": 2048,
+    "status": "ready",
+    "createdAt": "2026-08-27T09:00:00.000Z",
+    "updatedAt": "2026-08-27T09:01:00.000Z"
+  }
+}

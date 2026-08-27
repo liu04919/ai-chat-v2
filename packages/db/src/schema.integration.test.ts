@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDatabase } from "./client";
 import { migrateDatabase } from "./migration";
 import {
+  attachments,
   conversations,
   generations,
   messages,
@@ -112,5 +113,40 @@ describe("PostgreSQL 业务不变量", () => {
         status: "running",
       }),
     ).resolves.toBeDefined();
+  });
+
+  it("Attachment 大小必须有效，object key 不可重复", async () => {
+    const objectKey = `attachments/db-test-${randomUUID()}`;
+
+    await expect(
+      database.db.insert(attachments).values({
+        id: `db-test-empty-attachment-${randomUUID()}`,
+        ownerId,
+        objectKey: `${objectKey}-empty`,
+        originalName: "empty.pdf",
+        mediaType: "application/pdf",
+        sizeBytes: 0,
+      }),
+    ).rejects.toThrow();
+
+    await database.db.insert(attachments).values({
+      id: `db-test-attachment-${randomUUID()}`,
+      ownerId,
+      objectKey,
+      originalName: "diagram.png",
+      mediaType: "image/png",
+      sizeBytes: 1024,
+    });
+
+    await expect(
+      database.db.insert(attachments).values({
+        id: `db-test-duplicate-attachment-${randomUUID()}`,
+        ownerId,
+        objectKey,
+        originalName: "another.png",
+        mediaType: "image/png",
+        sizeBytes: 2048,
+      }),
+    ).rejects.toThrow();
   });
 });
