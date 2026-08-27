@@ -106,6 +106,8 @@ type MessagePart =
 
 当前 Message 只支持 `text | attachment`。Source 和 Image 在对应产品能力落地时再扩展。Tool execution 默认属于 Generation 执行记录，不是 MessagePart。
 
+Message 与 Attachment 的关系唯一记录在 `Message.parts` 中；第一版不增加 `message_attachment` 关系表，也不把 MessagePart 拆成 `image | file`。具体类型由 Attachment 元数据决定。
+
 ### Generation
 
 Generation 表示一次根据用户输入生成回答的执行：
@@ -252,6 +254,19 @@ Adapter 必须小而明确，并有 contract tests。实现 AI SDK 功能时先�
 
 密钥只通过服务端环境变量注入，不写入仓库、浏览器 bundle、日志或文档。
 
+### CatAPI 已验证能力与约束
+
+当前正式聊天链路只使用 CatAPI 的 `/v1/responses`，不同时维护 Chat Completions 与 Responses 两套业务实现。实际接口验证已经确认：
+
+- `input_image + R2 presigned URL` 可以让 `gpt-5.6-sol` 正确读取图片内容
+- `input_file + PDF R2 presigned URL` 可以正确读取多页 PDF
+- Responses 的文件输入可以使用流式输出
+- 补充兼容性验证已覆盖 Chat Completions 的 base64/URL 图片与 base64 PDF，以及 Responses 的文本、base64/URL 图片和 PDF；这些只作为网关能力证据，不作为正式 Adapter 路线
+
+CatAPI 的 `previous_response_id` 已分别使用纯文本和文件上下文验证，均不能可靠延续上一轮内容。因此 Provider 必须按无状态服务使用：每次 Generation 都由 Context Builder 重新组装需要的历史消息，并把仍需使用的 Attachment 重新转换为短期 presigned URL 后发送。不得依赖 CatAPI 保存 Conversation、文件上下文或执行状态。
+
+第三方返回的 file ID 即使以后使用，也只能作为可丢弃缓存，不能成为 Attachment 主键或资产事实来源。当前不建设 PDF Parser、`attachment_content`、chunk 或 embedding fallback；未经过实际验证的文件类型应明确拒绝，不能静默切换到自研解析链路。
+
 ### Tool 与 MCP
 
 LLM Tools 必须能由 Worker 独立执行。当前不支持浏览器执行 Tool，也不支持 Human-in-the-loop pause/resume。
@@ -270,7 +285,28 @@ Chat 上层只依赖 Retrieval abstraction。Pinecone 是可替换的基础设�
 
 Generation 只依赖 attachment ID。文件存储、模型原生 file ID、转文本和图片输入策略由 Attachment/File 边界决定，不泄漏 provider-specific 结构。
 
-Context Builder 统一组合 Summary、近期 Messages、Retrieval 结果和 Attachments。Summary 必须记录 coverage watermark，例如 `throughSequence`，避免重复或遗漏上下文。Token Budget 属于当前模型运行配置，不使用全局固定常量假设所有模型。
+用户上传的图片和文件，以及需要永久保留的模型生成图片，统一抽象为 Attachment。所有二进制内容存入私有 Cloudflare R2 Bucket；PostgreSQL 只保存对象 key、原始文件名、MIME、大小、所有者、上传状态和业务关联，不保存二进制、base64、永久签名 URL 或完整文件文本。
+
+当前只实现一个薄的对象存储边界、一个真实 R2 实现和测试所需 Fake；不提前创建 Aliyun、S3、R2、Local 或 MinIO 等多套实现，也不建设通用 ProviderCapabilities 框架。
+
+上传使用由服务端控制的两阶段链路：
+
+```text
+Browser 请求上传意图
+→ Web 校验身份、文件类型与大小，创建 pending Attachment
+→ Web 返回短期 R2 presigned PUT URL
+→ Browser 直接上传 R2
+→ Browser 确认上传
+→ Web 使用 HeadObject 核对对象后将 Attachment 标记为 ready
+```
+
+只有归属当前用户且状态为 `ready` 的 Attachment 才能进入 Message。R2 Bucket 保持私有；读取文件时由服务端完成 ownership 校验，并按调用方需要生成短期 presigned GET URL。数据库和消息历史始终保存稳定的 attachment ID/object key，不保存临时 URL。
+
+Context Builder 通过 Attachment 边界解析文件。当前已验证的 CatAPI Responses 路线可以从 R2 presigned URL 原生读取图片和 PDF，因此聊天主链优先传递原文件，不重复建设一套文档解析真相；其他格式只有经过真实接口验证后才开放。模型供应商返回的临时图片若需进入历史，必须先下载到自有 R2，再创建 ready Attachment。
+
+浏览器直传所需 R2 CORS 只允许实际 Web origin 和必要的 `PUT`/`Content-Type`；不开放公共 Bucket。当前不提前建设分片上传、病毒扫描、多云存储、失败对账或自动清理系统。
+
+Context Builder 在每次 Generation 中统一组合 Summary、近期 Messages、Retrieval 结果和 Attachments。Summary 必须记录 coverage watermark，例如 `throughSequence`，避免重复或遗漏上下文。Token Budget 属于当前模型运行配置，不使用全局固定常量假设所有模型。
 
 ## 8. 前端状态与流式性能
 
@@ -397,6 +433,8 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 22. 同源 HttpOnly Session Cookie 是主认证边界
 23. 当前不建设基础设施故障自动恢复系统
 24. 使用本文确认的 UI、表单、状态、数据、Markdown 与容器技术栈，但版本和局部配置按实际代码决定
+25. 图片与文件统一使用 Attachment；二进制存入私有 Cloudflare R2，PostgreSQL 与 Message 只保存稳定引用和元数据
+26. CatAPI 按无状态 Provider 使用；每次 Generation 重组上下文并重新签名所需 Attachment，不依赖 `previous_response_id` 或第三方 file ID
 
 ## 14. 尚未拍板的问题
 
@@ -409,11 +447,10 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 5. BullMQ concurrency
 6. cancel signal 的跨进程实现
 7. Cancel 后 partial Assistant Message 是否持久化
-8. object storage
-9. embedding provider、Chunk Strategy 与 Pinecone index schema
-10. 是否持久化完整 Tool input/output
-11. reasoning 的展示形态
-12. 最终部署拓扑
+8. embedding provider、Chunk Strategy 与 Pinecone index schema
+9. 是否持久化完整 Tool input/output
+10. reasoning 的展示形态
+11. 最终部署拓扑
 
 ## 15. 协作规则
 
