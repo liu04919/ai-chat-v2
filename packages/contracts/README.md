@@ -7,7 +7,7 @@
 当前只放已经有架构决定支撑的最小契约：
 
 - Conversation mode、列表与详情响应
-- Attachment 上传意图、上传确认与错误响应
+- Attachment 上传意图、上传确认、草稿移除与错误响应
 - Generation status
 - Chat Detail 的 active Generation
 

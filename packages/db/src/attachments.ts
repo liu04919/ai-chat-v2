@@ -81,3 +81,18 @@ export async function markAttachmentReady(
 
   return attachment ?? null;
 }
+
+export async function deleteAttachmentRecordForOwner(
+  ownerId: string,
+  attachmentId: string,
+  database: Database = getDatabase(),
+): Promise<AttachmentRecord | null> {
+  const [attachment] = await database
+    .delete(attachments)
+    .where(
+      and(eq(attachments.id, attachmentId), eq(attachments.ownerId, ownerId)),
+    )
+    .returning();
+
+  return attachment ?? null;
+}

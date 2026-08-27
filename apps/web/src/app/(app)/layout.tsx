@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import { ConversationSidebar } from "@/components/chat/conversation-sidebar";
+import { ConversationSidebar } from "@/components/chat/sidebar/conversation-sidebar";
 import { getCurrentSession } from "@/lib/session";
 import { listConversationsForOwner } from "@/server/conversations";
 

@@ -9,6 +9,7 @@ import {
 } from "@ai-chat/contracts";
 import {
   createPendingAttachmentRecord,
+  deleteAttachmentRecordForOwner,
   getAttachmentRecordForOwner,
   markAttachmentReady,
   type AttachmentRecord,
@@ -132,4 +133,20 @@ export async function completeAttachmentUploadForOwner(
   }
 
   return toAttachmentDto(concurrentResult);
+}
+
+export async function deleteAttachmentForOwner(
+  ownerId: string,
+  attachmentId: string,
+  dependencies: AttachmentServiceDependencies = {},
+): Promise<void> {
+  const attachment = await getAttachmentRecordForOwner(ownerId, attachmentId);
+
+  if (!attachment) {
+    throw new AttachmentServiceError("ATTACHMENT_NOT_FOUND", 404);
+  }
+
+  const storage = dependencies.storage ?? getAttachmentObjectStorage();
+  await storage.deleteObject(attachment.objectKey);
+  await deleteAttachmentRecordForOwner(ownerId, attachmentId);
 }

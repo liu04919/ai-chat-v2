@@ -1,7 +1,7 @@
 import { ImageIcon, MessageSquareText } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 
-import { ChatComposer } from "@/components/chat/chat-composer";
+import { ChatComposer } from "@/components/chat/composer/chat-composer";
 import { getCurrentSession } from "@/lib/session";
 import { getConversationForOwner } from "@/server/conversations";
 

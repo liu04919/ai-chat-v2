@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   completeAttachmentUploadForOwner,
   createAttachmentUploadForOwner,
+  deleteAttachmentForOwner,
 } from "./attachments";
 
 const localEnvironment = fileURLToPath(
@@ -183,5 +184,54 @@ describe("Attachment upload service", () => {
       code: "ATTACHMENT_NOT_FOUND",
       status: 404,
     });
+  });
+
+  it("移除草稿 Attachment 时同时删除对象与数据库记录", async () => {
+    const storage = new FakeObjectStorage();
+    const attachmentId = `attachment-${randomUUID()}`;
+    await createAttachmentUploadForOwner(
+      ownerId,
+      {
+        originalName: "remove.png",
+        mediaType: "image/png",
+        sizeBytes: 512,
+      },
+      { storage, createId: () => attachmentId },
+    );
+    storage.objects.set(`attachments/${attachmentId}`, {
+      contentType: "image/png",
+      sizeBytes: 512,
+    });
+
+    await deleteAttachmentForOwner(ownerId, attachmentId, { storage });
+
+    expect(storage.objects.has(`attachments/${attachmentId}`)).toBe(false);
+    await expect(
+      getAttachmentRecordForOwner(ownerId, attachmentId),
+    ).resolves.toBeNull();
+  });
+
+  it("其他用户无法删除 Attachment", async () => {
+    const storage = new FakeObjectStorage();
+    const attachmentId = `attachment-${randomUUID()}`;
+    await createAttachmentUploadForOwner(
+      ownerId,
+      {
+        originalName: "owned.pdf",
+        mediaType: "application/pdf",
+        sizeBytes: 256,
+      },
+      { storage, createId: () => attachmentId },
+    );
+
+    await expect(
+      deleteAttachmentForOwner(otherOwnerId, attachmentId, { storage }),
+    ).rejects.toMatchObject({
+      code: "ATTACHMENT_NOT_FOUND",
+      status: 404,
+    });
+    await expect(
+      getAttachmentRecordForOwner(ownerId, attachmentId),
+    ).resolves.not.toBeNull();
   });
 });

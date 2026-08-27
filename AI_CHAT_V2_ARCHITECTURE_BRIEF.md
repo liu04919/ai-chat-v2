@@ -251,6 +251,8 @@ Adapter 必须小而明确，并有 contract tests。实现 AI SDK 功能时先�
 | Provider          | CatAPI OpenAI-compatible relay |
 | Base URL          | `https://maomiapi.com/v1`      |
 | Provider model ID | `gpt-5.6-sol`                  |
+| Image Model       | GPT Image 2                    |
+| Image model ID    | `gpt-image-2`                  |
 
 密钥只通过服务端环境变量注入，不写入仓库、浏览器 bundle、日志或文档。
 
@@ -266,6 +268,10 @@ Adapter 必须小而明确，并有 contract tests。实现 AI SDK 功能时先�
 CatAPI 的 `previous_response_id` 已分别使用纯文本和文件上下文验证，均不能可靠延续上一轮内容。因此 Provider 必须按无状态服务使用：每次 Generation 都由 Context Builder 重新组装需要的历史消息，并把仍需使用的 Attachment 重新转换为短期 presigned URL 后发送。不得依赖 CatAPI 保存 Conversation、文件上下文或执行状态。
 
 第三方返回的 file ID 即使以后使用，也只能作为可丢弃缓存，不能成为 Attachment 主键或资产事实来源。当前不建设 PDF Parser、`attachment_content`、chunk 或 embedding fallback；未经过实际验证的文件类型应明确拒绝，不能静默切换到自研解析链路。
+
+CatAPI 的 `gpt-image-2` 已分别验证 `/v1/images/generations` 文生图和 `/v1/images/edits` 单参考图编辑，两条链路均返回可正确解码的 `b64_json` PNG，指令遵循和参考图保真满足当前产品需求。图片 Worker 必须把返回的 base64 解码并写入自有 R2，再以 ready Attachment 进入消息历史；不得持久化 base64 或依赖第三方临时资产。
+
+该渠道当前不能完整遵守图片尺寸参数：请求 `1024x1024` 时实际两次返回 `1536x1024`。在重新验证前，产品不向用户暴露尺寸、比例和质量选择器，也不假设返回尺寸等于请求尺寸。Image API 是非流式完成模型，前端通过自有 Generation 状态展示处理中与最终结果。
 
 ### Tool 与 MCP
 
@@ -361,6 +367,8 @@ Regenerate 只针对最后一条 Assistant Message，并创建新的 Generation�
 
 Chat 与 Image 共享账户、Conversation 外壳和基础设施，但拥有独立业务管线。图片生成不得作为 Chat Worker 中不断扩张的条件分支。
 
+Image 管线使用 CatAPI `gpt-image-2`：无参考图调用 `/v1/images/generations`，一张参考图调用 multipart `/v1/images/edits`。第一版只允许一张参考图片，不接受 PDF 作为 Image 模式输入。
+
 ## 10. Auth 与安全边界
 
 Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和存放在 PostgreSQL 的 Session，通过 HttpOnly Session Cookie 识别用户；原生 EventSource 自然携带同源 Cookie。当前不接入社交登录。
@@ -441,16 +449,15 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 这些问题在真实代码需要它们时讨论，不预先排期：
 
 1. ORM/DB layer
-2. Image Model
-3. Redis Stream TTL
-4. delta coalescing 的时间与大小阈值
-5. BullMQ concurrency
-6. cancel signal 的跨进程实现
-7. Cancel 后 partial Assistant Message 是否持久化
-8. embedding provider、Chunk Strategy 与 Pinecone index schema
-9. 是否持久化完整 Tool input/output
-10. reasoning 的展示形态
-11. 最终部署拓扑
+2. Redis Stream TTL
+3. delta coalescing 的时间与大小阈值
+4. BullMQ concurrency
+5. cancel signal 的跨进程实现
+6. Cancel 后 partial Assistant Message 是否持久化
+7. embedding provider、Chunk Strategy 与 Pinecone index schema
+8. 是否持久化完整 Tool input/output
+9. reasoning 的展示形态
+10. 最终部署拓扑
 
 ## 15. 协作规则
 

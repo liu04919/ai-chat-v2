@@ -6,6 +6,7 @@ import {
   completeAttachmentUploadResponseSchema,
   createAttachmentUploadRequestSchema,
   createAttachmentUploadResponseSchema,
+  deleteAttachmentResponseSchema,
 } from "./attachment";
 import {
   conversationDetailResponseSchema,
@@ -44,5 +45,11 @@ describe("contract examples", () => {
     expect(completeAttachmentUploadResponseSchema.parse(response)).toEqual(
       response,
     );
+  });
+
+  it("attachment delete response 与 Schema 保持一致", () => {
+    const response = readExample("attachment-delete.response.json");
+
+    expect(deleteAttachmentResponseSchema.parse(response)).toEqual(response);
   });
 });

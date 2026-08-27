@@ -5,6 +5,7 @@ export {
 } from "./client";
 export {
   createPendingAttachmentRecord,
+  deleteAttachmentRecordForOwner,
   getAttachmentRecordForOwner,
   markAttachmentReady,
   type AttachmentRecord,

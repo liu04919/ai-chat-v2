@@ -5,6 +5,7 @@ import {
   attachmentSchema,
   createAttachmentUploadRequestSchema,
   createAttachmentUploadResponseSchema,
+  deleteAttachmentResponseSchema,
 } from "./attachment";
 
 const attachment = {
@@ -69,5 +70,13 @@ describe("Attachment contracts", () => {
 
     expect(createAttachmentUploadResponseSchema.parse(response)).toEqual(response);
     expect(attachmentSchema.parse(attachment)).not.toHaveProperty("objectKey");
+  });
+
+  it("删除响应只返回稳定的 Attachment ID", () => {
+    expect(
+      deleteAttachmentResponseSchema.parse({
+        attachmentId: "attachment_example",
+      }),
+    ).toEqual({ attachmentId: "attachment_example" });
   });
 });

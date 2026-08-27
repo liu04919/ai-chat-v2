@@ -10,13 +10,16 @@ export {
   completeAttachmentUploadResponseSchema,
   createAttachmentUploadRequestSchema,
   createAttachmentUploadResponseSchema,
+  deleteAttachmentResponseSchema,
   type AttachmentDto,
   type AttachmentErrorCode,
   type AttachmentMediaType,
   type AttachmentStatusDto,
+  type AttachmentUploadInstruction,
   type CompleteAttachmentUploadResponse,
   type CreateAttachmentUploadRequest,
   type CreateAttachmentUploadResponse,
+  type DeleteAttachmentResponse,
 } from "./attachment";
 export {
   conversationDetailResponseSchema,

@@ -4,7 +4,7 @@ import type { ConversationModeDto } from "@ai-chat/contracts";
 import { ImageIcon, MessageSquareText } from "lucide-react";
 import { useState } from "react";
 
-import { ChatComposer } from "./chat-composer";
+import { ChatComposer } from "./composer/chat-composer";
 
 const modes: ReadonlyArray<{
   value: ConversationModeDto;
@@ -17,6 +17,7 @@ const modes: ReadonlyArray<{
 
 export function DraftWorkspace() {
   const [mode, setMode] = useState<ConversationModeDto>("chat");
+  const [hasAttachments, setHasAttachments] = useState(false);
 
   return (
     <section className="relative flex h-full min-h-0 items-center justify-center overflow-hidden px-5 py-10">
@@ -72,9 +73,15 @@ export function DraftWorkspace() {
                 className={
                   isSelected
                     ? "relative z-10 flex h-10 min-w-28 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium text-primary-foreground transition-colors duration-200"
-                    : "relative z-10 flex h-10 min-w-28 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground"
+                    : "relative z-10 flex h-10 min-w-28 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-muted-foreground"
                 }
+                disabled={hasAttachments && !isSelected}
                 key={item.value}
+                title={
+                  hasAttachments && !isSelected
+                    ? "请先移除已添加的附件"
+                    : undefined
+                }
                 type="button"
                 onClick={() => setMode(item.value)}
               >
@@ -86,7 +93,10 @@ export function DraftWorkspace() {
         </div>
 
         <div className="mt-8 w-full">
-          <ChatComposer mode={mode} />
+          <ChatComposer
+            mode={mode}
+            onAttachmentPresenceChange={setHasAttachments}
+          />
         </div>
       </div>
     </section>

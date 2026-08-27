@@ -54,6 +54,12 @@ export const completeAttachmentUploadResponseSchema = z
   })
   .strict();
 
+export const deleteAttachmentResponseSchema = z
+  .object({
+    attachmentId: z.string().min(1),
+  })
+  .strict();
+
 export const attachmentErrorCodeSchema = z.enum([
   "UNAUTHORIZED",
   "INVALID_REQUEST",
@@ -71,6 +77,9 @@ export const attachmentErrorResponseSchema = z
 export type AttachmentDto = z.infer<typeof attachmentSchema>;
 export type AttachmentMediaType = z.infer<typeof attachmentMediaTypeSchema>;
 export type AttachmentStatusDto = z.infer<typeof attachmentStatusSchema>;
+export type AttachmentUploadInstruction = z.infer<
+  typeof attachmentUploadInstructionSchema
+>;
 export type CreateAttachmentUploadRequest = z.infer<
   typeof createAttachmentUploadRequestSchema
 >;
@@ -79,5 +88,8 @@ export type CreateAttachmentUploadResponse = z.infer<
 >;
 export type CompleteAttachmentUploadResponse = z.infer<
   typeof completeAttachmentUploadResponseSchema
+>;
+export type DeleteAttachmentResponse = z.infer<
+  typeof deleteAttachmentResponseSchema
 >;
 export type AttachmentErrorCode = z.infer<typeof attachmentErrorCodeSchema>;
