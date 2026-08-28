@@ -11,6 +11,7 @@ export const generationTargetSchema = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("new"),
+      conversationId: z.string().min(1),
       mode: conversationModeSchema,
     })
     .strict(),

@@ -24,6 +24,15 @@ describe("Conversation response schemas", () => {
     const detail = {
       conversation,
       activeGeneration: { id: "generation_example", status: "running" },
+      messages: [
+        {
+          id: "message_example",
+          role: "user",
+          parts: [{ type: "text", text: "ReadableStream 如何工作" }],
+          sequence: 0,
+          createdAt: "2026-08-26T10:00:00.000Z",
+        },
+      ],
     };
 
     expect(conversationDetailResponseSchema.parse(detail)).toEqual(detail);
@@ -44,6 +53,7 @@ describe("Conversation response schemas", () => {
       conversationDetailResponseSchema.parse({
         conversation,
         activeGeneration: null,
+        messages: [],
         model: "gpt-5.6-sol",
       }),
     ).toThrow();

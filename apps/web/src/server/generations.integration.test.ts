@@ -86,7 +86,7 @@ describe("Generation creation service", () => {
     const generationId = `generation-${randomUUID()}`;
     const now = new Date("2026-08-27T12:00:00.000Z");
     const request = {
-      target: { type: "new", mode: "chat" },
+      target: { type: "new", conversationId, mode: "chat" },
       userMessageId,
       parts: [
         { type: "text", text: "解释一下 Redis Streams" },
@@ -108,7 +108,6 @@ describe("Generation creation service", () => {
 
     const response = await createGenerationForOwner(ownerId, request, {
       queue,
-      createConversationId: () => conversationId,
       createGenerationId: () => generationId,
       now: () => now,
     });
@@ -151,21 +150,20 @@ describe("Generation creation service", () => {
 
   it("相同 userMessageId 与相同 parts 返回原 Generation，并沿用稳定 job ID", async () => {
     const userMessageId = `generation-idempotent-message-${randomUUID()}`;
+    const conversationId = `generation-idempotent-conversation-${randomUUID()}`;
     const firstGenerationId = `generation-idempotent-${randomUUID()}`;
     const request = {
-      target: { type: "new", mode: "chat" },
+      target: { type: "new", conversationId, mode: "chat" },
       userMessageId,
       parts: [{ type: "text", text: "幂等请求" }],
       reasoningEffort: "low",
     } satisfies CreateGenerationRequest;
     const first = await createGenerationForOwner(ownerId, request, {
       queue,
-      createConversationId: () => `conversation-${randomUUID()}`,
       createGenerationId: () => firstGenerationId,
     });
     const retry = await createGenerationForOwner(ownerId, request, {
       queue,
-      createConversationId: () => `unused-conversation-${randomUUID()}`,
       createGenerationId: () => `unused-generation-${randomUUID()}`,
     });
 
@@ -178,6 +176,23 @@ describe("Generation creation service", () => {
       createGenerationForOwner(
         ownerId,
         { ...request, parts: [{ type: "text", text: "篡改内容" }] },
+        { queue },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: "MESSAGE_ID_CONFLICT" },
+      status: 409,
+    } satisfies Partial<GenerationServiceError>);
+
+    await expect(
+      createGenerationForOwner(
+        ownerId,
+        {
+          ...request,
+          target: {
+            ...request.target,
+            conversationId: `different-conversation-${randomUUID()}`,
+          },
+        },
         { queue },
       ),
     ).rejects.toMatchObject({
@@ -271,7 +286,11 @@ describe("Generation creation service", () => {
       createGenerationForOwner(
         ownerId,
         {
-          target: { type: "new", mode },
+          target: {
+            type: "new",
+            conversationId: `generation-validation-conversation-${randomUUID()}`,
+            mode,
+          },
           userMessageId: `generation-validation-message-${randomUUID()}`,
           parts: [
             { type: "text", text: "读取附件" },

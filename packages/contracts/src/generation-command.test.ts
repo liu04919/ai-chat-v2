@@ -10,7 +10,11 @@ import {
 describe("Generation command contracts", () => {
   it("接受新 Chat Conversation 的 Generation 命令", () => {
     const request = {
-      target: { type: "new", mode: "chat" },
+      target: {
+        type: "new",
+        conversationId: "conversation_example",
+        mode: "chat",
+      },
       userMessageId: "message_example",
       parts: [
         { type: "text", text: "解释 Redis Streams" },
@@ -25,7 +29,11 @@ describe("Generation command contracts", () => {
   it("拒绝空白消息和重复 Attachment", () => {
     expect(() =>
       createGenerationRequestSchema.parse({
-        target: { type: "new", mode: "chat" },
+        target: {
+          type: "new",
+          conversationId: "conversation_empty",
+          mode: "chat",
+        },
         userMessageId: "message_empty",
         parts: [{ type: "text", text: "   " }],
         reasoningEffort: "low",

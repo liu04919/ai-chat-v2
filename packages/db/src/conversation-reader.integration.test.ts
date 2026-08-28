@@ -115,6 +115,14 @@ describe("Conversation ownership queries", () => {
         id: activeGenerationId,
         status: "running",
       },
+      messages: [
+        {
+          id: activeUserMessageId,
+          role: "user",
+          parts: [{ type: "text", text: "继续生成" }],
+          sequence: 0,
+        },
+      ],
     });
   });
 

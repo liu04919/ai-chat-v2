@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { activeGenerationSchema } from "./generation";
+import { messageSchema } from "./message";
 
 export const conversationModeSchema = z.enum(["chat", "image"]);
 
@@ -26,6 +27,7 @@ export const conversationDetailResponseSchema = z
   .object({
     conversation: conversationSummarySchema,
     activeGeneration: activeGenerationSchema.nullable(),
+    messages: z.array(messageSchema),
   })
   .strict();
 

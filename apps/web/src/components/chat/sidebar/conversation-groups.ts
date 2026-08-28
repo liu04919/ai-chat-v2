@@ -1,15 +1,19 @@
 import type { ConversationSummaryDto } from "@ai-chat/contracts";
 
-export type ConversationGroup = {
+export type ConversationGroup<
+  TConversation extends ConversationSummaryDto = ConversationSummaryDto,
+> = {
   id: "today" | "yesterday" | "older";
   label: "今天" | "昨天" | "更久";
-  conversations: ConversationSummaryDto[];
+  conversations: TConversation[];
 };
 
-export function groupConversationsByRecency(
-  conversations: ConversationSummaryDto[],
+export function groupConversationsByRecency<
+  TConversation extends ConversationSummaryDto,
+>(
+  conversations: TConversation[],
   now = new Date(),
-): ConversationGroup[] {
+): ConversationGroup<TConversation>[] {
   const todayStart = new Date(
     now.getFullYear(),
     now.getMonth(),
@@ -20,7 +24,7 @@ export function groupConversationsByRecency(
     now.getMonth(),
     now.getDate() - 1,
   ).getTime();
-  const groups: ConversationGroup[] = [
+  const groups: ConversationGroup<TConversation>[] = [
     { id: "today", label: "今天", conversations: [] },
     { id: "yesterday", label: "昨天", conversations: [] },
     { id: "older", label: "更久", conversations: [] },

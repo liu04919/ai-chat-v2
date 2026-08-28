@@ -185,7 +185,9 @@ POST Generation
 
 POST 不运行模型，不把生成生命周期绑在 HTTP 请求上。
 
-客户端为新消息生成稳定的 `userMessageId`，服务器执行最小幂等：
+草稿页发送首条消息时，客户端同时生成稳定的 `conversationId` 与 `userMessageId`。界面立即使用这些 ID 乐观进入会话形态并更新侧栏；服务端确认创建命令后再进入正式会话 URL，失败则回滚乐观状态并保留草稿。
+
+服务器围绕 `userMessageId` 执行最小幂等：
 
 - 相同 ID、相同 Message parts：返回第一次创建的 Generation，不重复写入或 enqueue
 - 相同 ID、不同 Message parts：返回冲突
@@ -210,7 +212,7 @@ SSE Handler 只负责鉴权、读取、heartbeat 和编码，不运行 LLM、RAG
 首次消费从 stream beginning 开始；自动重连从 `Last-Event-ID` 之后继续。页面刷新时：
 
 1. 浏览器获取 Chat Detail
-2. 服务端从 PostgreSQL 返回 `activeGeneration: { id, status } | null`
+2. 服务端从 PostgreSQL 返回持久化 Message 与 `activeGeneration: { id, status } | null`
 3. 存在 Active Generation 时，浏览器使用该 ID 重新建立 EventSource
 
 浏览器不得根据 Redis、本地缓存、旧连接或 UI 残留状态猜测 Active Generation。首次消费和恢复使用同一 endpoint 与同一事件协议，不增加 Snapshot Stream 或 recovery 专用协议。
@@ -429,7 +431,7 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 10. POST command 与 GET SSE subscription 分离
 11. Chat Detail 返回服务端确认的 Active Generation
 12. 同一 Conversation 最多一个 Active Generation
-13. `userMessageId` 执行最小幂等与明确冲突语义
+13. 新草稿由客户端生成稳定的 `conversationId` 与 `userMessageId`，前者支撑乐观进入会话，后者执行最小幂等与明确冲突语义
 14. terminal event 必须晚于 PostgreSQL durable state
 15. AI SDK 只位于 LLM 执行防腐层
 16. Worker 执行 Tool，当前不做浏览器 Tool 和 Human-in-the-loop

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { messagePartsSchema } from "./message";
+import { messagePartsSchema, messageSchema } from "./message";
 
 describe("messagePartsSchema", () => {
   it("接受当前协议允许的 text 与 attachment", () => {
@@ -22,5 +22,17 @@ describe("messagePartsSchema", () => {
 
   it("拒绝空 parts", () => {
     expect(messagePartsSchema.safeParse([]).success).toBe(false);
+  });
+
+  it("Message DTO 包含稳定顺序和创建时间", () => {
+    const message = {
+      id: "message_example",
+      role: "user",
+      parts: [{ type: "text", text: "你好" }],
+      sequence: 0,
+      createdAt: "2026-08-28T00:00:00.000Z",
+    };
+
+    expect(messageSchema.parse(message)).toEqual(message);
   });
 });

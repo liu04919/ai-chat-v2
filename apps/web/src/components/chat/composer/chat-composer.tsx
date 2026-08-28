@@ -1,6 +1,10 @@
 "use client";
 
-import type { ConversationModeDto } from "@ai-chat/contracts";
+import type {
+  ConversationModeDto,
+  MessagePartsDto,
+  ReasoningEffortDto,
+} from "@ai-chat/contracts";
 import { ArrowUp, Brain, Paperclip } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -17,10 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { DraftAttachmentList } from "./draft-attachment-list";
 import { useDraftAttachments } from "./use-draft-attachments";
 
-type ReasoningEffort = "low" | "medium" | "high";
-
 const reasoningOptions: ReadonlyArray<{
-  value: ReasoningEffort;
+  value: ReasoningEffortDto;
   label: string;
 }> = [
   { value: "low", label: "快速" },
@@ -28,16 +30,26 @@ const reasoningOptions: ReadonlyArray<{
   { value: "high", label: "深入" },
 ];
 
+export type ChatComposerSubmission = {
+  parts: MessagePartsDto;
+  reasoningEffort: ReasoningEffortDto | null;
+};
+
 export function ChatComposer({
   mode,
   onAttachmentPresenceChange,
+  onSubmit,
+  submitError,
 }: Readonly<{
   mode: ConversationModeDto;
   onAttachmentPresenceChange?: (hasAttachments: boolean) => void;
+  onSubmit?: (submission: ChatComposerSubmission) => Promise<void>;
+  submitError?: string | null;
 }>) {
   const [input, setInput] = useState("");
   const [reasoningEffort, setReasoningEffort] =
-    useState<ReasoningEffort>("medium");
+    useState<ReasoningEffortDto>("medium");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachments = useDraftAttachments({
     mode,
@@ -48,13 +60,62 @@ export function ChatComposer({
     mode === "chat"
       ? "image/png,image/jpeg,image/webp,application/pdf"
       : "image/png,image/jpeg,image/webp";
+  const attachmentsReady = attachments.items.every(
+    (item) => item.status === "ready" && item.attachment !== null,
+  );
+  const hasContent =
+    input.trim().length > 0 ||
+    attachments.items.some(
+      (item) => item.status === "ready" && item.attachment !== null,
+    );
+  const canSubmit =
+    Boolean(onSubmit) && attachmentsReady && hasContent && !isSubmitting;
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canSubmit || !onSubmit) {
+      return;
+    }
+
+    const text = input.trim();
+    const parts: MessagePartsDto = [
+      ...(text ? [{ type: "text" as const, text }] : []),
+      ...attachments.items.flatMap((item) =>
+        item.status === "ready" && item.attachment
+          ? [
+              {
+                type: "attachment" as const,
+                attachmentId: item.attachment.id,
+              },
+            ]
+          : [],
+      ),
+    ];
+
+    setIsSubmitting(true);
+
+    try {
+      await onSubmit({
+        parts,
+        reasoningEffort: mode === "chat" ? reasoningEffort : null,
+      });
+      setInput("");
+    } catch {
+      // 父组件保留并展示具体错误，Composer 只负责保留当前草稿。
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <form
+      aria-busy={isSubmitting}
       className="w-full rounded-[1.75rem] border bg-background p-2 shadow-[0_18px_55px_-28px_rgba(15,23,42,0.35)]"
-      onSubmit={(event) => event.preventDefault()}
+      onSubmit={handleSubmit}
     >
       <DraftAttachmentList
+        disabled={isSubmitting}
         items={attachments.items}
         onRemove={(item) => void attachments.removeItem(item)}
         onRetry={attachments.retryItem}
@@ -65,6 +126,7 @@ export function ChatComposer({
         className="min-h-20 max-h-64"
         placeholder={mode === "chat" ? "输入消息" : "描述你想生成的图片"}
         value={input}
+        disabled={isSubmitting}
         onChange={(event) => setInput(event.target.value)}
       />
 
@@ -84,7 +146,7 @@ export function ChatComposer({
           <Button
             aria-label={mode === "chat" ? "添加图片或 PDF" : "添加参考图片"}
             className="size-9 rounded-full p-0 hover:bg-foreground/10 active:bg-foreground/20"
-            disabled={!attachments.canAdd}
+            disabled={!attachments.canAdd || isSubmitting}
             onClick={() => fileInputRef.current?.click()}
             title={mode === "chat" ? "添加附件" : "添加一张参考图片"}
             variant="ghost"
@@ -101,10 +163,10 @@ export function ChatComposer({
             }
           >
             <Select
-              disabled={mode !== "chat"}
+              disabled={mode !== "chat" || isSubmitting}
               value={reasoningEffort}
               onValueChange={(value) =>
-                setReasoningEffort(value as ReasoningEffort)
+                setReasoningEffort(value as ReasoningEffortDto)
               }
             >
               <SelectTrigger
@@ -141,16 +203,16 @@ export function ChatComposer({
         <Button
           aria-label={mode === "chat" ? "发送消息" : "生成图片"}
           className="size-10 rounded-full p-0"
-          disabled
+          disabled={!canSubmit}
           type="submit"
         >
           <ArrowUp className="size-5" aria-hidden="true" />
         </Button>
       </div>
 
-      {attachments.notice ? (
+      {submitError || attachments.notice ? (
         <p className="px-3 pb-1 text-xs text-destructive" role="alert">
-          {attachments.notice}
+          {submitError ?? attachments.notice}
         </p>
       ) : null}
     </form>

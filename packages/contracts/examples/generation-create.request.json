@@ -1,6 +1,7 @@
 {
   "target": {
     "type": "new",
+    "conversationId": "conversation_example",
     "mode": "chat"
   },
   "userMessageId": "message_example",

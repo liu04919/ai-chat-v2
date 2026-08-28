@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  conversationListResponseSchema,
   type ConversationSummaryDto,
 } from "@ai-chat/contracts";
 import { useQuery } from "@tanstack/react-query";
@@ -17,6 +16,12 @@ import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 
 import {
+  conversationListQueryKey,
+  fetchConversations,
+  type ClientConversationSummary,
+} from "@/lib/conversations-client";
+
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -27,23 +32,11 @@ import {
   type ConversationGroup,
 } from "./conversation-groups";
 
-const conversationListQueryKey = ["conversations"] as const;
-
-async function fetchConversations() {
-  const response = await fetch("/api/conversations");
-
-  if (!response.ok) {
-    throw new Error("无法加载对话");
-  }
-
-  return conversationListResponseSchema.parse(await response.json());
-}
-
 function ConversationGroupSection({
   group,
   pathname,
 }: Readonly<{
-  group: ConversationGroup;
+  group: ConversationGroup<ClientConversationSummary>;
   pathname: string;
 }>) {
   return (
@@ -61,20 +54,34 @@ function ConversationGroupSection({
           const Icon =
             conversation.mode === "image" ? ImageIcon : MessageSquareText;
 
-          return (
+          const className = isActive
+            ? "flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-3 py-2.5 text-sm font-medium shadow-sm ring-1 ring-border"
+            : "flex min-w-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
+          const content = (
+            <>
+              <Icon className="size-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">{conversation.title}</span>
+            </>
+          );
+
+          return conversation.isPending ? (
+            <div
+              aria-disabled="true"
+              className={className}
+              key={conversation.id}
+              title="正在创建对话"
+            >
+              {content}
+            </div>
+          ) : (
             <Link
               aria-current={isActive ? "page" : undefined}
-              className={
-                isActive
-                  ? "flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-3 py-2.5 text-sm font-medium shadow-sm ring-1 ring-border"
-                  : "flex min-w-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              }
+              className={className}
               href={`/chat/${conversation.id}`}
               key={conversation.id}
               title={conversation.title}
             >
-              <Icon className="size-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">{conversation.title}</span>
+              {content}
             </Link>
           );
         })}

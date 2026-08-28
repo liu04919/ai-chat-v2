@@ -9,5 +9,19 @@
   "activeGeneration": {
     "id": "generation_example",
     "status": "running"
-  }
+  },
+  "messages": [
+    {
+      "id": "message_example",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "ReadableStream 如何工作"
+        }
+      ],
+      "sequence": 0,
+      "createdAt": "2026-08-26T10:00:00.000Z"
+    }
+  ]
 }

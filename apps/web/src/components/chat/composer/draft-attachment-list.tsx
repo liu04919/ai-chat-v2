@@ -53,10 +53,12 @@ function AttachmentStatus({ item }: Readonly<{ item: DraftAttachmentItem }>) {
 }
 
 export function DraftAttachmentList({
+  disabled = false,
   items,
   onRemove,
   onRetry,
 }: Readonly<{
+  disabled?: boolean;
   items: DraftAttachmentItem[];
   onRemove: (item: DraftAttachmentItem) => void;
   onRetry: (item: DraftAttachmentItem) => void;
@@ -113,6 +115,7 @@ export function DraftAttachmentList({
               <Button
                 aria-label={`重新上传 ${item.file.name}`}
                 className="size-8 rounded-full p-0"
+                disabled={disabled}
                 onClick={() => onRetry(item)}
                 title="重新上传"
                 variant="ghost"
@@ -123,7 +126,11 @@ export function DraftAttachmentList({
             <Button
               aria-label={`移除 ${item.file.name}`}
               className="size-8 rounded-full p-0"
-              disabled={item.status === "uploading" || item.status === "removing"}
+              disabled={
+                disabled ||
+                item.status === "uploading" ||
+                item.status === "removing"
+              }
               onClick={() => onRemove(item)}
               title="移除附件"
               variant="ghost"

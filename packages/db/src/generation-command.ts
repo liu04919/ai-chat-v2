@@ -46,7 +46,6 @@ export type CreateGenerationCommandRecordResult =
 
 export type CreateGenerationCommandRecordInput = CreateGenerationRequest & {
   ownerId: string;
-  conversationId: string;
   generationId: string;
   conversationTitle: string;
   now: Date;
@@ -121,7 +120,8 @@ function resolveExistingCommand(
 ): CreateGenerationCommandRecordResult {
   const targetMatches =
     input.target.type === "new"
-      ? input.target.mode === existing.conversationMode
+      ? input.target.conversationId === existing.conversationId &&
+        input.target.mode === existing.conversationMode
       : input.target.conversationId === existing.conversationId;
 
   if (
@@ -183,7 +183,7 @@ export async function createGenerationCommandRecord(
         const [createdConversation] = await transaction
           .insert(conversations)
           .values({
-            id: input.conversationId,
+            id: input.target.conversationId,
             ownerId: input.ownerId,
             mode: input.target.mode,
             title: input.conversationTitle,
@@ -381,7 +381,7 @@ export async function createGenerationCommandRecord(
         .from(generations)
         .where(
           and(
-            eq(generations.conversationId, input.conversationId),
+            eq(generations.conversationId, input.target.conversationId),
             inArray(generations.status, ["queued", "running"]),
           ),
         )

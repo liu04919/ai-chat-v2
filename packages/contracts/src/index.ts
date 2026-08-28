@@ -59,9 +59,13 @@ export {
 } from "./generation-command";
 export {
   attachmentMessagePartSchema,
+  messageRoleSchema,
+  messageSchema,
   messagePartSchema,
   messagePartsSchema,
   textMessagePartSchema,
+  type MessageDto,
   type MessagePartDto,
   type MessagePartsDto,
+  type MessageRoleDto,
 } from "./message";

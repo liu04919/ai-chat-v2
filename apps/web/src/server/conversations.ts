@@ -41,5 +41,9 @@ export async function getConversationForOwner(
   return {
     conversation: toConversationSummary(detail.conversation),
     activeGeneration: detail.activeGeneration,
+    messages: detail.messages.map((message) => ({
+      ...message,
+      createdAt: message.createdAt.toISOString(),
+    })),
   };
 }

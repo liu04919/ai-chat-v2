@@ -4,12 +4,13 @@ import type {
   CreateGenerationRequest,
   CreateGenerationResponse,
   GenerationErrorResponse,
-  MessagePartsDto,
 } from "@ai-chat/contracts";
 import {
   createGenerationCommandRecord,
   type CreateGenerationCommandRecordResult,
 } from "@ai-chat/db";
+
+import { createConversationTitle } from "../lib/conversation-title";
 
 type GenerationServiceStatus = 400 | 404 | 409 | 503;
 
@@ -28,23 +29,9 @@ export class GenerationServiceError extends Error {
 
 type GenerationServiceDependencies = {
   queue: GenerationQueueProducer;
-  createConversationId?: () => string;
   createGenerationId?: () => string;
   now?: () => Date;
 };
-
-function createConversationTitle(parts: MessagePartsDto): string {
-  const text = parts.find(
-    (part) => part.type === "text" && part.text.trim().length > 0,
-  );
-
-  if (text?.type === "text") {
-    const normalized = text.text.trim().replaceAll(/\s+/g, " ");
-    return Array.from(normalized).slice(0, 30).join("");
-  }
-
-  return "附件对话";
-}
 
 function throwForPersistenceResult(
   result: Exclude<
@@ -111,14 +98,9 @@ export async function createGenerationForOwner(
   dependencies: GenerationServiceDependencies,
 ): Promise<CreateGenerationResponse> {
   const now = (dependencies.now ?? (() => new Date()))();
-  const conversationId =
-    input.target.type === "existing"
-      ? input.target.conversationId
-      : (dependencies.createConversationId ?? randomUUID)();
   const result = await createGenerationCommandRecord({
     ...input,
     ownerId,
-    conversationId,
     generationId: (dependencies.createGenerationId ?? randomUUID)(),
     conversationTitle: createConversationTitle(input.parts),
     now,
