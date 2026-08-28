@@ -10,6 +10,10 @@ export const generationStatusSchema = z.enum([
 
 export type GenerationStatusDto = z.infer<typeof generationStatusSchema>;
 
+export const reasoningEffortSchema = z.enum(["low", "medium", "high"]);
+
+export type ReasoningEffortDto = z.infer<typeof reasoningEffortSchema>;
+
 export const activeGenerationSchema = z
   .object({
     id: z.string().min(1),

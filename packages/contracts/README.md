@@ -8,7 +8,8 @@
 
 - Conversation mode、列表与详情响应
 - Attachment 上传意图、上传确认、草稿移除与错误响应
-- Generation status
+- Generation 创建命令、初始响应、错误与 Worker job
+- Generation status 与 reasoning effort
 - Chat Detail 的 active Generation
 
 修改 contract 时，需要在同一轮更新 Schema、推导类型、fixtures、tests 和消费者。

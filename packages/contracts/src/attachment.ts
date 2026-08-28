@@ -66,6 +66,7 @@ export const attachmentErrorCodeSchema = z.enum([
   "ATTACHMENT_NOT_FOUND",
   "ATTACHMENT_UPLOAD_NOT_FOUND",
   "ATTACHMENT_METADATA_MISMATCH",
+  "ATTACHMENT_IN_USE",
 ]);
 
 export const attachmentErrorResponseSchema = z

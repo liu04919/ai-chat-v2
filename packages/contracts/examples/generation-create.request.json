@@ -1,0 +1,18 @@
+{
+  "target": {
+    "type": "new",
+    "mode": "chat"
+  },
+  "userMessageId": "message_example",
+  "parts": [
+    {
+      "type": "text",
+      "text": "解释 Redis Streams"
+    },
+    {
+      "type": "attachment",
+      "attachmentId": "attachment_example"
+    }
+  ],
+  "reasoningEffort": "medium"
+}

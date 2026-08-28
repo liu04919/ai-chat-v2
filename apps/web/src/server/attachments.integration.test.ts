@@ -234,4 +234,33 @@ describe("Attachment upload service", () => {
       getAttachmentRecordForOwner(ownerId, attachmentId),
     ).resolves.not.toBeNull();
   });
+
+  it("已经进入 Message 的 Attachment 不允许再删除", async () => {
+    const storage = new FakeObjectStorage();
+    const attachmentId = `attachment-${randomUUID()}`;
+    await createAttachmentUploadForOwner(
+      ownerId,
+      {
+        originalName: "linked.png",
+        mediaType: "image/png",
+        sizeBytes: 512,
+      },
+      { storage, createId: () => attachmentId },
+    );
+    await database.client`
+      UPDATE attachments
+      SET linked_at = NOW()
+      WHERE id = ${attachmentId}
+    `;
+
+    await expect(
+      deleteAttachmentForOwner(ownerId, attachmentId, { storage }),
+    ).rejects.toMatchObject({
+      code: "ATTACHMENT_IN_USE",
+      status: 409,
+    });
+    await expect(
+      getAttachmentRecordForOwner(ownerId, attachmentId),
+    ).resolves.not.toBeNull();
+  });
 });

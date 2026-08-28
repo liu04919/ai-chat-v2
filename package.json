@@ -17,6 +17,8 @@
   "scripts": {
     "dev:web": "pnpm --filter @ai-chat/web dev",
     "dev:worker": "pnpm --filter @ai-chat/worker dev",
+    "infra:up": "docker compose up -d postgres redis",
+    "infra:down": "docker compose down",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate",
@@ -25,7 +27,7 @@
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run --exclude **/*.integration.test.ts",
-    "test:integration": "vitest run --no-file-parallelism packages/db/src/schema.integration.test.ts packages/db/src/conversation-reader.integration.test.ts apps/web/src/lib/auth.integration.test.ts apps/web/src/server/attachments.integration.test.ts",
+    "test:integration": "vitest run --no-file-parallelism packages/db/src/schema.integration.test.ts packages/db/src/conversation-reader.integration.test.ts apps/web/src/lib/auth.integration.test.ts apps/web/src/server/attachments.integration.test.ts apps/web/src/server/generations.integration.test.ts apps/web/src/server/generation-queue.integration.test.ts",
     "test:r2": "vitest run packages/storage/src/r2.integration.test.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration && pnpm build"
   },

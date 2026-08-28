@@ -18,5 +18,11 @@ export type {
   ConversationDetailRecord,
   ConversationRecord,
 } from "./conversation-reader";
+export {
+  createGenerationCommandRecord,
+  type CreateGenerationCommandRecordInput,
+  type CreateGenerationCommandRecordResult,
+  type GenerationCommandRecord,
+} from "./generation-command";
 export { migrateDatabase } from "./migration";
 export * from "./schema/index";

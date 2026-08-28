@@ -22,6 +22,7 @@ const errorMessages: Record<AttachmentClientError["code"], string> = {
   ATTACHMENT_NOT_FOUND: "附件不存在或已被移除",
   ATTACHMENT_UPLOAD_NOT_FOUND: "没有找到已上传的文件，请重试",
   ATTACHMENT_METADATA_MISMATCH: "上传后的文件信息不一致，请重试",
+  ATTACHMENT_IN_USE: "附件已经进入消息，不能再作为草稿移除",
   UPLOAD_FAILED: "文件上传失败，请检查网络后重试",
   UNKNOWN: "附件操作失败，请稍后重试",
 };

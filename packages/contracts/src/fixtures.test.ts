@@ -12,6 +12,12 @@ import {
   conversationDetailResponseSchema,
   conversationListResponseSchema,
 } from "./conversation";
+import {
+  createGenerationRequestSchema,
+  createGenerationResponseSchema,
+  generationErrorResponseSchema,
+  generationJobPayloadSchema,
+} from "./generation-command";
 
 function readExample(name: string): unknown {
   const url = new URL(`../examples/${name}`, import.meta.url);
@@ -51,5 +57,21 @@ describe("contract examples", () => {
     const response = readExample("attachment-delete.response.json");
 
     expect(deleteAttachmentResponseSchema.parse(response)).toEqual(response);
+  });
+
+  it("generation create request/response 与 Schema 保持一致", () => {
+    const request = readExample("generation-create.request.json");
+    const response = readExample("generation-create.response.json");
+
+    expect(createGenerationRequestSchema.parse(request)).toEqual(request);
+    expect(createGenerationResponseSchema.parse(response)).toEqual(response);
+  });
+
+  it("generation error 与 Worker job 示例保持一致", () => {
+    const error = readExample("generation-active.error.json");
+    const job = readExample("generation-job.json");
+
+    expect(generationErrorResponseSchema.parse(error)).toEqual(error);
+    expect(generationJobPayloadSchema.parse(job)).toEqual(job);
   });
 });

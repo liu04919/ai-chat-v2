@@ -39,6 +39,7 @@ export const attachments = pgTable(
     sizeBytes: integer("size_bytes").notNull(),
     status: attachmentStatus("status").default("pending").notNull(),
     readyAt: timestamp("ready_at", { mode: "date", withTimezone: true }),
+    linkedAt: timestamp("linked_at", { mode: "date", withTimezone: true }),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),

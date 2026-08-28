@@ -142,7 +142,7 @@ export function ConversationSidebar({
             <ConversationGroupSection
               group={group}
               key={group.id}
-              pathname={pathname}
+              pathname={pathname ?? ""}
             />
           ))}
         </div>

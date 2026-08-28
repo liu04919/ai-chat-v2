@@ -1,4 +1,4 @@
-import type { MessagePartsDto } from "@ai-chat/contracts";
+import type { MessagePartsDto, ReasoningEffortDto } from "@ai-chat/contracts";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -34,6 +34,11 @@ export const generationStatus = pgEnum("generation_status", [
   "completed",
   "failed",
   "cancelled",
+]);
+export const reasoningEffort = pgEnum("reasoning_effort", [
+  "low",
+  "medium",
+  "high",
 ]);
 
 export const conversations = pgTable(
@@ -92,6 +97,7 @@ export const generations = pgTable(
       { onDelete: "set null" },
     ),
     status: generationStatus("status").default("queued").notNull(),
+    reasoningEffort: reasoningEffort("reasoning_effort").$type<ReasoningEffortDto>(),
     errorCode: text("error_code"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()

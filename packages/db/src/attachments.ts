@@ -2,7 +2,7 @@ import type {
   AttachmentMediaType,
   AttachmentStatusDto,
 } from "@ai-chat/contracts";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { getDatabase } from "./client";
 import { attachments } from "./schema/index";
@@ -18,6 +18,7 @@ export type AttachmentRecord = {
   sizeBytes: number;
   status: AttachmentStatusDto;
   readyAt: Date | null;
+  linkedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -90,7 +91,11 @@ export async function deleteAttachmentRecordForOwner(
   const [attachment] = await database
     .delete(attachments)
     .where(
-      and(eq(attachments.id, attachmentId), eq(attachments.ownerId, ownerId)),
+      and(
+        eq(attachments.id, attachmentId),
+        eq(attachments.ownerId, ownerId),
+        isNull(attachments.linkedAt),
+      ),
     )
     .returning();
 

@@ -140,13 +140,21 @@ export async function deleteAttachmentForOwner(
   attachmentId: string,
   dependencies: AttachmentServiceDependencies = {},
 ): Promise<void> {
-  const attachment = await getAttachmentRecordForOwner(ownerId, attachmentId);
+  const attachment = await deleteAttachmentRecordForOwner(
+    ownerId,
+    attachmentId,
+  );
 
   if (!attachment) {
+    const existing = await getAttachmentRecordForOwner(ownerId, attachmentId);
+
+    if (existing?.linkedAt) {
+      throw new AttachmentServiceError("ATTACHMENT_IN_USE", 409);
+    }
+
     throw new AttachmentServiceError("ATTACHMENT_NOT_FOUND", 404);
   }
 
   const storage = dependencies.storage ?? getAttachmentObjectStorage();
   await storage.deleteObject(attachment.objectKey);
-  await deleteAttachmentRecordForOwner(ownerId, attachmentId);
 }
