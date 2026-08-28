@@ -18,6 +18,7 @@ import {
   generationErrorResponseSchema,
   generationJobPayloadSchema,
 } from "./generation-command";
+import { generationEventSchema } from "./generation-event";
 
 function readExample(name: string): unknown {
   const url = new URL(`../examples/${name}`, import.meta.url);
@@ -73,5 +74,17 @@ describe("contract examples", () => {
 
     expect(generationErrorResponseSchema.parse(error)).toEqual(error);
     expect(generationJobPayloadSchema.parse(job)).toEqual(job);
+  });
+
+  it.each([
+    "started",
+    "text-delta",
+    "reasoning-delta",
+    "completed",
+    "failed",
+  ])("GenerationEvent %s 示例与 Schema 保持一致", (name) => {
+    const event = readExample(`redis/generation-event/${name}.json`);
+
+    expect(generationEventSchema.parse(event)).toEqual(event);
   });
 });

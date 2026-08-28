@@ -9,6 +9,7 @@
 - Conversation mode、列表与包含 Message 的详情响应
 - Attachment 上传意图、上传确认、草稿移除与错误响应
 - Generation 创建命令、初始响应、错误与 Worker job
+- GenerationEvent 与 Redis Stream cursor
 - Generation status 与 reasoning effort
 - Chat Detail 的 active Generation
 

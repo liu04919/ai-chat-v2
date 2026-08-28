@@ -127,7 +127,7 @@ Generation 与最终 Assistant Message 不是同一个对象。执行中的 reas
 
 - **PostgreSQL**：Conversation、Completed Message、Generation 状态、Attachment、Knowledge、Share Snapshot
 - **BullMQ**：把 Generation 和知识入库任务交给 Worker，不作为业务事件历史
-- **Redis Streams**：短期 Generation Event Log，支持实时消费和断线重放，不作为永久数据库
+- **Redis Streams**：短期 Generation Event Log，支持实时消费和断线重放，不作为永久数据库；每次追加事件时刷新 24 小时 TTL
 
 PostgreSQL 是 Completed Message 的唯一永久事实来源。前端刷新后不能从 Redis 或浏览器缓存重建永久消息。
 
@@ -156,7 +156,7 @@ Browser、Web/API 与 Worker 之间的可序列化契约集中在 `packages/cont
 
 ### GenerationEvent
 
-当前协议只实现真实消费者需要的事件。文字生成主链包含：
+当前协议只实现真实消费者需要的事件。文字生成正常与失败主链包含：
 
 ```text
 generation.started
@@ -164,10 +164,9 @@ text.delta
 reasoning.delta  # 上游实际提供时才有
 generation.completed
 generation.failed
-generation.cancelled
 ```
 
-Tool 和来源能力接入时再增加 `tool.called`、`tool.completed`、`source.added`。不得提前实现没有调用方的未来事件。
+取消链路实现时再增加 `generation.cancelled`；Tool 和来源能力接入时再增加 `tool.called`、`tool.completed`、`source.added`。不得提前实现没有调用方的未来事件。
 
 Redis Stream 和 SSE 传输同一个 GenerationEvent，不再定义第二套 SSE 业务协议。Redis Stream ID 默认直接作为 SSE `id` 和恢复 cursor；只有出现明确需求并经开发者确认后才能增加映射层。
 
@@ -238,7 +237,7 @@ AI SDK 的 finish/error 只是 Worker 内部执行结果，不能直接等同公
 AI SDK Core 只存在于 LLM Execution 边界，用于模型协议适配、streaming、tool calling 和多步 tool loop。禁止让 AI SDK UI 类型、`useChat`、`UIMessageStream` 或 SDK stream protocol 成为系统的领域模型和应用协议。
 
 ```text
-AI SDK fullStream
+AI SDK stream
 → packages/llm Adapter
 → GenerationEvent 或 Worker 内部 finish/error
 ```
@@ -451,15 +450,14 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 这些问题在真实代码需要它们时讨论，不预先排期：
 
 1. ORM/DB layer
-2. Redis Stream TTL
-3. delta coalescing 的时间与大小阈值
-4. BullMQ concurrency
-5. cancel signal 的跨进程实现
-6. Cancel 后 partial Assistant Message 是否持久化
-7. embedding provider、Chunk Strategy 与 Pinecone index schema
-8. 是否持久化完整 Tool input/output
-9. reasoning 的展示形态
-10. 最终部署拓扑
+2. delta coalescing 的时间与大小阈值
+3. BullMQ concurrency
+4. cancel signal 的跨进程实现
+5. Cancel 后 partial Assistant Message 是否持久化
+6. embedding provider、Chunk Strategy 与 Pinecone index schema
+7. 是否持久化完整 Tool input/output
+8. reasoning 的展示形态
+9. 最终部署拓扑
 
 ## 15. 协作规则
 

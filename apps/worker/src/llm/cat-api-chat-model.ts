@@ -73,7 +73,7 @@ export function createCatApiChatModel(
         },
       });
 
-      for await (const part of result.fullStream) {
+      for await (const part of result.stream) {
         switch (part.type) {
           case "text-delta":
             yield { type: "text", delta: part.text };

@@ -1,0 +1,5 @@
+{
+  "type": "text.delta",
+  "generationId": "generation_example",
+  "delta": "Redis Stream"
+}

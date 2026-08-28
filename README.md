@@ -13,6 +13,7 @@ packages/contracts  跨 runtime 的运行时 Schema 与 wire types
 packages/core       不依赖框架的领域规则
 packages/db         Drizzle schema、PostgreSQL client 与 migrations
 packages/storage    Web/Worker 共享的薄 R2 对象存储边界
+packages/event-store Web/Worker 共享的 Redis GenerationEvent 日志边界
 ```
 
 ## 本地运行
