@@ -26,27 +26,27 @@ function readExample(name: string): unknown {
 
 describe("contract examples", () => {
   it("conversation list response 与 Schema 保持一致", () => {
-    const example = readExample("conversation-list.response.json");
+    const example = readExample("http/conversation/list.response.json");
 
     expect(conversationListResponseSchema.parse(example)).toEqual(example);
   });
 
   it("conversation detail response 与 Schema 保持一致", () => {
-    const example = readExample("conversation-detail.response.json");
+    const example = readExample("http/conversation/detail.response.json");
 
     expect(conversationDetailResponseSchema.parse(example)).toEqual(example);
   });
 
   it("attachment upload request/response 与 Schema 保持一致", () => {
-    const request = readExample("attachment-upload.request.json");
-    const response = readExample("attachment-upload.response.json");
+    const request = readExample("http/attachment/upload.request.json");
+    const response = readExample("http/attachment/upload.response.json");
 
     expect(createAttachmentUploadRequestSchema.parse(request)).toEqual(request);
     expect(createAttachmentUploadResponseSchema.parse(response)).toEqual(response);
   });
 
   it("attachment complete response 与 Schema 保持一致", () => {
-    const response = readExample("attachment-complete.response.json");
+    const response = readExample("http/attachment/complete.response.json");
 
     expect(completeAttachmentUploadResponseSchema.parse(response)).toEqual(
       response,
@@ -54,22 +54,22 @@ describe("contract examples", () => {
   });
 
   it("attachment delete response 与 Schema 保持一致", () => {
-    const response = readExample("attachment-delete.response.json");
+    const response = readExample("http/attachment/delete.response.json");
 
     expect(deleteAttachmentResponseSchema.parse(response)).toEqual(response);
   });
 
   it("generation create request/response 与 Schema 保持一致", () => {
-    const request = readExample("generation-create.request.json");
-    const response = readExample("generation-create.response.json");
+    const request = readExample("http/generation/create.request.json");
+    const response = readExample("http/generation/create.response.json");
 
     expect(createGenerationRequestSchema.parse(request)).toEqual(request);
     expect(createGenerationResponseSchema.parse(response)).toEqual(response);
   });
 
   it("generation error 与 Worker job 示例保持一致", () => {
-    const error = readExample("generation-active.error.json");
-    const job = readExample("generation-job.json");
+    const error = readExample("http/generation/active.error.json");
+    const job = readExample("worker/generation.job.json");
 
     expect(generationErrorResponseSchema.parse(error)).toEqual(error);
     expect(generationJobPayloadSchema.parse(job)).toEqual(job);
