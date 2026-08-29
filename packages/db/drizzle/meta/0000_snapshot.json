@@ -1,5 +1,5 @@
 {
-  "id": "317285b4-62ae-4f07-9cab-4bb38eca359d",
+  "id": "e7eded1d-7344-4969-b36a-29325d9c6cda",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -649,12 +649,6 @@
           "name": "reasoning_effort",
           "type": "reasoning_effort",
           "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_state": {
-          "name": "provider_state",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

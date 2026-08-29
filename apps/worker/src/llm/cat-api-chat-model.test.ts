@@ -24,7 +24,6 @@ function createResponsesStream(): string {
       item: {
         type: "reasoning",
         id: "reasoning_example",
-        encrypted_content: "encrypted_reasoning_example",
       },
     }),
     sseEvent({
@@ -52,7 +51,6 @@ function createResponsesStream(): string {
       item: {
         type: "reasoning",
         id: "reasoning_example",
-        encrypted_content: "encrypted_reasoning_example",
       },
     }),
     sseEvent({
@@ -144,17 +142,6 @@ describe("CatAPI Chat Adapter", () => {
             { id: "old-reasoning", type: "reasoning", text: "先检查附件类型" },
             { id: "old-text", type: "text", text: "我会读取。" },
           ],
-          providerState: {
-            version: 1,
-            provider: "openai-responses",
-            reasoning: [
-              {
-                partId: "old-reasoning",
-                itemId: "old-provider-reasoning",
-                encryptedContent: "old-encrypted-reasoning",
-              },
-            ],
-          },
         },
       ],
       reasoningEffort: "medium",
@@ -173,17 +160,6 @@ describe("CatAPI Chat Adapter", () => {
       {
         type: "finish",
         reason: "stop",
-        providerState: {
-          version: 1,
-          provider: "openai-responses",
-          reasoning: [
-            {
-              partId: "reasoning_example:0",
-              itemId: "reasoning_example",
-              encryptedContent: "encrypted_reasoning_example",
-            },
-          ],
-        },
       },
     ]);
     expect(capturedRequest).toBeDefined();
@@ -198,7 +174,6 @@ describe("CatAPI Chat Adapter", () => {
       stream: boolean;
       store: boolean;
       reasoning: { effort: string; summary: string };
-      include: string[];
       input: Array<{ role: string; content: unknown }>;
     };
 
@@ -207,7 +182,6 @@ describe("CatAPI Chat Adapter", () => {
       stream: true,
       store: false,
       reasoning: { effort: "medium", summary: "auto" },
-      include: ["reasoning.encrypted_content"],
     });
     expect(body.input).toEqual([
       {
@@ -223,12 +197,6 @@ describe("CatAPI Chat Adapter", () => {
             file_url: "https://files.example/report.pdf?signature=pdf",
           },
         ],
-      },
-      {
-        type: "reasoning",
-        id: "old-provider-reasoning",
-        encrypted_content: "old-encrypted-reasoning",
-        summary: [],
       },
       {
         role: "assistant",

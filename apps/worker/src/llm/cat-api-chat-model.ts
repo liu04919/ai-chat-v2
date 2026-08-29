@@ -8,8 +8,6 @@ import { streamText, type ModelMessage } from "ai";
 import type {
   ChatModel,
   ChatModelMessage,
-  ChatModelProviderState,
-  ChatModelReasoningState,
   ChatModelStreamPart,
 } from "./chat-model";
 
@@ -31,44 +29,13 @@ function assistantHistoryLabel(text: string): string {
 function toAssistantModelMessage(
   message: Extract<ChatModelMessage, { role: "assistant" }>,
 ): ModelMessage {
-  const reasoningStateByPartId = new Map(
-    message.providerState?.reasoning.map((state) => [state.partId, state]),
-  );
-  const content: Array<
-    | {
-        type: "reasoning";
-        text: string;
-        providerOptions: {
-          openai: {
-            itemId?: string;
-            reasoningEncryptedContent: string;
-          };
-        };
-      }
-    | { type: "text"; text: string }
-  > = [];
+  const content: Array<{ type: "text"; text: string }> = [];
 
   for (const part of message.parts) {
     switch (part.type) {
-      case "reasoning": {
-        const state = reasoningStateByPartId.get(part.id);
-
-        if (state) {
-          content.push({
-            type: "reasoning",
-            text: "",
-            providerOptions: {
-              openai: {
-                ...(state.itemId ? { itemId: state.itemId } : {}),
-                reasoningEncryptedContent: state.encryptedContent,
-              },
-            },
-          });
-        }
-
+      case "reasoning":
         content.push({ type: "text", text: reasoningHistoryLabel(part.text) });
         break;
-      }
       case "text":
         content.push({ type: "text", text: assistantHistoryLabel(part.text) });
         break;
@@ -111,39 +78,6 @@ function toError(error: unknown, fallbackMessage: string): Error {
     : new Error(fallbackMessage, { cause: error });
 }
 
-function readReasoningState(
-  partId: string,
-  providerMetadata: unknown,
-): ChatModelReasoningState | undefined {
-  if (
-    typeof providerMetadata !== "object" ||
-    providerMetadata === null ||
-    !("openai" in providerMetadata) ||
-    typeof providerMetadata.openai !== "object" ||
-    providerMetadata.openai === null
-  ) {
-    return undefined;
-  }
-
-  const metadata = providerMetadata.openai;
-
-  if (
-    !("reasoningEncryptedContent" in metadata) ||
-    typeof metadata.reasoningEncryptedContent !== "string" ||
-    metadata.reasoningEncryptedContent.length === 0
-  ) {
-    return undefined;
-  }
-
-  return {
-    partId,
-    encryptedContent: metadata.reasoningEncryptedContent,
-    ...("itemId" in metadata && typeof metadata.itemId === "string"
-      ? { itemId: metadata.itemId }
-      : {}),
-  };
-}
-
 export function createCatApiChatModel(
   config: CatApiChatModelConfig,
 ): ChatModel {
@@ -156,7 +90,6 @@ export function createCatApiChatModel(
 
   return {
     async *stream(request): AsyncIterable<ChatModelStreamPart> {
-      const reasoningStateByPartId = new Map<string, ChatModelReasoningState>();
       const result = streamText({
         model,
         maxRetries: 0,
@@ -167,8 +100,6 @@ export function createCatApiChatModel(
             forceReasoning: true,
             reasoningEffort: request.reasoningEffort,
             reasoningSummary: "auto",
-            reasoningContext: "all_turns",
-            include: ["reasoning.encrypted_content"],
             store: false,
           } satisfies OpenAILanguageModelResponsesOptions,
         },
@@ -180,34 +111,14 @@ export function createCatApiChatModel(
             yield { type: "text", partId: part.id, delta: part.text };
             break;
           case "reasoning-start":
-          case "reasoning-end": {
-            const state = readReasoningState(part.id, part.providerMetadata);
-
-            if (state) {
-              reasoningStateByPartId.set(part.id, state);
-            }
+          case "reasoning-end":
             break;
-          }
           case "reasoning-delta":
             yield { type: "reasoning", partId: part.id, delta: part.text };
             break;
-          case "finish": {
-            const providerState: ChatModelProviderState | null =
-              reasoningStateByPartId.size === 0
-                ? null
-                : {
-                    version: 1,
-                    provider: "openai-responses",
-                    reasoning: [...reasoningStateByPartId.values()],
-                  };
-
-            yield {
-              type: "finish",
-              reason: part.finishReason,
-              providerState,
-            };
+          case "finish":
+            yield { type: "finish", reason: part.finishReason };
             break;
-          }
           case "error":
             throw toError(part.error, "CatAPI 流式响应失败");
           case "abort":

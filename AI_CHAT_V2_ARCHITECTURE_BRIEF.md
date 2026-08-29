@@ -100,7 +100,7 @@ Message 是永久业务记录，不使用 AI SDK 的 `UIMessage` 作为领域类
 
 Message 按角色约束 Parts：User Message 只允许 `text | attachment`；Assistant Message 使用有序 Parts，允许 `reasoning | text | attachment | tool-call | tool-result`。数组顺序就是唯一内容顺序，必须保留 `reasoning → tool-call → tool-result → reasoning → text` 等交替结构；不得把所有 reasoning 和 text 分别聚合后再拼接。Assistant Part 使用稳定 `id`，Tool call/result 通过 `toolCallId` 关联。
 
-用户能够看见并引用的 Assistant 内容必须进入后续 Context Builder。Provider 原生 reasoning state 不能代替可见历史文本；Context Builder 既回放 Provider 的不透明状态，也把可见 reasoning 作为普通 Assistant 历史文本投影给模型。
+用户能够看见并引用的 Assistant 内容必须进入后续 Context Builder。系统只回放持久化的可见历史：reasoning 与最终 text 都作为普通 Assistant 历史文本投影给模型，不保存或依赖 Provider 私有推理状态。
 
 Message 与 Attachment 的关系唯一记录在 `Message.parts` 中；第一版不增加 `message_attachment` 关系表，也不把 MessagePart 拆成 `image | file`。具体类型由 Attachment 元数据决定。
 
@@ -117,7 +117,7 @@ type GenerationStatus =
   | "cancelled";
 ```
 
-Generation 与最终 Assistant Message 不是同一个对象。执行中的增量和 Provider state 属于 Generation；成功完成后，按原始顺序聚合的可见 reasoning、tool 过程和最终输出共同成为 Assistant Message。失败的 partial 是否永久保存仍单独决策。
+Generation 与最终 Assistant Message 不是同一个对象。执行中的增量属于 Generation；成功完成后，按原始顺序聚合的可见 reasoning、tool 过程和最终输出共同成为 Assistant Message。失败的 partial 是否永久保存仍单独决策。
 
 ### 存储职责
 
@@ -264,7 +264,7 @@ Adapter 必须小而明确，并有 contract tests。实现 AI SDK 功能时先�
 
 CatAPI 的 `previous_response_id` 已分别使用纯文本和文件上下文验证，均不能可靠延续上一轮内容。因此 Provider 必须按无状态服务使用：每次 Generation 都由 Context Builder 重新组装需要的历史消息，并把仍需使用的 Attachment 重新转换为短期 presigned URL 后发送。不得依赖 CatAPI 保存 Conversation、文件上下文或执行状态。
 
-CatAPI 已验证可以返回并接受 Responses 的 `itemId + reasoning.encrypted_content`，但该加密状态不能替代原始消息，也不能保证模型理解用户对可见 reasoning 摘要的引用。Generation 私有保存该不透明状态以尽可能延续 Provider 原生推理；可见 reasoning 同时作为普通 Assistant 历史文本投影，后者才是对话语义连续性的可靠保证。
+系统不保存或重放 Provider 私有推理状态。CatAPI 返回给用户的可见 reasoning 与最终 text 都按原顺序持久化为 Assistant Message Parts，并在后续 Generation 中作为普通 Assistant 历史文本重新发送；用户可见历史就是模型可见历史。
 
 第三方返回的 file ID 即使以后使用，也只能作为可丢弃缓存，不能成为 Attachment 主键或资产事实来源。当前不建设 PDF Parser、`attachment_content`、chunk 或 embedding fallback；未经过实际验证的文件类型应明确拒绝，不能静默切换到自研解析链路。
 

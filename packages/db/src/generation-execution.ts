@@ -30,12 +30,10 @@ export type GenerationExecutionMessageRecord =
   | (GenerationExecutionMessageBase & {
       role: "user";
       parts: UserMessagePartsDto;
-      providerState: null;
     })
   | (GenerationExecutionMessageBase & {
       role: "assistant";
       parts: AssistantMessagePartsDto;
-      providerState: unknown | null;
     });
 
 export type GenerationExecutionAttachmentRecord = {
@@ -118,10 +116,8 @@ export async function claimGenerationExecution(
         role: messages.role,
         parts: messages.parts,
         sequence: messages.sequence,
-        providerState: generations.providerState,
       })
       .from(messages)
-      .leftJoin(generations, eq(generations.assistantMessageId, messages.id))
       .where(eq(messages.conversationId, claimed.conversationId))
       .orderBy(asc(messages.sequence));
     const messageRecords: GenerationExecutionMessageRecord[] =
@@ -132,14 +128,12 @@ export async function claimGenerationExecution(
               role: "user",
               parts: userMessagePartsSchema.parse(message.parts),
               sequence: message.sequence,
-              providerState: null,
             }
           : {
               id: message.id,
               role: "assistant",
               parts: assistantMessagePartsSchema.parse(message.parts),
               sequence: message.sequence,
-              providerState: message.providerState,
             },
       );
     const attachmentIds = [
@@ -190,7 +184,6 @@ export async function completeGenerationExecution(
     generationId: string;
     assistantMessageId: string;
     assistantParts: AssistantMessagePartsDto;
-    providerState: unknown | null;
     now: Date;
   },
   database: Database = getDatabase(),
@@ -244,7 +237,6 @@ export async function completeGenerationExecution(
       .set({
         status: "completed",
         assistantMessageId: input.assistantMessageId,
-        providerState: input.providerState,
         finishedAt: input.now,
         errorCode: null,
       })

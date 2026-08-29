@@ -104,7 +104,6 @@ export const generations = pgTable(
     ),
     status: generationStatus("status").default("queued").notNull(),
     reasoningEffort: reasoningEffort("reasoning_effort").$type<ReasoningEffortDto>(),
-    providerState: jsonb("provider_state").$type<unknown>(),
     errorCode: text("error_code"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()

@@ -9,11 +9,7 @@ import {
   failGenerationExecution,
 } from "@ai-chat/db";
 
-import type {
-  ChatModel,
-  ChatModelProviderState,
-  ChatModelStreamPart,
-} from "../llm/chat-model";
+import type { ChatModel, ChatModelStreamPart } from "../llm/chat-model";
 import { buildChatModelRequest } from "./context-builder";
 import {
   coalesceChatModelStream,
@@ -120,7 +116,6 @@ export async function executeChatGeneration(
       dependencies.objectStorage,
     );
     const assistantParts: AssistantMessagePartDto[] = [];
-    let providerState: ChatModelProviderState | null = null;
     let finished = false;
 
     for await (const part of coalesceChatModelStream(
@@ -148,7 +143,6 @@ export async function executeChatGeneration(
           break;
         case "finish":
           finished = true;
-          providerState = part.providerState;
           break;
       }
     }
@@ -164,7 +158,6 @@ export async function executeChatGeneration(
       generationId,
       assistantMessageId,
       assistantParts,
-      providerState,
       now: (dependencies.now ?? (() => new Date()))(),
     });
 

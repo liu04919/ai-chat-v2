@@ -18,7 +18,7 @@ describe("Chat delta coalescer", () => {
     async function* source(): AsyncIterable<ChatModelStreamPart> {
       yield { type: "reasoning", partId: "reasoning-1", delta: "第一段" };
       yield { type: "reasoning", partId: "reasoning-2", delta: "第二段" };
-      yield { type: "finish", reason: "stop", providerState: null };
+      yield { type: "finish", reason: "stop" };
     }
 
     await expect(
@@ -31,7 +31,7 @@ describe("Chat delta coalescer", () => {
     ).resolves.toEqual([
       { type: "reasoning", partId: "reasoning-1", delta: "第一段" },
       { type: "reasoning", partId: "reasoning-2", delta: "第二段" },
-      { type: "finish", reason: "stop", providerState: null },
+      { type: "finish", reason: "stop" },
     ]);
   });
 
@@ -43,7 +43,7 @@ describe("Chat delta coalescer", () => {
       yield { type: "reasoning", partId: "reasoning-1", delta: "R1" };
       yield { type: "reasoning", partId: "reasoning-1", delta: "R2" };
       yield { type: "text", partId: "text-2", delta: "D" };
-      yield { type: "finish", reason: "stop", providerState: null };
+      yield { type: "finish", reason: "stop" };
     }
 
     await expect(
@@ -58,7 +58,7 @@ describe("Chat delta coalescer", () => {
       { type: "text", partId: "text-1", delta: "BC" },
       { type: "reasoning", partId: "reasoning-1", delta: "R1R2" },
       { type: "text", partId: "text-2", delta: "D" },
-      { type: "finish", reason: "stop", providerState: null },
+      { type: "finish", reason: "stop" },
     ]);
   });
 
@@ -72,7 +72,7 @@ describe("Chat delta coalescer", () => {
       yield { type: "text", partId: "text-1", delta: "首" };
       yield { type: "text", partId: "text-1", delta: "次" };
       await sourceGate;
-      yield { type: "finish", reason: "stop", providerState: null };
+      yield { type: "finish", reason: "stop" };
     }
 
     const iterator = coalesceChatModelStream(source(), {
@@ -91,7 +91,7 @@ describe("Chat delta coalescer", () => {
     releaseSource();
     await expect(iterator.next()).resolves.toEqual({
       done: false,
-      value: { type: "finish", reason: "stop", providerState: null },
+      value: { type: "finish", reason: "stop" },
     });
     await expect(iterator.next()).resolves.toEqual({
       done: true,

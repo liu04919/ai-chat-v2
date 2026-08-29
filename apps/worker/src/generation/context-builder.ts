@@ -6,7 +6,6 @@ import type {
   ChatModelRequest,
   ChatModelUserPart,
 } from "../llm/chat-model";
-import { parseChatModelProviderState } from "../llm/chat-model";
 
 export const MODEL_ATTACHMENT_URL_TTL_SECONDS = 15 * 60;
 
@@ -42,16 +41,9 @@ export async function buildChatModelRequest(
 
   const modelMessages: ChatModelMessage[] = execution.messages.map((message) => {
     if (message.role === "assistant") {
-      const providerState = parseChatModelProviderState(message.providerState);
-
-      if (message.providerState !== null && !providerState) {
-        throw new Error(`Assistant Message ${message.id} 的 Provider State 无效`);
-      }
-
       return {
         role: "assistant",
         parts: message.parts,
-        ...(providerState ? { providerState } : {}),
       };
     }
 

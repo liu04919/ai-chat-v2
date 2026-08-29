@@ -98,21 +98,7 @@ const fakeChatModel: ChatModel = {
     yield { type: "reasoning", partId: "reasoning-1", delta: "分析" };
     yield { type: "text", partId: "text-1", delta: "你" };
     yield { type: "text", partId: "text-1", delta: "好" };
-    yield {
-      type: "finish",
-      reason: "stop",
-      providerState: {
-        version: 1,
-        provider: "openai-responses",
-        reasoning: [
-          {
-            partId: "reasoning-1",
-            itemId: "provider-reasoning-1",
-            encryptedContent: "encrypted-reasoning-1",
-          },
-        ],
-      },
-    };
+    yield { type: "finish", reason: "stop" };
   },
 };
 const createDownloadUrl = vi.fn(
@@ -301,17 +287,6 @@ describe("Chat Generation Worker 主链", () => {
     ).resolves.toMatchObject({
       status: "completed",
       errorCode: null,
-      providerState: {
-        version: 1,
-        provider: "openai-responses",
-        reasoning: [
-          {
-            partId: "reasoning-1",
-            itemId: "provider-reasoning-1",
-            encryptedContent: "encrypted-reasoning-1",
-          },
-        ],
-      },
     });
     const persistedMessages = await database.db.query.messages.findMany({
       where: (table, { eq }) => eq(table.conversationId, conversationId),
@@ -340,7 +315,7 @@ describe("Chat Generation Worker 主链", () => {
     ).toHaveLength(2);
   });
 
-  it("下一轮从 PostgreSQL 重建 reasoning、text 与 Provider State", async () => {
+  it("下一轮从 PostgreSQL 重建可见 reasoning 与 text", async () => {
     const conversationId = `worker-history-conversation-${randomUUID()}`;
     const firstGenerationId = `worker-history-generation-${randomUUID()}`;
     const requestOffset = capturedRequests.length;
@@ -377,17 +352,6 @@ describe("Chat Generation Worker 主链", () => {
             { id: "reasoning-1", type: "reasoning", text: "先分析" },
             { id: "text-1", type: "text", text: "你好" },
           ],
-          providerState: {
-            version: 1,
-            provider: "openai-responses",
-            reasoning: [
-              {
-                partId: "reasoning-1",
-                itemId: "provider-reasoning-1",
-                encryptedContent: "encrypted-reasoning-1",
-              },
-            ],
-          },
         },
         {
           role: "user",
