@@ -10,7 +10,12 @@
   },
   "dependencies": {
     "@ai-chat/contracts": "workspace:*",
+    "@ai-chat/db": "workspace:*",
+    "@ai-chat/event-store": "workspace:*",
+    "@ai-chat/storage": "workspace:*",
     "@ai-sdk/openai": "^4.0.50",
-    "ai": "^7.0.83"
+    "ai": "^7.0.83",
+    "bullmq": "^6.3.1",
+    "ioredis": "^6.0.0"
   }
 }

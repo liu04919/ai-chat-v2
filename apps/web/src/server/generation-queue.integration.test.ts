@@ -54,6 +54,7 @@ describe("BullMQ Generation queue", () => {
       id: generationId,
       name: GENERATION_JOB_NAME,
       data: { generationId },
+      opts: { attempts: 1 },
     });
     expect(
       (await inspector.getJobs()).filter((job) => job.id === generationId),

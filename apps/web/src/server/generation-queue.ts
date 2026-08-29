@@ -41,6 +41,7 @@ export function createBullMqGenerationQueueProducer(input: {
 
       await queue.add(GENERATION_JOB_NAME, job, {
         jobId: job.generationId,
+        attempts: 1,
         removeOnComplete: { count: 1000 },
         removeOnFail: { count: 1000 },
       });
