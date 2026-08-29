@@ -47,8 +47,18 @@ describe("Redis GenerationEvent store", () => {
     keyFor(generationId);
     const events = [
       { type: "generation.started", generationId } as const,
-      { type: "reasoning.delta", generationId, delta: "先分析" } as const,
-      { type: "text.delta", generationId, delta: "你好" } as const,
+      {
+        type: "reasoning.delta",
+        generationId,
+        partId: "reasoning-1",
+        delta: "先分析",
+      } as const,
+      {
+        type: "text.delta",
+        generationId,
+        partId: "text-1",
+        delta: "你好",
+      } as const,
       { type: "generation.completed", generationId } as const,
     ];
     const cursors = [];
@@ -78,7 +88,12 @@ describe("Redis GenerationEvent store", () => {
 
     await store.append({ type: "generation.started", generationId });
     await inspector.expire(key, 1);
-    await store.append({ type: "text.delta", generationId, delta: "继续" });
+    await store.append({
+      type: "text.delta",
+      generationId,
+      partId: "text-1",
+      delta: "继续",
+    });
 
     expect(await inspector.ttl(key)).toBeGreaterThan(50);
   });

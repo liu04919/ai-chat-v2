@@ -1,9 +1,10 @@
 import type {
   CreateGenerationRequest,
   GenerationStatusDto,
-  MessagePartsDto,
   ReasoningEffortDto,
+  UserMessagePartsDto,
 } from "@ai-chat/contracts";
+import { userMessagePartsSchema } from "@ai-chat/contracts";
 import {
   and,
   asc,
@@ -55,7 +56,7 @@ type ExistingCommandRow = {
   ownerId: string;
   conversationId: string;
   conversationMode: "chat" | "image";
-  parts: MessagePartsDto;
+  parts: UserMessagePartsDto;
   generationId: string | null;
   generationStatus: GenerationStatusDto | null;
   reasoningEffort: ReasoningEffortDto | null;
@@ -63,8 +64,8 @@ type ExistingCommandRow = {
 };
 
 function messagePartsEqual(
-  left: MessagePartsDto,
-  right: MessagePartsDto,
+  left: UserMessagePartsDto,
+  right: UserMessagePartsDto,
 ): boolean {
   return (
     left.length === right.length &&
@@ -107,11 +108,13 @@ async function findExistingCommand(
         isNull(generations.replacesAssistantMessageId),
       ),
     )
-    .where(eq(messages.id, userMessageId))
+    .where(and(eq(messages.id, userMessageId), eq(messages.role, "user")))
     .orderBy(asc(generations.createdAt))
     .limit(1);
 
-  return row ?? null;
+  return row
+    ? { ...row, parts: userMessagePartsSchema.parse(row.parts) }
+    : null;
 }
 
 function resolveExistingCommand(

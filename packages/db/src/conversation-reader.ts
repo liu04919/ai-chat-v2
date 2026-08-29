@@ -1,4 +1,11 @@
-import type { MessagePartsDto } from "@ai-chat/contracts";
+import type {
+  AssistantMessagePartsDto,
+  UserMessagePartsDto,
+} from "@ai-chat/contracts";
+import {
+  assistantMessagePartsSchema,
+  userMessagePartsSchema,
+} from "@ai-chat/contracts";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { getDatabase } from "./client";
@@ -22,13 +29,22 @@ export type ConversationDetailRecord = {
     id: string;
     status: (typeof activeGenerationStatuses)[number];
   } | null;
-  messages: Array<{
-    id: string;
-    role: "user" | "assistant";
-    parts: MessagePartsDto;
-    sequence: number;
-    createdAt: Date;
-  }>;
+  messages: Array<
+    | {
+        id: string;
+        role: "user";
+        parts: UserMessagePartsDto;
+        sequence: number;
+        createdAt: Date;
+      }
+    | {
+        id: string;
+        role: "assistant";
+        parts: AssistantMessagePartsDto;
+        sequence: number;
+        createdAt: Date;
+      }
+  >;
 };
 
 export async function listConversationRecordsForOwner(
@@ -88,7 +104,7 @@ export async function getConversationRecordForOwner(
     (row.generationStatus === "queued" || row.generationStatus === "running")
       ? { id: row.generationId, status: row.generationStatus }
       : null;
-  const messageRecords = await database
+  const rawMessageRecords = await database
     .select({
       id: messages.id,
       role: messages.role,
@@ -99,6 +115,20 @@ export async function getConversationRecordForOwner(
     .from(messages)
     .where(eq(messages.conversationId, row.id))
     .orderBy(asc(messages.sequence));
+  const messageRecords: ConversationDetailRecord["messages"] =
+    rawMessageRecords.map((message) =>
+      message.role === "user"
+        ? {
+            ...message,
+            role: "user",
+            parts: userMessagePartsSchema.parse(message.parts),
+          }
+        : {
+            ...message,
+            role: "assistant",
+            parts: assistantMessagePartsSchema.parse(message.parts),
+          },
+    );
 
   return {
     conversation: {

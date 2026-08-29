@@ -98,13 +98,9 @@ Web 与 Worker 位于同一 workspace，但拥有独立运行生命周期。是�
 
 Message 是永久业务记录，不使用 AI SDK 的 `UIMessage` 作为领域类型。
 
-```ts
-type MessagePart =
-  | { type: "text"; text: string }
-  | { type: "attachment"; attachmentId: string };
-```
+Message 按角色约束 Parts：User Message 只允许 `text | attachment`；Assistant Message 使用有序 Parts，允许 `reasoning | text | attachment | tool-call | tool-result`。数组顺序就是唯一内容顺序，必须保留 `reasoning → tool-call → tool-result → reasoning → text` 等交替结构；不得把所有 reasoning 和 text 分别聚合后再拼接。Assistant Part 使用稳定 `id`，Tool call/result 通过 `toolCallId` 关联。
 
-当前 Message 只支持 `text | attachment`。Source 和 Image 在对应产品能力落地时再扩展。Tool execution 默认属于 Generation 执行记录，不是 MessagePart。
+用户能够看见并引用的 Assistant 内容必须进入后续 Context Builder。Provider 原生 reasoning state 不能代替可见历史文本；Context Builder 既回放 Provider 的不透明状态，也把可见 reasoning 作为普通 Assistant 历史文本投影给模型。
 
 Message 与 Attachment 的关系唯一记录在 `Message.parts` 中；第一版不增加 `message_attachment` 关系表，也不把 MessagePart 拆成 `image | file`。具体类型由 Attachment 元数据决定。
 
@@ -121,7 +117,7 @@ type GenerationStatus =
   | "cancelled";
 ```
 
-Generation 与最终 Assistant Message 不是同一个对象。执行中的 reasoning、tool call 和文本增量属于 Generation；完成后的回答才成为 Message。
+Generation 与最终 Assistant Message 不是同一个对象。执行中的增量和 Provider state 属于 Generation；成功完成后，按原始顺序聚合的可见 reasoning、tool 过程和最终输出共同成为 Assistant Message。失败的 partial 是否永久保存仍单独决策。
 
 ### 存储职责
 
@@ -160,8 +156,8 @@ Browser、Web/API 与 Worker 之间的可序列化契约集中在 `packages/cont
 
 ```text
 generation.started
-text.delta
-reasoning.delta  # 上游实际提供时才有
+text.delta       # 携带 partId
+reasoning.delta  # 携带 partId；上游实际提供时才有
 generation.completed
 generation.failed
 ```
@@ -267,6 +263,8 @@ Adapter 必须小而明确，并有 contract tests。实现 AI SDK 功能时先�
 - 补充兼容性验证已覆盖 Chat Completions 的 base64/URL 图片与 base64 PDF，以及 Responses 的文本、base64/URL 图片和 PDF；这些只作为网关能力证据，不作为正式 Adapter 路线
 
 CatAPI 的 `previous_response_id` 已分别使用纯文本和文件上下文验证，均不能可靠延续上一轮内容。因此 Provider 必须按无状态服务使用：每次 Generation 都由 Context Builder 重新组装需要的历史消息，并把仍需使用的 Attachment 重新转换为短期 presigned URL 后发送。不得依赖 CatAPI 保存 Conversation、文件上下文或执行状态。
+
+CatAPI 已验证可以返回并接受 Responses 的 `itemId + reasoning.encrypted_content`，但该加密状态不能替代原始消息，也不能保证模型理解用户对可见 reasoning 摘要的引用。Generation 私有保存该不透明状态以尽可能延续 Provider 原生推理；可见 reasoning 同时作为普通 Assistant 历史文本投影，后者才是对话语义连续性的可靠保证。
 
 第三方返回的 file ID 即使以后使用，也只能作为可丢弃缓存，不能成为 Attachment 主键或资产事实来源。当前不建设 PDF Parser、`attachment_content`、chunk 或 embedding fallback；未经过实际验证的文件类型应明确拒绝，不能静默切换到自研解析链路。
 
@@ -455,8 +453,8 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 4. cancel signal 的跨进程实现
 5. Cancel 后 partial Assistant Message 是否持久化
 6. embedding provider、Chunk Strategy 与 Pinecone index schema
-7. 是否持久化完整 Tool input/output
-8. reasoning 的展示形态
+7. Tool input/output 的脱敏、截断与前端展示细节
+8. reasoning 的最终视觉展示形态
 9. 最终部署拓扑
 
 ## 15. 协作规则

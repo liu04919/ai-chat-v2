@@ -84,6 +84,7 @@ CREATE TABLE "generations" (
 	"replaces_assistant_message_id" text,
 	"status" "generation_status" DEFAULT 'queued' NOT NULL,
 	"reasoning_effort" "reasoning_effort",
+	"provider_state" jsonb,
 	"error_code" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"started_at" timestamp with time zone,

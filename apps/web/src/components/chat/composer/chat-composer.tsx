@@ -2,8 +2,8 @@
 
 import type {
   ConversationModeDto,
-  MessagePartsDto,
   ReasoningEffortDto,
+  UserMessagePartsDto,
 } from "@ai-chat/contracts";
 import { ArrowUp, Brain, Paperclip } from "lucide-react";
 import { useRef, useState } from "react";
@@ -31,7 +31,7 @@ const reasoningOptions: ReadonlyArray<{
 ];
 
 export type ChatComposerSubmission = {
-  parts: MessagePartsDto;
+  parts: UserMessagePartsDto;
   reasoningEffort: ReasoningEffortDto | null;
 };
 
@@ -79,7 +79,7 @@ export function ChatComposer({
     }
 
     const text = input.trim();
-    const parts: MessagePartsDto = [
+    const parts: UserMessagePartsDto = [
       ...(text ? [{ type: "text" as const, text }] : []),
       ...attachments.items.flatMap((item) =>
         item.status === "ready" && item.attachment

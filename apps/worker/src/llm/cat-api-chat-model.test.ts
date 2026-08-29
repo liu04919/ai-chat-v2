@@ -24,7 +24,7 @@ function createResponsesStream(): string {
       item: {
         type: "reasoning",
         id: "reasoning_example",
-        encrypted_content: null,
+        encrypted_content: "encrypted_reasoning_example",
       },
     }),
     sseEvent({
@@ -52,7 +52,7 @@ function createResponsesStream(): string {
       item: {
         type: "reasoning",
         id: "reasoning_example",
-        encrypted_content: null,
+        encrypted_content: "encrypted_reasoning_example",
       },
     }),
     sseEvent({
@@ -138,7 +138,24 @@ describe("CatAPI Chat Adapter", () => {
             },
           ],
         },
-        { role: "assistant", text: "我会读取。" },
+        {
+          role: "assistant",
+          parts: [
+            { id: "old-reasoning", type: "reasoning", text: "先检查附件类型" },
+            { id: "old-text", type: "text", text: "我会读取。" },
+          ],
+          providerState: {
+            version: 1,
+            provider: "openai-responses",
+            reasoning: [
+              {
+                partId: "old-reasoning",
+                itemId: "old-provider-reasoning",
+                encryptedContent: "old-encrypted-reasoning",
+              },
+            ],
+          },
+        },
       ],
       reasoningEffort: "medium",
     })) {
@@ -146,10 +163,28 @@ describe("CatAPI Chat Adapter", () => {
     }
 
     expect(parts).toEqual([
-      { type: "reasoning", delta: "先读取附件。" },
-      { type: "text", delta: "附件" },
-      { type: "text", delta: "已读取。" },
-      { type: "finish", reason: "stop" },
+      {
+        type: "reasoning",
+        partId: "reasoning_example:0",
+        delta: "先读取附件。",
+      },
+      { type: "text", partId: "message_example", delta: "附件" },
+      { type: "text", partId: "message_example", delta: "已读取。" },
+      {
+        type: "finish",
+        reason: "stop",
+        providerState: {
+          version: 1,
+          provider: "openai-responses",
+          reasoning: [
+            {
+              partId: "reasoning_example:0",
+              itemId: "reasoning_example",
+              encryptedContent: "encrypted_reasoning_example",
+            },
+          ],
+        },
+      },
     ]);
     expect(capturedRequest).toBeDefined();
     expect(capturedRequest?.url).toBe("https://maomiapi.com/v1/responses");
@@ -163,6 +198,7 @@ describe("CatAPI Chat Adapter", () => {
       stream: boolean;
       store: boolean;
       reasoning: { effort: string; summary: string };
+      include: string[];
       input: Array<{ role: string; content: unknown }>;
     };
 
@@ -171,6 +207,7 @@ describe("CatAPI Chat Adapter", () => {
       stream: true,
       store: false,
       reasoning: { effort: "medium", summary: "auto" },
+      include: ["reasoning.encrypted_content"],
     });
     expect(body.input).toEqual([
       {
@@ -188,8 +225,28 @@ describe("CatAPI Chat Adapter", () => {
         ],
       },
       {
+        type: "reasoning",
+        id: "old-provider-reasoning",
+        encrypted_content: "old-encrypted-reasoning",
+        summary: [],
+      },
+      {
         role: "assistant",
-        content: [{ type: "output_text", text: "我会读取。" }],
+        content: [
+          {
+            type: "output_text",
+            text: "[上一轮展示给用户的思考摘要]\n先检查附件类型",
+          },
+        ],
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text: "[上一轮助手输出]\n我会读取。",
+          },
+        ],
       },
     ]);
   });

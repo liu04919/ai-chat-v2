@@ -1,8 +1,13 @@
 import type {
+  AssistantMessagePartsDto,
   AttachmentMediaType,
   AttachmentStatusDto,
-  MessagePartsDto,
   ReasoningEffortDto,
+  UserMessagePartsDto,
+} from "@ai-chat/contracts";
+import {
+  assistantMessagePartsSchema,
+  userMessagePartsSchema,
 } from "@ai-chat/contracts";
 import { and, asc, eq, inArray, max } from "drizzle-orm";
 
@@ -16,12 +21,22 @@ import {
 
 type Database = ReturnType<typeof getDatabase>;
 
-export type GenerationExecutionMessageRecord = {
+type GenerationExecutionMessageBase = {
   id: string;
-  role: "user" | "assistant";
-  parts: MessagePartsDto;
   sequence: number;
 };
+
+export type GenerationExecutionMessageRecord =
+  | (GenerationExecutionMessageBase & {
+      role: "user";
+      parts: UserMessagePartsDto;
+      providerState: null;
+    })
+  | (GenerationExecutionMessageBase & {
+      role: "assistant";
+      parts: AssistantMessagePartsDto;
+      providerState: unknown | null;
+    });
 
 export type GenerationExecutionAttachmentRecord = {
   id: string;
@@ -97,16 +112,36 @@ export async function claimGenerationExecution(
       throw new Error("Generation 对应的 Conversation 不存在");
     }
 
-    const messageRecords = await transaction
+    const rawMessageRecords = await transaction
       .select({
         id: messages.id,
         role: messages.role,
         parts: messages.parts,
         sequence: messages.sequence,
+        providerState: generations.providerState,
       })
       .from(messages)
+      .leftJoin(generations, eq(generations.assistantMessageId, messages.id))
       .where(eq(messages.conversationId, claimed.conversationId))
       .orderBy(asc(messages.sequence));
+    const messageRecords: GenerationExecutionMessageRecord[] =
+      rawMessageRecords.map((message) =>
+        message.role === "user"
+          ? {
+              id: message.id,
+              role: "user",
+              parts: userMessagePartsSchema.parse(message.parts),
+              sequence: message.sequence,
+              providerState: null,
+            }
+          : {
+              id: message.id,
+              role: "assistant",
+              parts: assistantMessagePartsSchema.parse(message.parts),
+              sequence: message.sequence,
+              providerState: message.providerState,
+            },
+      );
     const attachmentIds = [
       ...new Set(
         messageRecords.flatMap((message) =>
@@ -154,7 +189,8 @@ export async function completeGenerationExecution(
   input: {
     generationId: string;
     assistantMessageId: string;
-    assistantText: string;
+    assistantParts: AssistantMessagePartsDto;
+    providerState: unknown | null;
     now: Date;
   },
   database: Database = getDatabase(),
@@ -162,8 +198,16 @@ export async function completeGenerationExecution(
   assertNonEmpty(input.generationId, "generationId");
   assertNonEmpty(input.assistantMessageId, "assistantMessageId");
 
-  if (input.assistantText.trim().length === 0) {
-    throw new TypeError("assistantText 不能为空");
+  const assistantParts = assistantMessagePartsSchema.parse(
+    input.assistantParts,
+  );
+
+  if (
+    !assistantParts.some(
+      (part) => part.type === "text" && part.text.trim().length > 0,
+    )
+  ) {
+    throw new TypeError("Chat Assistant Message 必须包含非空 text part");
   }
 
   return database.transaction(async (transaction) => {
@@ -191,7 +235,7 @@ export async function completeGenerationExecution(
       id: input.assistantMessageId,
       conversationId: generation.conversationId,
       role: "assistant",
-      parts: [{ type: "text", text: input.assistantText }],
+      parts: assistantParts,
       sequence: nextSequence,
       createdAt: input.now,
     });
@@ -200,6 +244,7 @@ export async function completeGenerationExecution(
       .set({
         status: "completed",
         assistantMessageId: input.assistantMessageId,
+        providerState: input.providerState,
         finishedAt: input.now,
         errorCode: null,
       })

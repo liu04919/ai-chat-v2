@@ -1,5 +1,6 @@
 {
   "type": "text.delta",
   "generationId": "generation_example",
+  "partId": "text_example",
   "delta": "Redis Stream"
 }

@@ -137,7 +137,7 @@ export async function* coalesceChatModelStream(
         continue;
       }
 
-      if (pending.type !== part.type) {
+      if (pending.type !== part.type || pending.partId !== part.partId) {
         yield pending;
         pending = { ...part };
         deadline = Date.now() + maxDelayMs;

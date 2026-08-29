@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { conversationModeSchema } from "./conversation";
 import { generationStatusSchema, reasoningEffortSchema } from "./generation";
-import { messagePartsSchema } from "./message";
+import { userMessagePartsSchema } from "./message";
 
 export const GENERATION_QUEUE_NAME = "generation";
 export const GENERATION_JOB_NAME = "generate";
@@ -27,7 +27,7 @@ export const createGenerationRequestSchema = z
   .object({
     target: generationTargetSchema,
     userMessageId: z.string().min(1),
-    parts: messagePartsSchema,
+    parts: userMessagePartsSchema,
     reasoningEffort: reasoningEffortSchema.nullable(),
   })
   .strict()

@@ -72,7 +72,11 @@ function requestText(request: ChatModelRequest): string {
   return request.messages
     .flatMap((message) =>
       message.role === "assistant"
-        ? [message.text]
+        ? message.parts.flatMap((part) =>
+            part.type === "text" || part.type === "reasoning"
+              ? [part.text]
+              : [],
+          )
         : message.parts.flatMap((part) =>
             part.type === "text" ? [part.text] : [],
           ),
@@ -86,15 +90,29 @@ const fakeChatModel: ChatModel = {
     capturedRequests.push(request);
 
     if (requestText(request).includes("触发失败")) {
-      yield { type: "text", delta: "部分" };
+      yield { type: "text", partId: "failed-text", delta: "部分" };
       throw new Error("Fake LLM failure");
     }
 
-    yield { type: "reasoning", delta: "先" };
-    yield { type: "reasoning", delta: "分析" };
-    yield { type: "text", delta: "你" };
-    yield { type: "text", delta: "好" };
-    yield { type: "finish", reason: "stop" };
+    yield { type: "reasoning", partId: "reasoning-1", delta: "先" };
+    yield { type: "reasoning", partId: "reasoning-1", delta: "分析" };
+    yield { type: "text", partId: "text-1", delta: "你" };
+    yield { type: "text", partId: "text-1", delta: "好" };
+    yield {
+      type: "finish",
+      reason: "stop",
+      providerState: {
+        version: 1,
+        provider: "openai-responses",
+        reasoning: [
+          {
+            partId: "reasoning-1",
+            itemId: "provider-reasoning-1",
+            encryptedContent: "encrypted-reasoning-1",
+          },
+        ],
+      },
+    };
   },
 };
 const createDownloadUrl = vi.fn(
@@ -133,6 +151,32 @@ async function createQueuedGeneration(input: {
       parts: input.parts,
       reasoningEffort: "medium",
       conversationTitle: "Worker Integration",
+      now: new Date(),
+    },
+    database.db,
+  );
+
+  expect(result.kind).toBe("created");
+}
+
+async function createExistingQueuedGeneration(input: {
+  generationId: string;
+  conversationId: string;
+  userMessageId: string;
+  parts: CreateGenerationRequest["parts"];
+}) {
+  const result = await createGenerationCommandRecord(
+    {
+      ownerId,
+      generationId: input.generationId,
+      target: {
+        type: "existing",
+        conversationId: input.conversationId,
+      },
+      userMessageId: input.userMessageId,
+      parts: input.parts,
+      reasoningEffort: "medium",
+      conversationTitle: "不会用于已有 Conversation",
       now: new Date(),
     },
     database.db,
@@ -230,9 +274,24 @@ describe("Chat Generation Worker 主链", () => {
       (await eventStore.read({ generationId })).map((entry) => entry.event),
     ).toEqual([
       { type: "generation.started", generationId },
-      { type: "reasoning.delta", generationId, delta: "先" },
-      { type: "reasoning.delta", generationId, delta: "分析" },
-      { type: "text.delta", generationId, delta: "你好" },
+      {
+        type: "reasoning.delta",
+        generationId,
+        partId: "reasoning-1",
+        delta: "先",
+      },
+      {
+        type: "reasoning.delta",
+        generationId,
+        partId: "reasoning-1",
+        delta: "分析",
+      },
+      {
+        type: "text.delta",
+        generationId,
+        partId: "text-1",
+        delta: "你好",
+      },
       { type: "generation.completed", generationId },
     ]);
     await expect(
@@ -242,6 +301,17 @@ describe("Chat Generation Worker 主链", () => {
     ).resolves.toMatchObject({
       status: "completed",
       errorCode: null,
+      providerState: {
+        version: 1,
+        provider: "openai-responses",
+        reasoning: [
+          {
+            partId: "reasoning-1",
+            itemId: "provider-reasoning-1",
+            encryptedContent: "encrypted-reasoning-1",
+          },
+        ],
+      },
     });
     const persistedMessages = await database.db.query.messages.findMany({
       where: (table, { eq }) => eq(table.conversationId, conversationId),
@@ -252,7 +322,10 @@ describe("Chat Generation Worker 主链", () => {
       {
         role: "assistant",
         sequence: 1,
-        parts: [{ type: "text", text: "你好" }],
+        parts: [
+          { id: "reasoning-1", type: "reasoning", text: "先分析" },
+          { id: "text-1", type: "text", text: "你好" },
+        ],
       },
     ]);
 
@@ -265,6 +338,63 @@ describe("Chat Generation Worker 主链", () => {
         where: (table, { eq }) => eq(table.conversationId, conversationId),
       }),
     ).toHaveLength(2);
+  });
+
+  it("下一轮从 PostgreSQL 重建 reasoning、text 与 Provider State", async () => {
+    const conversationId = `worker-history-conversation-${randomUUID()}`;
+    const firstGenerationId = `worker-history-generation-${randomUUID()}`;
+    const requestOffset = capturedRequests.length;
+    await createQueuedGeneration({
+      generationId: firstGenerationId,
+      conversationId,
+      userMessageId: `worker-history-message-${randomUUID()}`,
+      parts: [{ type: "text", text: "第一轮问题" }],
+    });
+
+    const firstJob = await enqueue(firstGenerationId);
+    await firstJob.waitUntilFinished(queueEvents, 5000);
+
+    const secondGenerationId = `worker-history-generation-${randomUUID()}`;
+    await createExistingQueuedGeneration({
+      generationId: secondGenerationId,
+      conversationId,
+      userMessageId: `worker-history-message-${randomUUID()}`,
+      parts: [{ type: "text", text: "请检查上一轮思考" }],
+    });
+    const secondJob = await enqueue(secondGenerationId);
+    await secondJob.waitUntilFinished(queueEvents, 5000);
+
+    expect(capturedRequests[requestOffset + 1]).toEqual({
+      reasoningEffort: "medium",
+      messages: [
+        {
+          role: "user",
+          parts: [{ type: "text", text: "第一轮问题" }],
+        },
+        {
+          role: "assistant",
+          parts: [
+            { id: "reasoning-1", type: "reasoning", text: "先分析" },
+            { id: "text-1", type: "text", text: "你好" },
+          ],
+          providerState: {
+            version: 1,
+            provider: "openai-responses",
+            reasoning: [
+              {
+                partId: "reasoning-1",
+                itemId: "provider-reasoning-1",
+                encryptedContent: "encrypted-reasoning-1",
+              },
+            ],
+          },
+        },
+        {
+          role: "user",
+          parts: [{ type: "text", text: "请检查上一轮思考" }],
+        },
+      ],
+    });
   });
 
   it("模型流失败时保留已发布 delta，并把 Generation 标记为 failed", async () => {
@@ -294,7 +424,12 @@ describe("Chat Generation Worker 主链", () => {
       (await eventStore.read({ generationId })).map((entry) => entry.event),
     ).toEqual([
       { type: "generation.started", generationId },
-      { type: "text.delta", generationId, delta: "部分" },
+      {
+        type: "text.delta",
+        generationId,
+        partId: "failed-text",
+        delta: "部分",
+      },
       { type: "generation.failed", generationId },
     ]);
     expect(

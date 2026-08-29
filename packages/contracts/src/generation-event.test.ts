@@ -11,11 +11,13 @@ describe("generationEventSchema", () => {
     {
       type: "text.delta",
       generationId: "generation_123",
+      partId: "text_123",
       delta: "你好",
     },
     {
       type: "reasoning.delta",
       generationId: "generation_123",
+      partId: "reasoning_123",
       delta: "先分析问题",
     },
     { type: "generation.completed", generationId: "generation_123" },
@@ -29,6 +31,7 @@ describe("generationEventSchema", () => {
       generationEventSchema.parse({
         type: "text.delta",
         generationId: "generation_123",
+        partId: "text_123",
         delta: "",
       }),
     ).toThrow();

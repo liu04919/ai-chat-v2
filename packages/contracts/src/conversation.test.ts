@@ -32,6 +32,24 @@ describe("Conversation response schemas", () => {
           sequence: 0,
           createdAt: "2026-08-26T10:00:00.000Z",
         },
+        {
+          id: "message_assistant_example",
+          role: "assistant",
+          parts: [
+            {
+              id: "reasoning_example",
+              type: "reasoning",
+              text: "先梳理读取顺序",
+            },
+            {
+              id: "text_example",
+              type: "text",
+              text: "ReadableStream 支持逐块读取。",
+            },
+          ],
+          sequence: 1,
+          createdAt: "2026-08-26T10:05:00.000Z",
+        },
       ],
     };
 

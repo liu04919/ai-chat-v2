@@ -22,6 +22,24 @@
       ],
       "sequence": 0,
       "createdAt": "2026-08-26T10:00:00.000Z"
+    },
+    {
+      "id": "message_assistant_example",
+      "role": "assistant",
+      "parts": [
+        {
+          "id": "reasoning_example",
+          "type": "reasoning",
+          "text": "先梳理数据从生产者到消费者的读取顺序。"
+        },
+        {
+          "id": "text_example",
+          "type": "text",
+          "text": "ReadableStream 让消费者按需逐块读取数据。"
+        }
+      ],
+      "sequence": 1,
+      "createdAt": "2026-08-26T10:05:00.000Z"
     }
   ]
 }

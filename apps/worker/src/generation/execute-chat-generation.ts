@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import type { AssistantMessagePartDto } from "@ai-chat/contracts";
 import type { GenerationEventStore } from "@ai-chat/event-store";
 import type { ObjectStorage } from "@ai-chat/storage";
 import {
@@ -8,7 +9,11 @@ import {
   failGenerationExecution,
 } from "@ai-chat/db";
 
-import type { ChatModel } from "../llm/chat-model";
+import type {
+  ChatModel,
+  ChatModelProviderState,
+  ChatModelStreamPart,
+} from "../llm/chat-model";
 import { buildChatModelRequest } from "./context-builder";
 import {
   coalesceChatModelStream,
@@ -34,6 +39,33 @@ function asError(error: unknown): Error {
   return error instanceof Error
     ? error
     : new Error("Chat Generation 执行失败", { cause: error });
+}
+
+type StreamDeltaPart = Extract<
+  ChatModelStreamPart,
+  { type: "text" | "reasoning" }
+>;
+
+function appendAssistantDelta(
+  parts: AssistantMessagePartDto[],
+  delta: StreamDeltaPart,
+): void {
+  const lastPart = parts.at(-1);
+
+  if (lastPart?.id === delta.partId) {
+    if (lastPart.type !== delta.type) {
+      throw new Error(`Assistant part ${delta.partId} 在流中改变了类型`);
+    }
+
+    lastPart.text += delta.delta;
+    return;
+  }
+
+  if (parts.some((part) => part.id === delta.partId)) {
+    throw new Error(`Assistant part ${delta.partId} 在流中非连续地重新出现`);
+  }
+
+  parts.push({ id: delta.partId, type: delta.type, text: delta.delta });
 }
 
 async function recordFailure(
@@ -87,7 +119,8 @@ export async function executeChatGeneration(
       claim.execution,
       dependencies.objectStorage,
     );
-    let assistantText = "";
+    const assistantParts: AssistantMessagePartDto[] = [];
+    let providerState: ChatModelProviderState | null = null;
     let finished = false;
 
     for await (const part of coalesceChatModelStream(
@@ -96,22 +129,26 @@ export async function executeChatGeneration(
     )) {
       switch (part.type) {
         case "text":
-          assistantText += part.delta;
+          appendAssistantDelta(assistantParts, part);
           await dependencies.eventStore.append({
             type: "text.delta",
             generationId,
+            partId: part.partId,
             delta: part.delta,
           });
           break;
         case "reasoning":
+          appendAssistantDelta(assistantParts, part);
           await dependencies.eventStore.append({
             type: "reasoning.delta",
             generationId,
+            partId: part.partId,
             delta: part.delta,
           });
           break;
         case "finish":
           finished = true;
+          providerState = part.providerState;
           break;
       }
     }
@@ -126,7 +163,8 @@ export async function executeChatGeneration(
     const completed = await completeGenerationExecution({
       generationId,
       assistantMessageId,
-      assistantText,
+      assistantParts,
+      providerState,
       now: (dependencies.now ?? (() => new Date()))(),
     });
 

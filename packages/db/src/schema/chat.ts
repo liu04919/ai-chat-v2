@@ -1,4 +1,8 @@
-import type { MessagePartsDto, ReasoningEffortDto } from "@ai-chat/contracts";
+import type {
+  AssistantMessagePartsDto,
+  ReasoningEffortDto,
+  UserMessagePartsDto,
+} from "@ai-chat/contracts";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -63,7 +67,9 @@ export const messages = pgTable(
       .notNull()
       .references(() => conversations.id, { onDelete: "cascade" }),
     role: messageRole("role").notNull(),
-    parts: jsonb("parts").$type<MessagePartsDto>().notNull(),
+    parts: jsonb("parts")
+      .$type<UserMessagePartsDto | AssistantMessagePartsDto>()
+      .notNull(),
     sequence: integer("sequence").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
@@ -98,6 +104,7 @@ export const generations = pgTable(
     ),
     status: generationStatus("status").default("queued").notNull(),
     reasoningEffort: reasoningEffort("reasoning_effort").$type<ReasoningEffortDto>(),
+    providerState: jsonb("provider_state").$type<unknown>(),
     errorCode: text("error_code"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()

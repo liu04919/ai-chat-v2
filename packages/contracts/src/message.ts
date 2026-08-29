@@ -1,39 +1,134 @@
 import { z } from "zod";
 
-export const textMessagePartSchema = z
+const messageBase = {
+  id: z.string().min(1),
+  sequence: z.number().int().nonnegative(),
+  createdAt: z.iso.datetime(),
+} as const;
+
+export const userTextMessagePartSchema = z
   .object({
     type: z.literal("text"),
     text: z.string(),
   })
   .strict();
 
-export const attachmentMessagePartSchema = z
+export const userAttachmentMessagePartSchema = z
   .object({
     type: z.literal("attachment"),
     attachmentId: z.string().min(1),
   })
   .strict();
 
-export const messagePartSchema = z.discriminatedUnion("type", [
-  textMessagePartSchema,
-  attachmentMessagePartSchema,
+export const userMessagePartSchema = z.discriminatedUnion("type", [
+  userTextMessagePartSchema,
+  userAttachmentMessagePartSchema,
 ]);
 
-export const messagePartsSchema = z.array(messagePartSchema).min(1);
+export const userMessagePartsSchema = z.array(userMessagePartSchema).min(1);
 
-export const messageRoleSchema = z.enum(["user", "assistant"]);
+const assistantPartBase = {
+  id: z.string().min(1),
+} as const;
 
-export const messageSchema = z
+export const assistantReasoningMessagePartSchema = z
   .object({
-    id: z.string().min(1),
-    role: messageRoleSchema,
-    parts: messagePartsSchema,
-    sequence: z.number().int().nonnegative(),
-    createdAt: z.iso.datetime(),
+    ...assistantPartBase,
+    type: z.literal("reasoning"),
+    text: z.string().min(1),
   })
   .strict();
 
-export type MessagePartDto = z.infer<typeof messagePartSchema>;
-export type MessagePartsDto = z.infer<typeof messagePartsSchema>;
+export const assistantTextMessagePartSchema = z
+  .object({
+    ...assistantPartBase,
+    type: z.literal("text"),
+    text: z.string().min(1),
+  })
+  .strict();
+
+export const assistantAttachmentMessagePartSchema = z
+  .object({
+    ...assistantPartBase,
+    type: z.literal("attachment"),
+    attachmentId: z.string().min(1),
+  })
+  .strict();
+
+export const assistantToolCallMessagePartSchema = z
+  .object({
+    ...assistantPartBase,
+    type: z.literal("tool-call"),
+    toolCallId: z.string().min(1),
+    toolName: z.string().min(1),
+    input: z.json(),
+  })
+  .strict();
+
+export const assistantToolResultMessagePartSchema = z
+  .object({
+    ...assistantPartBase,
+    type: z.literal("tool-result"),
+    toolCallId: z.string().min(1),
+    output: z.json(),
+    isError: z.boolean(),
+  })
+  .strict();
+
+export const assistantMessagePartSchema = z.discriminatedUnion("type", [
+  assistantReasoningMessagePartSchema,
+  assistantTextMessagePartSchema,
+  assistantAttachmentMessagePartSchema,
+  assistantToolCallMessagePartSchema,
+  assistantToolResultMessagePartSchema,
+]);
+
+export const assistantMessagePartsSchema = z
+  .array(assistantMessagePartSchema)
+  .min(1)
+  .superRefine((parts, context) => {
+    const partIds = parts.map((part) => part.id);
+
+    if (new Set(partIds).size !== partIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Assistant Message 的 part id 不能重复",
+      });
+    }
+  });
+
+export const messageRoleSchema = z.enum(["user", "assistant"]);
+
+export const userMessageSchema = z
+  .object({
+    ...messageBase,
+    role: z.literal("user"),
+    parts: userMessagePartsSchema,
+  })
+  .strict();
+
+export const assistantMessageSchema = z
+  .object({
+    ...messageBase,
+    role: z.literal("assistant"),
+    parts: assistantMessagePartsSchema,
+  })
+  .strict();
+
+export const messageSchema = z.discriminatedUnion("role", [
+  userMessageSchema,
+  assistantMessageSchema,
+]);
+
+export type UserMessagePartDto = z.infer<typeof userMessagePartSchema>;
+export type UserMessagePartsDto = z.infer<typeof userMessagePartsSchema>;
+export type AssistantMessagePartDto = z.infer<
+  typeof assistantMessagePartSchema
+>;
+export type AssistantMessagePartsDto = z.infer<
+  typeof assistantMessagePartsSchema
+>;
 export type MessageRoleDto = z.infer<typeof messageRoleSchema>;
+export type UserMessageDto = z.infer<typeof userMessageSchema>;
+export type AssistantMessageDto = z.infer<typeof assistantMessageSchema>;
 export type MessageDto = z.infer<typeof messageSchema>;

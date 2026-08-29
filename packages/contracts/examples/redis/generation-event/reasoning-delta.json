@@ -1,5 +1,6 @@
 {
   "type": "reasoning.delta",
   "generationId": "generation_example",
+  "partId": "reasoning_example",
   "delta": "先说明事件日志的作用。"
 }

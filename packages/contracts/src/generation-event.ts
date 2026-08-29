@@ -15,6 +15,7 @@ export const textDeltaEventSchema = z
   .object({
     type: z.literal("text.delta"),
     ...generationEventBase,
+    partId: z.string().min(1),
     delta: z.string().min(1),
   })
   .strict();
@@ -23,6 +24,7 @@ export const reasoningDeltaEventSchema = z
   .object({
     type: z.literal("reasoning.delta"),
     ...generationEventBase,
+    partId: z.string().min(1),
     delta: z.string().min(1),
   })
   .strict();

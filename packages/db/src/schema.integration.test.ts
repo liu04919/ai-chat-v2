@@ -74,7 +74,7 @@ describe("PostgreSQL 业务不变量", () => {
         id: `db-test-duplicate-message-${randomUUID()}`,
         conversationId,
         role: "assistant",
-        parts: [{ type: "text", text: "重复序号" }],
+        parts: [{ id: "duplicate-text", type: "text", text: "重复序号" }],
         sequence: 0,
       }),
     ).rejects.toThrow();

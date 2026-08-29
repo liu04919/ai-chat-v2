@@ -15,6 +15,7 @@ const execution: ClaimedGenerationExecution = {
       id: "message_1",
       role: "user",
       sequence: 0,
+      providerState: null,
       parts: [
         { type: "text", text: "读取附件" },
         { type: "attachment", attachmentId: "attachment_123" },
@@ -24,12 +25,27 @@ const execution: ClaimedGenerationExecution = {
       id: "message_2",
       role: "assistant",
       sequence: 1,
-      parts: [{ type: "text", text: "第一轮回答" }],
+      parts: [
+        { id: "reasoning_1", type: "reasoning", text: "先分析问题" },
+        { id: "text_1", type: "text", text: "第一轮回答" },
+      ],
+      providerState: {
+        version: 1,
+        provider: "openai-responses",
+        reasoning: [
+          {
+            partId: "reasoning_1",
+            itemId: "provider_reasoning_1",
+            encryptedContent: "encrypted_reasoning_1",
+          },
+        ],
+      },
     },
     {
       id: "message_3",
       role: "user",
       sequence: 2,
+      providerState: null,
       parts: [{ type: "text", text: "继续解释" }],
     },
   ],
@@ -67,7 +83,24 @@ describe("Chat Context Builder", () => {
             },
           ],
         },
-        { role: "assistant", text: "第一轮回答" },
+        {
+          role: "assistant",
+          parts: [
+            { id: "reasoning_1", type: "reasoning", text: "先分析问题" },
+            { id: "text_1", type: "text", text: "第一轮回答" },
+          ],
+          providerState: {
+            version: 1,
+            provider: "openai-responses",
+            reasoning: [
+              {
+                partId: "reasoning_1",
+                itemId: "provider_reasoning_1",
+                encryptedContent: "encrypted_reasoning_1",
+              },
+            ],
+          },
+        },
         {
           role: "user",
           parts: [{ type: "text", text: "继续解释" }],

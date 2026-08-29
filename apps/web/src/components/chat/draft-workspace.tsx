@@ -1,6 +1,9 @@
 "use client";
 
-import type { ConversationModeDto, MessagePartsDto } from "@ai-chat/contracts";
+import type {
+  ConversationModeDto,
+  UserMessagePartsDto,
+} from "@ai-chat/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { ImageIcon, MessageSquareText } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -37,12 +40,12 @@ type PendingConversation = {
   id: string;
   mode: ConversationModeDto;
   title: string;
-  parts: MessagePartsDto;
+  parts: UserMessagePartsDto;
 };
 
 function OptimisticUserMessage({
   parts,
-}: Readonly<{ parts: MessagePartsDto }>) {
+}: Readonly<{ parts: UserMessagePartsDto }>) {
   return (
     <div className="ml-auto max-w-2xl rounded-3xl bg-muted px-5 py-3 text-sm shadow-sm">
       <MessageParts parts={parts} />

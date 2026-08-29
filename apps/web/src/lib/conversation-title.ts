@@ -1,6 +1,6 @@
-import type { MessagePartsDto } from "@ai-chat/contracts";
+import type { UserMessagePartsDto } from "@ai-chat/contracts";
 
-export function createConversationTitle(parts: MessagePartsDto): string {
+export function createConversationTitle(parts: UserMessagePartsDto): string {
   const textPart = parts.find(
     (part) => part.type === "text" && part.text.trim().length > 0,
   );
