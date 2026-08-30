@@ -12,6 +12,8 @@ const EVENT_FIELD = "event";
 const DEFAULT_KEY_PREFIX = "generation";
 const DEFAULT_READ_LIMIT = 100;
 const MAX_READ_LIMIT = 1000;
+const DEFAULT_BLOCK_MS = 15_000;
+const MAX_BLOCK_MS = 60_000;
 
 export type GenerationEventEntry = {
   cursor: GenerationEventCursor;
@@ -24,6 +26,13 @@ export type ReadGenerationEventsInput = {
   limit?: number;
 };
 
+export type ReadBlockingGenerationEventsInput = {
+  generationId: string;
+  afterCursor: GenerationEventCursor;
+  limit?: number;
+  blockMs?: number;
+};
+
 export interface GenerationEventStore {
   append(event: GenerationEventDto): Promise<GenerationEventCursor>;
   read(input: ReadGenerationEventsInput): Promise<GenerationEventEntry[]>;
@@ -33,10 +42,23 @@ export type RedisGenerationEventStore = GenerationEventStore & {
   close(): Promise<void>;
 };
 
+export interface GenerationEventReader {
+  read(input: ReadGenerationEventsInput): Promise<GenerationEventEntry[]>;
+  readBlocking(
+    input: ReadBlockingGenerationEventsInput,
+  ): Promise<GenerationEventEntry[]>;
+  close(): Promise<void>;
+}
+
 export type RedisGenerationEventStoreConfig = {
   redisUrl: string;
   keyPrefix?: string;
   ttlSeconds?: number;
+};
+
+export type RedisGenerationEventReaderConfig = {
+  redisUrl: string;
+  keyPrefix?: string;
 };
 
 function assertNonEmpty(value: string, name: string): string {
@@ -53,6 +75,16 @@ function assertPositiveInteger(value: number, name: string): number {
   }
 
   return value;
+}
+
+function readLimit(value: number | undefined): number {
+  const limit = assertPositiveInteger(value ?? DEFAULT_READ_LIMIT, "limit");
+
+  if (limit > MAX_READ_LIMIT) {
+    throw new RangeError(`limit 不能超过 ${MAX_READ_LIMIT}`);
+  }
+
+  return limit;
 }
 
 function streamKey(keyPrefix: string, generationId: string): string {
@@ -135,14 +167,7 @@ export function createRedisGenerationEventStore(
       const afterCursor = input.afterCursor
         ? generationEventCursorSchema.parse(input.afterCursor)
         : undefined;
-      const limit = assertPositiveInteger(
-        input.limit ?? DEFAULT_READ_LIMIT,
-        "limit",
-      );
-
-      if (limit > MAX_READ_LIMIT) {
-        throw new RangeError(`limit 不能超过 ${MAX_READ_LIMIT}`);
-      }
+      const limit = readLimit(input.limit);
 
       const entries = await connection.xrange(
         streamKey(keyPrefix, generationId),
@@ -166,6 +191,78 @@ export function createRedisGenerationEventStore(
       }
 
       await connection.quit();
+    },
+  };
+}
+
+export function createRedisGenerationEventReader(
+  config: RedisGenerationEventReaderConfig,
+): GenerationEventReader {
+  const keyPrefix = assertNonEmpty(
+    config.keyPrefix ?? DEFAULT_KEY_PREFIX,
+    "keyPrefix",
+  );
+  const connection = new IORedis(config.redisUrl, {
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+    autoResendUnfulfilledCommands: false,
+  });
+  let closed = false;
+
+  connection.on("error", () => {
+    // Reader 调用方负责处理读取失败；主动断开时错误会由 close 路径吞掉。
+  });
+
+  return {
+    async read(input) {
+      const generationId = assertNonEmpty(input.generationId, "generationId");
+      const afterCursor = input.afterCursor
+        ? generationEventCursorSchema.parse(input.afterCursor)
+        : undefined;
+      const entries = await connection.xrange(
+        streamKey(keyPrefix, generationId),
+        afterCursor ? `(${afterCursor}` : "-",
+        "+",
+        "COUNT",
+        readLimit(input.limit),
+      );
+
+      return entries.map((entry) => parseEntry(generationId, entry));
+    },
+
+    async readBlocking(input) {
+      const generationId = assertNonEmpty(input.generationId, "generationId");
+      const afterCursor = generationEventCursorSchema.parse(input.afterCursor);
+      const blockMs = assertPositiveInteger(
+        input.blockMs ?? DEFAULT_BLOCK_MS,
+        "blockMs",
+      );
+
+      if (blockMs > MAX_BLOCK_MS) {
+        throw new RangeError(`blockMs 不能超过 ${MAX_BLOCK_MS}`);
+      }
+
+      const streams = await connection.xread(
+        "COUNT",
+        readLimit(input.limit),
+        "BLOCK",
+        blockMs,
+        "STREAMS",
+        streamKey(keyPrefix, generationId),
+        afterCursor,
+      );
+      const entries = streams?.[0]?.[1] ?? [];
+
+      return entries.map((entry) => parseEntry(generationId, entry));
+    },
+
+    async close() {
+      if (closed) {
+        return;
+      }
+
+      closed = true;
+      connection.disconnect();
     },
   };
 }

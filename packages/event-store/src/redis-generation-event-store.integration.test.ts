@@ -4,7 +4,9 @@ import IORedis from "ioredis";
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
+  createRedisGenerationEventReader,
   createRedisGenerationEventStore,
+  type GenerationEventReader,
   type RedisGenerationEventStore,
 } from "./redis-generation-event-store";
 
@@ -20,6 +22,13 @@ const store: RedisGenerationEventStore = createRedisGenerationEventStore({
   ttlSeconds: 60,
 });
 const streamKeys = new Set<string>();
+const readers = new Set<GenerationEventReader>();
+
+function createReader(): GenerationEventReader {
+  const reader = createRedisGenerationEventReader({ redisUrl, keyPrefix });
+  readers.add(reader);
+  return reader;
+}
 
 function keyFor(generationId: string): string {
   const key = `${keyPrefix}:${generationId}:events`;
@@ -28,6 +37,8 @@ function keyFor(generationId: string): string {
 }
 
 afterAll(async () => {
+  await Promise.all([...readers].map((reader) => reader.close()));
+
   if (streamKeys.size > 0) {
     await inspector.del(...streamKeys);
   }
@@ -105,5 +116,40 @@ describe("Redis GenerationEvent store", () => {
     await inspector.xadd(key, "*", "event", "not-json");
 
     await expect(store.read({ generationId })).rejects.toThrow();
+  });
+
+  it("使用独立连接阻塞等待 cursor 后的新事件", async () => {
+    const generationId = `generation-${randomUUID()}`;
+    keyFor(generationId);
+    const reader = createReader();
+    const startedCursor = await store.append({
+      type: "generation.started",
+      generationId,
+    });
+    const waiting = reader.readBlocking({
+      generationId,
+      afterCursor: startedCursor,
+      blockMs: 2_000,
+    });
+    const completed = { type: "generation.completed", generationId } as const;
+    const completedCursor = await store.append(completed);
+
+    await expect(waiting).resolves.toEqual([
+      { cursor: completedCursor, event: completed },
+    ]);
+  });
+
+  it("阻塞超时返回空数组", async () => {
+    const generationId = `generation-${randomUUID()}`;
+    keyFor(generationId);
+    const reader = createReader();
+
+    await expect(
+      reader.readBlocking({
+        generationId,
+        afterCursor: "0-0",
+        blockMs: 10,
+      }),
+    ).resolves.toEqual([]);
   });
 });

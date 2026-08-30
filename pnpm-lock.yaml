@@ -41,6 +41,9 @@ importers:
       '@ai-chat/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@ai-chat/event-store':
+        specifier: workspace:*
+        version: link:../../packages/event-store
       '@ai-chat/storage':
         specifier: workspace:*
         version: link:../../packages/storage

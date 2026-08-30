@@ -33,5 +33,9 @@ export {
   type GenerationExecutionAttachmentRecord,
   type GenerationExecutionMessageRecord,
 } from "./generation-execution";
+export {
+  getGenerationRecordForOwner,
+  type GenerationRecord,
+} from "./generation-reader";
 export { migrateDatabase } from "./migration";
 export * from "./schema/index";

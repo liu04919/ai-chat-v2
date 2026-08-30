@@ -204,6 +204,8 @@ Last-Event-ID
 
 SSE Handler 只负责鉴权、读取、heartbeat 和编码，不运行 LLM、RAG、Tool、coalescing 或 UI throttle。
 
+Reader 先用非阻塞批量读取追到当前最新 cursor，再从同一 cursor 使用 `XREAD BLOCK` 等待未来事件，因此切换阶段不丢事件。每条 SSE 连接独占一个可随请求取消的 Redis Reader 连接，不在 Worker 写连接、BullMQ 连接或其他共享客户端上执行阻塞命令。
+
 首次消费从 stream beginning 开始；自动重连从 `Last-Event-ID` 之后继续。页面刷新时：
 
 1. 浏览器获取 Chat Detail
