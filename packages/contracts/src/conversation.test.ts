@@ -23,7 +23,11 @@ describe("Conversation response schemas", () => {
   it("接受包含 Active Generation 的详情响应", () => {
     const detail = {
       conversation,
-      activeGeneration: { id: "generation_example", status: "running" },
+      activeGeneration: {
+        id: "generation_example",
+        status: "running",
+        cancelRequestedAt: null,
+      },
       messages: [
         {
           id: "message_example",

@@ -3,9 +3,13 @@ import { existsSync } from "node:fs";
 import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
 
-import type { CreateGenerationRequest } from "@ai-chat/contracts";
+import type {
+  CreateGenerationRequest,
+  GenerationEventDto,
+} from "@ai-chat/contracts";
 import {
   attachments,
+  claimGenerationExecution,
   closeApplicationDatabase,
   conversations,
   createDatabase,
@@ -16,6 +20,10 @@ import {
 } from "@ai-chat/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  cancelGenerationForOwner,
+  GenerationCancellationServiceError,
+} from "./generation-cancellation";
 import {
   createGenerationForOwner,
   type GenerationQueueProducer,
@@ -44,6 +52,23 @@ class FakeGenerationQueue implements GenerationQueueProducer {
 
   async enqueue(payload: { generationId: string }) {
     this.jobs.set(payload.generationId, payload);
+  }
+}
+
+class FakeCancellationPublisher {
+  readonly published: string[] = [];
+
+  async publish(generationId: string) {
+    this.published.push(generationId);
+  }
+}
+
+class FakeGenerationEventWriter {
+  readonly events: GenerationEventDto[] = [];
+
+  async append(event: GenerationEventDto) {
+    this.events.push(event);
+    return "1-0" as const;
   }
 }
 
@@ -310,5 +335,120 @@ describe("Generation creation service", () => {
     await expect(createWithAttachment(pdfAttachmentId, "image")).rejects.toMatchObject({
       response: { code: "ATTACHMENT_MODE_MISMATCH", attachmentId: pdfAttachmentId },
     });
+  });
+});
+
+describe("Generation cancellation service", () => {
+  it("queued Generation 直接进入 cancelled，且不创建空 Assistant Message", async () => {
+    const generationId = `generation-cancel-queued-${randomUUID()}`;
+    const conversationId = `generation-cancel-conversation-${randomUUID()}`;
+    const now = new Date("2026-08-30T09:00:00.000Z");
+    await createGenerationForOwner(
+      ownerId,
+      {
+        target: { type: "new", conversationId, mode: "chat" },
+        userMessageId: `generation-cancel-message-${randomUUID()}`,
+        parts: [{ type: "text", text: "尚未开始就停止" }],
+        reasoningEffort: "medium",
+      },
+      {
+        queue,
+        createGenerationId: () => generationId,
+      },
+    );
+    const cancellationPublisher = new FakeCancellationPublisher();
+    const eventWriter = new FakeGenerationEventWriter();
+
+    await expect(
+      cancelGenerationForOwner(ownerId, generationId, {
+        cancellationPublisher,
+        eventWriter,
+        now: () => now,
+      }),
+    ).resolves.toEqual({
+      generation: {
+        id: generationId,
+        status: "cancelled",
+        cancelRequestedAt: now.toISOString(),
+      },
+    });
+    expect(cancellationPublisher.published).toEqual([]);
+    expect(eventWriter.events).toEqual([
+      { type: "generation.cancelled", generationId },
+    ]);
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, generationId),
+      }),
+    ).resolves.toMatchObject({
+      status: "cancelled",
+      assistantMessageId: null,
+      cancelRequestedAt: now,
+      finishedAt: now,
+    });
+    await expect(
+      database.db.query.messages.findMany({
+        where: (table, { eq }) => eq(table.conversationId, conversationId),
+      }),
+    ).resolves.toHaveLength(1);
+  });
+
+  it("running Generation 持久化一次取消时间，重复请求会再次通知 Worker", async () => {
+    const generationId = `generation-cancel-running-${randomUUID()}`;
+    const conversationId = `generation-cancel-running-conversation-${randomUUID()}`;
+    const firstRequestedAt = new Date("2026-08-30T10:00:00.000Z");
+    const retryAt = new Date("2026-08-30T10:01:00.000Z");
+    await createGenerationForOwner(
+      ownerId,
+      {
+        target: { type: "new", conversationId, mode: "chat" },
+        userMessageId: `generation-cancel-running-message-${randomUUID()}`,
+        parts: [{ type: "text", text: "开始后停止" }],
+        reasoningEffort: "high",
+      },
+      {
+        queue,
+        createGenerationId: () => generationId,
+      },
+    );
+    await claimGenerationExecution(
+      generationId,
+      firstRequestedAt,
+      database.db,
+    );
+    const cancellationPublisher = new FakeCancellationPublisher();
+    const eventWriter = new FakeGenerationEventWriter();
+
+    const first = await cancelGenerationForOwner(ownerId, generationId, {
+      cancellationPublisher,
+      eventWriter,
+      now: () => firstRequestedAt,
+    });
+    const retry = await cancelGenerationForOwner(ownerId, generationId, {
+      cancellationPublisher,
+      eventWriter,
+      now: () => retryAt,
+    });
+
+    expect(first).toEqual(retry);
+    expect(first.generation).toEqual({
+      id: generationId,
+      status: "running",
+      cancelRequestedAt: firstRequestedAt.toISOString(),
+    });
+    expect(cancellationPublisher.published).toEqual([
+      generationId,
+      generationId,
+    ]);
+    expect(eventWriter.events).toEqual([]);
+    await expect(
+      cancelGenerationForOwner(otherOwnerId, generationId, {
+        cancellationPublisher,
+        eventWriter,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: "GENERATION_NOT_FOUND" },
+      status: 404,
+    } satisfies Partial<GenerationCancellationServiceError>);
   });
 });

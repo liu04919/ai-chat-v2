@@ -9,6 +9,7 @@ const statusMessages = {
   reconnecting: "连接中断，正在恢复…",
   completed: "正在同步回复…",
   failed: "回复生成失败，请重新发送。",
+  cancelled: "已停止生成。",
   "connection-error": "回复连接异常，请刷新重试。",
 } as const;
 
@@ -38,6 +39,7 @@ export function GenerationResponse({
 
       {projection.parts.length === 0 ||
       projection.status === "failed" ||
+      projection.status === "cancelled" ||
       projection.status === "connection-error" ||
       projection.status === "reconnecting" ||
       projection.status === "completed" ? (

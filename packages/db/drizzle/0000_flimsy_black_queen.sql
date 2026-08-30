@@ -85,6 +85,7 @@ CREATE TABLE "generations" (
 	"status" "generation_status" DEFAULT 'queued' NOT NULL,
 	"reasoning_effort" "reasoning_effort",
 	"error_code" text,
+	"cancel_requested_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"started_at" timestamp with time zone,
 	"finished_at" timestamp with time zone,

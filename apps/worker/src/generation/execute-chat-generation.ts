@@ -1,12 +1,17 @@
 import { randomUUID } from "node:crypto";
 
 import type { AssistantMessagePartDto } from "@ai-chat/contracts";
-import type { GenerationEventWriter } from "@ai-chat/event-store";
+import type {
+  GenerationCancellationSubscriber,
+  GenerationEventWriter,
+} from "@ai-chat/event-store";
 import type { ObjectStorage } from "@ai-chat/storage";
 import {
   claimGenerationExecution,
+  cancelGenerationExecution,
   completeGenerationExecution,
   failGenerationExecution,
+  isGenerationCancellationRequested,
 } from "@ai-chat/db";
 
 import type { ChatModel, ChatModelStreamPart } from "../llm/chat-model";
@@ -20,6 +25,7 @@ const CHAT_GENERATION_FAILED = "CHAT_GENERATION_FAILED";
 
 export type ExecuteChatGenerationDependencies = {
   chatModel: ChatModel;
+  cancellationSubscriber: GenerationCancellationSubscriber;
   eventWriter: GenerationEventWriter;
   objectStorage: Pick<ObjectStorage, "createDownloadUrl">;
   coalescing?: DeltaCoalescingOptions;
@@ -29,6 +35,7 @@ export type ExecuteChatGenerationDependencies = {
 
 export type ExecuteChatGenerationResult =
   | { kind: "completed"; assistantMessageId: string }
+  | { kind: "cancelled"; assistantMessageId: string | null }
   | { kind: "skipped" };
 
 function asError(error: unknown): Error {
@@ -67,8 +74,9 @@ function appendAssistantDelta(
 async function recordFailure(
   generationId: string,
   error: Error,
+  assistantParts: AssistantMessagePartDto[],
   dependencies: ExecuteChatGenerationDependencies,
-): Promise<never> {
+): Promise<ExecuteChatGenerationResult> {
   try {
     const failed = await failGenerationExecution({
       generationId,
@@ -81,6 +89,12 @@ async function recordFailure(
         type: "generation.failed",
         generationId,
       });
+    } else if (await isGenerationCancellationRequested(generationId)) {
+      return recordCancellation(
+        generationId,
+        assistantParts,
+        dependencies,
+      );
     }
   } catch (recordingError) {
     throw new AggregateError(
@@ -90,6 +104,34 @@ async function recordFailure(
   }
 
   throw error;
+}
+
+async function recordCancellation(
+  generationId: string,
+  assistantParts: AssistantMessagePartDto[],
+  dependencies: ExecuteChatGenerationDependencies,
+): Promise<Extract<ExecuteChatGenerationResult, { kind: "cancelled" }>> {
+  const assistantMessageId =
+    assistantParts.length > 0
+      ? (dependencies.createAssistantMessageId ?? randomUUID)()
+      : null;
+  const cancelled = await cancelGenerationExecution({
+    generationId,
+    assistantMessageId,
+    assistantParts,
+    now: (dependencies.now ?? (() => new Date()))(),
+  });
+
+  if (!cancelled) {
+    throw new Error("Generation 已不再处于待取消的 running 状态");
+  }
+
+  await dependencies.eventWriter.append({
+    type: "generation.cancelled",
+    generationId,
+  });
+
+  return { kind: "cancelled", assistantMessageId };
 }
 
 export async function executeChatGeneration(
@@ -105,7 +147,30 @@ export async function executeChatGeneration(
     return { kind: "skipped" };
   }
 
+  const abortController = new AbortController();
+  const assistantParts: AssistantMessagePartDto[] = [];
+  let unsubscribe: () => Promise<void>;
+
   try {
+    unsubscribe = await dependencies.cancellationSubscriber.subscribe(
+      generationId,
+      () => abortController.abort("用户已请求停止生成"),
+    );
+  } catch (error) {
+    return recordFailure(
+      generationId,
+      asError(error),
+      assistantParts,
+      dependencies,
+    );
+  }
+
+  try {
+    if (await isGenerationCancellationRequested(generationId)) {
+      abortController.abort("用户已请求停止生成");
+    }
+
+    abortController.signal.throwIfAborted();
     await dependencies.eventWriter.append({
       type: "generation.started",
       generationId,
@@ -115,7 +180,8 @@ export async function executeChatGeneration(
       claim.execution,
       dependencies.objectStorage,
     );
-    const assistantParts: AssistantMessagePartDto[] = [];
+    abortController.signal.throwIfAborted();
+    request.abortSignal = abortController.signal;
     let finished = false;
 
     for await (const part of coalesceChatModelStream(
@@ -162,6 +228,14 @@ export async function executeChatGeneration(
     });
 
     if (!completed) {
+      if (await isGenerationCancellationRequested(generationId)) {
+        return recordCancellation(
+          generationId,
+          assistantParts,
+          dependencies,
+        );
+      }
+
       throw new Error("Generation 已不再处于 running，无法完成落库");
     }
 
@@ -172,6 +246,17 @@ export async function executeChatGeneration(
 
     return { kind: "completed", assistantMessageId };
   } catch (error) {
-    return recordFailure(generationId, asError(error), dependencies);
+    if (await isGenerationCancellationRequested(generationId)) {
+      return recordCancellation(generationId, assistantParts, dependencies);
+    }
+
+    return recordFailure(
+      generationId,
+      asError(error),
+      assistantParts,
+      dependencies,
+    );
+  } finally {
+    await unsubscribe();
   }
 }

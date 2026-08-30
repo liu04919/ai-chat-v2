@@ -8,7 +8,8 @@
   },
   "activeGeneration": {
     "id": "generation_example",
-    "status": "running"
+    "status": "running",
+    "cancelRequestedAt": null
   },
   "messages": [
     {

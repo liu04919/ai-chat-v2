@@ -43,12 +43,20 @@ export const generationFailedEventSchema = z
   })
   .strict();
 
+export const generationCancelledEventSchema = z
+  .object({
+    type: z.literal("generation.cancelled"),
+    ...generationEventBase,
+  })
+  .strict();
+
 export const generationEventSchema = z.discriminatedUnion("type", [
   generationStartedEventSchema,
   textDeltaEventSchema,
   reasoningDeltaEventSchema,
   generationCompletedEventSchema,
   generationFailedEventSchema,
+  generationCancelledEventSchema,
 ]);
 
 export const generationEventCursorSchema = z

@@ -30,7 +30,8 @@ function isTerminalStatus(status: GenerationStatusDto): boolean {
 function isTerminalEntry(entry: GenerationEventEntry): boolean {
   return (
     entry.event.type === "generation.completed" ||
-    entry.event.type === "generation.failed"
+    entry.event.type === "generation.failed" ||
+    entry.event.type === "generation.cancelled"
   );
 }
 

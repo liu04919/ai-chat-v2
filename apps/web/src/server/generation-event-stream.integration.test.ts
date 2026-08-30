@@ -75,7 +75,12 @@ function dependencies(blockMs = 2_000) {
 }
 
 async function createGeneration(
-  status: "queued" | "running" | "completed" | "failed" = "running",
+  status:
+    | "queued"
+    | "running"
+    | "completed"
+    | "failed"
+    | "cancelled" = "running",
 ) {
   const conversationId = `generation-sse-conversation-${randomUUID()}`;
   const userMessageId = `generation-sse-message-${randomUUID()}`;
@@ -225,6 +230,24 @@ describe("Generation SSE stream", () => {
     );
     await expect(readFrame(reader)).resolves.toBe(
       `id: ${completedCursor}\ndata: ${JSON.stringify(completed)}\n\n`,
+    );
+    await expect(readFrame(reader)).resolves.toBeNull();
+  });
+
+  it("重放 generation.cancelled 后关闭 SSE", async () => {
+    const generationId = await createGeneration("cancelled");
+    const cancelled = { type: "generation.cancelled", generationId } as const;
+    const cursor = await eventWriter.append(cancelled);
+    const stream = await openGenerationEventStreamForOwner(
+      ownerId,
+      generationId,
+      undefined,
+      dependencies(),
+    );
+    const reader = stream!.getReader();
+
+    await expect(readFrame(reader)).resolves.toBe(
+      `id: ${cursor}\ndata: ${JSON.stringify(cancelled)}\n\n`,
     );
     await expect(readFrame(reader)).resolves.toBeNull();
   });

@@ -19,6 +19,13 @@ export type {
   ConversationRecord,
 } from "./conversation-reader";
 export {
+  cancelGenerationExecution,
+  isGenerationCancellationRequested,
+  requestGenerationCancellationForOwner,
+  type GenerationCancellationRecord,
+  type RequestGenerationCancellationResult,
+} from "./generation-cancellation";
+export {
   createGenerationCommandRecord,
   type CreateGenerationCommandRecordInput,
   type CreateGenerationCommandRecordResult,

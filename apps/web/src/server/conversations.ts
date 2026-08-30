@@ -40,7 +40,13 @@ export async function getConversationForOwner(
 
   return {
     conversation: toConversationSummary(detail.conversation),
-    activeGeneration: detail.activeGeneration,
+    activeGeneration: detail.activeGeneration
+      ? {
+          ...detail.activeGeneration,
+          cancelRequestedAt:
+            detail.activeGeneration.cancelRequestedAt?.toISOString() ?? null,
+        }
+      : null,
     messages: detail.messages.map((message) => ({
       ...message,
       createdAt: message.createdAt.toISOString(),

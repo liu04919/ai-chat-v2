@@ -60,6 +60,7 @@ export const useGenerationProjectionStore =
           !projection ||
           projection.status === "completed" ||
           projection.status === "failed" ||
+          projection.status === "cancelled" ||
           projection.status === "connection-error"
         ) {
           return state;

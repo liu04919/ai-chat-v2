@@ -3,7 +3,10 @@ import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { closeApplicationDatabase } from "@ai-chat/db";
-import { createRedisGenerationEventWriter } from "@ai-chat/event-store";
+import {
+  createRedisGenerationCancellationSubscriber,
+  createRedisGenerationEventWriter,
+} from "@ai-chat/event-store";
 import { createR2ObjectStorage } from "@ai-chat/storage";
 
 import { createBullMqGenerationWorker } from "./generation/bullmq-generation-worker";
@@ -30,6 +33,9 @@ function requireEnvironment(name: string): string {
 
 requireEnvironment("DATABASE_URL");
 const redisUrl = requireEnvironment("REDIS_URL");
+const cancellationSubscriber = createRedisGenerationCancellationSubscriber({
+  redisUrl,
+});
 const eventWriter = createRedisGenerationEventWriter({ redisUrl });
 const objectStorage = createR2ObjectStorage({
   endpoint: requireEnvironment("R2_ENDPOINT"),
@@ -47,6 +53,7 @@ const worker = createBullMqGenerationWorker({
   processGeneration: (generationId) =>
     executeChatGeneration(generationId, {
       chatModel,
+      cancellationSubscriber,
       eventWriter,
       objectStorage,
     }),
@@ -58,6 +65,7 @@ function shutdown(signal: NodeJS.Signals): Promise<void> {
   shutdownPromise ??= (async () => {
     console.info(`收到 ${signal}，正在停止 Generation Worker`);
     await worker.close();
+    await cancellationSubscriber.close();
     await eventWriter.close();
     await closeApplicationDatabase();
   })();

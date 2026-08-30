@@ -12,6 +12,7 @@ import {
   conversationDetailResponseSchema,
   conversationListResponseSchema,
 } from "./conversation";
+import { cancelGenerationResponseSchema } from "./generation-cancellation";
 import {
   createGenerationRequestSchema,
   createGenerationResponseSchema,
@@ -68,6 +69,12 @@ describe("contract examples", () => {
     expect(createGenerationResponseSchema.parse(response)).toEqual(response);
   });
 
+  it("generation cancel response 与 Schema 保持一致", () => {
+    const response = readExample("http/generation/cancel.response.json");
+
+    expect(cancelGenerationResponseSchema.parse(response)).toEqual(response);
+  });
+
   it("generation error 与 Worker job 示例保持一致", () => {
     const error = readExample("http/generation/active.error.json");
     const job = readExample("worker/generation.job.json");
@@ -82,6 +89,7 @@ describe("contract examples", () => {
     "reasoning-delta",
     "completed",
     "failed",
+    "cancelled",
   ])("GenerationEvent %s 示例与 Schema 保持一致", (name) => {
     const event = readExample(`redis/generation-event/${name}.json`);
 

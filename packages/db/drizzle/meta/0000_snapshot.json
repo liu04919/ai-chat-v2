@@ -1,5 +1,5 @@
 {
-  "id": "e7eded1d-7344-4969-b36a-29325d9c6cda",
+  "id": "85e6e5bf-7477-4dfd-8f19-159b59aedc65",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -655,6 +655,12 @@
         "error_code": {
           "name": "error_code",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancel_requested_at": {
+          "name": "cancel_requested_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

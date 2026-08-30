@@ -13,9 +13,12 @@ import {
   createDatabase,
   createGenerationCommandRecord,
   migrateDatabase,
+  requestGenerationCancellationForOwner,
   user,
 } from "@ai-chat/db";
 import {
+  createRedisGenerationCancellationPublisher,
+  createRedisGenerationCancellationSubscriber,
   createRedisGenerationEventReader,
   createRedisGenerationEventWriter,
 } from "@ai-chat/event-store";
@@ -64,6 +67,15 @@ const queueEvents = new QueueEvents(queueName, {
   connection: eventsConnection,
 });
 const eventKeyPrefix = `worker-integration-${randomUUID()}`;
+const cancellationChannelPrefix = `worker-cancellation-${randomUUID()}`;
+const cancellationPublisher = createRedisGenerationCancellationPublisher({
+  redisUrl,
+  channelPrefix: cancellationChannelPrefix,
+});
+const cancellationSubscriber = createRedisGenerationCancellationSubscriber({
+  redisUrl,
+  channelPrefix: cancellationChannelPrefix,
+});
 const eventWriter = createRedisGenerationEventWriter({
   redisUrl,
   keyPrefix: eventKeyPrefix,
@@ -76,30 +88,60 @@ const eventReader = createRedisGenerationEventReader({
 const capturedRequests: ChatModelRequest[] = [];
 let modelCalls = 0;
 
-function requestText(request: ChatModelRequest): string {
-  return request.messages
-    .flatMap((message) =>
-      message.role === "assistant"
-        ? message.parts.flatMap((part) =>
-            part.type === "text" || part.type === "reasoning"
-              ? [part.text]
-              : [],
-          )
-        : message.parts.flatMap((part) =>
-            part.type === "text" ? [part.text] : [],
-          ),
-    )
-    .join("\n");
+function latestUserText(request: ChatModelRequest): string {
+  const message = [...request.messages].reverse().find(
+    (candidate) => candidate.role === "user",
+  );
+
+  return message?.parts
+    .flatMap((part) => (part.type === "text" ? [part.text] : []))
+    .join("\n") ?? "";
 }
 
 const fakeChatModel: ChatModel = {
   async *stream(request): AsyncIterable<ChatModelStreamPart> {
     modelCalls += 1;
-    capturedRequests.push(request);
+    capturedRequests.push({
+      messages: request.messages,
+      reasoningEffort: request.reasoningEffort,
+    });
 
-    if (requestText(request).includes("触发失败")) {
+    if (latestUserText(request).includes("触发失败")) {
       yield { type: "text", partId: "failed-text", delta: "部分" };
       throw new Error("Fake LLM failure");
+    }
+
+    if (latestUserText(request).includes("等待无输出取消")) {
+      await new Promise<void>((resolve) => {
+        if (request.abortSignal?.aborted) {
+          resolve();
+          return;
+        }
+
+        request.abortSignal?.addEventListener("abort", () => resolve(), {
+          once: true,
+        });
+      });
+      request.abortSignal?.throwIfAborted();
+    }
+
+    if (latestUserText(request).includes("等待取消")) {
+      yield {
+        type: "reasoning",
+        partId: "cancel-reasoning",
+        delta: "分析到一半",
+      };
+      await new Promise<void>((resolve) => {
+        if (request.abortSignal?.aborted) {
+          resolve();
+          return;
+        }
+
+        request.abortSignal?.addEventListener("abort", () => resolve(), {
+          once: true,
+        });
+      });
+      request.abortSignal?.throwIfAborted();
     }
 
     yield { type: "reasoning", partId: "reasoning-1", delta: "先" };
@@ -119,6 +161,7 @@ const worker = createBullMqGenerationWorker({
   processGeneration: (generationId) =>
     executeChatGeneration(generationId, {
       chatModel: fakeChatModel,
+      cancellationSubscriber,
       eventWriter,
       objectStorage: { createDownloadUrl },
       coalescing: { maxDelayMs: 1000, maxCharacters: 128 },
@@ -187,6 +230,25 @@ async function enqueue(generationId: string): Promise<Job> {
   );
 }
 
+async function waitForGenerationEvent(
+  generationId: string,
+  eventType: "generation.started" | "reasoning.delta",
+): Promise<void> {
+  const deadline = Date.now() + 5_000;
+
+  while (Date.now() < deadline) {
+    const events = await eventReader.read({ generationId });
+
+    if (events.some((entry) => entry.event.type === eventType)) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+
+  throw new Error("等待 " + eventType + " 超时");
+}
+
 beforeAll(async () => {
   await migrateDatabase({
     databaseUrl: testDatabaseUrl,
@@ -211,6 +273,8 @@ afterAll(async () => {
   eventsConnection.disconnect();
   await eventReader.close();
   await eventWriter.close();
+  await cancellationSubscriber.close();
+  await cancellationPublisher.close();
   await database.client`DELETE FROM "user" WHERE id = ${ownerId}`;
   await database.close();
   await closeApplicationDatabase();
@@ -410,5 +474,132 @@ describe("Chat Generation Worker 主链", () => {
         where: (table, { eq }) => eq(table.conversationId, conversationId),
       }),
     ).toHaveLength(1);
+  });
+
+  it("收到跨进程取消信号后停止模型并持久化 reasoning-only partial", async () => {
+    const generationId = `worker-cancel-generation-${randomUUID()}`;
+    const conversationId = `worker-cancel-conversation-${randomUUID()}`;
+    await createQueuedGeneration({
+      generationId,
+      conversationId,
+      userMessageId: `worker-cancel-message-${randomUUID()}`,
+      parts: [{ type: "text", text: "等待取消" }],
+    });
+
+    const job = await enqueue(generationId);
+    await waitForGenerationEvent(generationId, "reasoning.delta");
+    const cancellation = await requestGenerationCancellationForOwner(
+      { ownerId, generationId, now: new Date() },
+      database.db,
+    );
+    expect(cancellation.kind).toBe("running_requested");
+    await cancellationPublisher.publish(generationId);
+
+    await expect(
+      job.waitUntilFinished(queueEvents, 5_000),
+    ).resolves.toMatchObject({ kind: "cancelled" });
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, generationId),
+      }),
+    ).resolves.toMatchObject({
+      status: "cancelled",
+      errorCode: null,
+    });
+    const persistedMessages = await database.db.query.messages.findMany({
+      where: (table, { eq }) => eq(table.conversationId, conversationId),
+      orderBy: (table, { asc }) => asc(table.sequence),
+    });
+    expect(persistedMessages).toMatchObject([
+      { role: "user", sequence: 0 },
+      {
+        role: "assistant",
+        sequence: 1,
+        parts: [
+          {
+            id: "cancel-reasoning",
+            type: "reasoning",
+            text: "分析到一半",
+          },
+        ],
+      },
+    ]);
+    expect(
+      (await eventReader.read({ generationId })).map((entry) => entry.event),
+    ).toEqual([
+      { type: "generation.started", generationId },
+      {
+        type: "reasoning.delta",
+        generationId,
+        partId: "cancel-reasoning",
+        delta: "分析到一半",
+      },
+      { type: "generation.cancelled", generationId },
+    ]);
+
+    const nextGenerationId = `worker-after-cancel-${randomUUID()}`;
+    const requestOffset = capturedRequests.length;
+    await createExistingQueuedGeneration({
+      generationId: nextGenerationId,
+      conversationId,
+      userMessageId: `worker-after-cancel-message-${randomUUID()}`,
+      parts: [{ type: "text", text: "沿着刚才的内容继续" }],
+    });
+    const nextJob = await enqueue(nextGenerationId);
+    await nextJob.waitUntilFinished(queueEvents, 5_000);
+
+    expect(capturedRequests[requestOffset]).toMatchObject({
+      messages: [
+        { role: "user", parts: [{ type: "text", text: "等待取消" }] },
+        {
+          role: "assistant",
+          parts: [
+            {
+              id: "cancel-reasoning",
+              type: "reasoning",
+              text: "分析到一半",
+            },
+          ],
+        },
+        {
+          role: "user",
+          parts: [{ type: "text", text: "沿着刚才的内容继续" }],
+        },
+      ],
+    });
+  });
+
+  it("模型尚无可见输出时取消，不创建空 Assistant Message", async () => {
+    const generationId = `worker-cancel-empty-${randomUUID()}`;
+    const conversationId = `worker-cancel-empty-conversation-${randomUUID()}`;
+    await createQueuedGeneration({
+      generationId,
+      conversationId,
+      userMessageId: `worker-cancel-empty-message-${randomUUID()}`,
+      parts: [{ type: "text", text: "等待无输出取消" }],
+    });
+
+    const job = await enqueue(generationId);
+    await waitForGenerationEvent(generationId, "generation.started");
+    await requestGenerationCancellationForOwner(
+      { ownerId, generationId, now: new Date() },
+      database.db,
+    );
+    await cancellationPublisher.publish(generationId);
+    await job.waitUntilFinished(queueEvents, 5_000);
+
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, generationId),
+      }),
+    ).resolves.toMatchObject({
+      status: "cancelled",
+      assistantMessageId: null,
+    });
+    await expect(
+      database.db.query.messages.findMany({
+        where: (table, { eq }) => eq(table.conversationId, conversationId),
+      }),
+    ).resolves.toHaveLength(1);
   });
 });

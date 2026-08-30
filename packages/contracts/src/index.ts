@@ -41,6 +41,13 @@ export {
   type ReasoningEffortDto,
 } from "./generation";
 export {
+  cancelGenerationErrorResponseSchema,
+  cancelGenerationResponseSchema,
+  type CancelGenerationErrorResponse,
+  type CancelGenerationResponse,
+} from "./generation-cancellation";
+export {
+  generationCancelledEventSchema,
   generationCompletedEventSchema,
   generationEventCursorSchema,
   generationEventSchema,

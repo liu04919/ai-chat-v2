@@ -22,6 +22,7 @@ describe("generationEventSchema", () => {
     },
     { type: "generation.completed", generationId: "generation_123" },
     { type: "generation.failed", generationId: "generation_123" },
+    { type: "generation.cancelled", generationId: "generation_123" },
   ])("接受 $type", (event) => {
     expect(generationEventSchema.parse(event)).toEqual(event);
   });

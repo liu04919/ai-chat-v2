@@ -9,6 +9,7 @@ export type GenerationProjectionStatus =
   | "reconnecting"
   | "completed"
   | "failed"
+  | "cancelled"
   | "connection-error";
 
 export type GenerationProjection = {
@@ -80,6 +81,7 @@ export function reduceGenerationEvents(
     if (
       current.status === "completed" ||
       current.status === "failed" ||
+      current.status === "cancelled" ||
       current.status === "connection-error"
     ) {
       return current;
@@ -99,6 +101,8 @@ export function reduceGenerationEvents(
         return { ...current, status: "completed" };
       case "generation.failed":
         return { ...current, status: "failed" };
+      case "generation.cancelled":
+        return { ...current, status: "cancelled" };
     }
   }, projection);
 }

@@ -11,7 +11,12 @@ import { useGenerationProjectionStore } from "./generation-projection-store";
 
 type TerminalGenerationEvent = Extract<
   GenerationEventDto,
-  { type: "generation.completed" | "generation.failed" }
+  {
+    type:
+      | "generation.completed"
+      | "generation.failed"
+      | "generation.cancelled";
+  }
 >;
 
 export function useGenerationEventStream({
@@ -42,7 +47,8 @@ export function useGenerationEventStream({
       const terminalEvent = events.findLast(
         (event): event is TerminalGenerationEvent =>
           event.type === "generation.completed" ||
-          event.type === "generation.failed",
+          event.type === "generation.failed" ||
+          event.type === "generation.cancelled",
       );
 
       if (terminalEvent) {
@@ -86,7 +92,8 @@ export function useGenerationEventStream({
 
       if (
         parsedEvent.data.type === "generation.completed" ||
-        parsedEvent.data.type === "generation.failed"
+        parsedEvent.data.type === "generation.failed" ||
+        parsedEvent.data.type === "generation.cancelled"
       ) {
         source.close();
       }

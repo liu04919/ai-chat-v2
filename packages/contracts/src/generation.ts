@@ -18,6 +18,7 @@ export const activeGenerationSchema = z
   .object({
     id: z.string().min(1),
     status: z.enum(["queued", "running"]),
+    cancelRequestedAt: z.iso.datetime().nullable(),
   })
   .strict();
 

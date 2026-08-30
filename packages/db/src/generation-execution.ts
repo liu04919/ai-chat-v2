@@ -9,7 +9,7 @@ import {
   assistantMessagePartsSchema,
   userMessagePartsSchema,
 } from "@ai-chat/contracts";
-import { and, asc, eq, inArray, max } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, max } from "drizzle-orm";
 
 import { getDatabase } from "./client";
 import {
@@ -85,6 +85,7 @@ export async function claimGenerationExecution(
         and(
           eq(generations.id, generationId),
           eq(generations.status, "queued"),
+          isNull(generations.cancelRequestedAt),
         ),
       )
       .returning({
@@ -208,13 +209,18 @@ export async function completeGenerationExecution(
       .select({
         conversationId: generations.conversationId,
         status: generations.status,
+        cancelRequestedAt: generations.cancelRequestedAt,
       })
       .from(generations)
       .where(eq(generations.id, input.generationId))
       .for("update")
       .limit(1);
 
-    if (!generation || generation.status !== "running") {
+    if (
+      !generation ||
+      generation.status !== "running" ||
+      generation.cancelRequestedAt
+    ) {
       return false;
     }
 
@@ -272,6 +278,7 @@ export async function failGenerationExecution(
       and(
         eq(generations.id, input.generationId),
         eq(generations.status, "running"),
+        isNull(generations.cancelRequestedAt),
       ),
     )
     .returning({ id: generations.id });

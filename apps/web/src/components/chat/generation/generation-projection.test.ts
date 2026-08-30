@@ -108,4 +108,24 @@ describe("Generation projection", () => {
     expect(wrongGeneration.status).toBe("connection-error");
     expect(wrongPartType.status).toBe("connection-error");
   });
+
+  it("保留取消前的 partial parts，并进入 cancelled 终态", () => {
+    const projection = reduceGenerationEvents(
+      createGenerationProjection("conversation_123", generationId),
+      [
+        {
+          type: "reasoning.delta",
+          generationId,
+          partId: "reasoning_1",
+          delta: "正在分析",
+        },
+        { type: "generation.cancelled", generationId },
+      ],
+    );
+
+    expect(projection.status).toBe("cancelled");
+    expect(projection.parts).toEqual([
+      { id: "reasoning_1", type: "reasoning", text: "正在分析" },
+    ]);
+  });
 });

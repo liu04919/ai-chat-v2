@@ -117,15 +117,15 @@ type GenerationStatus =
   | "cancelled";
 ```
 
-Generation 与最终 Assistant Message 不是同一个对象。执行中的增量属于 Generation；成功完成后，按原始顺序聚合的可见 reasoning、tool 过程和最终输出共同成为 Assistant Message。失败的 partial 是否永久保存仍单独决策。
+Generation 与 Assistant Message 不是同一个对象。执行中的增量属于 Generation；成功完成后，按原始顺序聚合的可见 reasoning、tool 过程和最终输出共同成为 Assistant Message。普通失败不保存 partial；用户主动取消时，已经生成的可见 parts 作为 partial Assistant Message 永久保存，没有任何可见 part 时不创建空 Message。
 
 ### 存储职责
 
-- **PostgreSQL**：Conversation、Completed Message、Generation 状态、Attachment、Knowledge、Share Snapshot
+- **PostgreSQL**：Conversation、永久 Message、Generation 状态、Attachment、Knowledge、Share Snapshot
 - **BullMQ**：把 Generation 和知识入库任务交给 Worker，不作为业务事件历史
 - **Redis Streams**：短期 Generation Event Log，支持实时消费和断线重放，不作为永久数据库；每次追加事件时刷新 24 小时 TTL
 
-PostgreSQL 是 Completed Message 的唯一永久事实来源。前端刷新后不能从 Redis 或浏览器缓存重建永久消息。
+PostgreSQL 是永久 Message 的唯一事实来源。前端刷新后不能从 Redis 或浏览器缓存重建永久消息。
 
 ## 5. 自有跨边界协议
 
@@ -346,7 +346,9 @@ Regenerate 只针对最后一条 Assistant Message，并创建新的 Generation�
 
 ### Cancel
 
-取消链路为 `API → durable cancelled state → Worker abort/cleanup → generation.cancelled`。是否永久保存已经生成的 partial Assistant Message 尚未决定，不能从 `cancelled` 事件自行推断。
+取消请求先写入 PostgreSQL，再通过 Redis Pub/Sub 唤醒 Worker；PostgreSQL 标记负责可靠判定，Pub/Sub 只负责快速中断。`queued` Generation 可由 API 直接置为 `cancelled`；`running` Generation 在 Worker 完成 partial 落库前仍保持 active，避免下一条用户消息越过尚未提交的上下文。
+
+Worker 收到请求后用 `AbortSignal` 停止模型流，把内存中按原顺序聚合的可见 parts 与 `cancelled` 状态在同一 PostgreSQL transaction 中提交；reasoning-only partial 合法，没有可见 part 时不创建空 Assistant Message。durable transaction 成功后才能发布 `generation.cancelled`。后续 Context Builder 把该 partial 当作普通 Assistant 历史重新发送。
 
 ### Delete Conversation
 
@@ -452,12 +454,10 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 1. ORM/DB layer
 2. delta coalescing 的时间与大小阈值
 3. BullMQ concurrency
-4. cancel signal 的跨进程实现
-5. Cancel 后 partial Assistant Message 是否持久化
-6. embedding provider、Chunk Strategy 与 Pinecone index schema
-7. Tool input/output 的脱敏、截断与前端展示细节
-8. reasoning 的最终视觉展示形态
-9. 最终部署拓扑
+4. embedding provider、Chunk Strategy 与 Pinecone index schema
+5. Tool input/output 的脱敏、截断与前端展示细节
+6. reasoning 的最终视觉展示形态
+7. 最终部署拓扑
 
 ## 15. 协作规则
 

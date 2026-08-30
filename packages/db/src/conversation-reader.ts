@@ -28,6 +28,7 @@ export type ConversationDetailRecord = {
   activeGeneration: {
     id: string;
     status: (typeof activeGenerationStatuses)[number];
+    cancelRequestedAt: Date | null;
   } | null;
   messages: Array<
     | {
@@ -78,6 +79,7 @@ export async function getConversationRecordForOwner(
       updatedAt: conversations.updatedAt,
       generationId: generations.id,
       generationStatus: generations.status,
+      generationCancelRequestedAt: generations.cancelRequestedAt,
     })
     .from(conversations)
     .leftJoin(
@@ -102,7 +104,11 @@ export async function getConversationRecordForOwner(
   const activeGeneration =
     row.generationId &&
     (row.generationStatus === "queued" || row.generationStatus === "running")
-      ? { id: row.generationId, status: row.generationStatus }
+      ? {
+          id: row.generationId,
+          status: row.generationStatus,
+          cancelRequestedAt: row.generationCancelRequestedAt,
+        }
       : null;
   const rawMessageRecords = await database
     .select({

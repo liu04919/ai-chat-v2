@@ -105,6 +105,10 @@ export const generations = pgTable(
     status: generationStatus("status").default("queued").notNull(),
     reasoningEffort: reasoningEffort("reasoning_effort").$type<ReasoningEffortDto>(),
     errorCode: text("error_code"),
+    cancelRequestedAt: timestamp("cancel_requested_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),

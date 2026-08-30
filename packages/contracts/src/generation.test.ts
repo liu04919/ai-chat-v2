@@ -15,13 +15,27 @@ describe("chatRuntimeStateSchema", () => {
   it("只允许 queued 或 running 作为 active Generation", () => {
     expect(
       chatRuntimeStateSchema.parse({
-        activeGeneration: { id: "gen_123", status: "running" },
+        activeGeneration: {
+          id: "gen_123",
+          status: "running",
+          cancelRequestedAt: null,
+        },
       }),
-    ).toEqual({ activeGeneration: { id: "gen_123", status: "running" } });
+    ).toEqual({
+      activeGeneration: {
+        id: "gen_123",
+        status: "running",
+        cancelRequestedAt: null,
+      },
+    });
 
     expect(() =>
       chatRuntimeStateSchema.parse({
-        activeGeneration: { id: "gen_123", status: "completed" },
+        activeGeneration: {
+          id: "gen_123",
+          status: "completed",
+          cancelRequestedAt: null,
+        },
       }),
     ).toThrow();
   });

@@ -29,7 +29,12 @@ import {
 
 type TerminalGenerationEvent = Extract<
   GenerationEventDto,
-  { type: "generation.completed" | "generation.failed" }
+  {
+    type:
+      | "generation.completed"
+      | "generation.failed"
+      | "generation.cancelled";
+  }
 >;
 
 function nextMessageSequence(messages: readonly MessageDto[]): number {
@@ -82,7 +87,8 @@ export function ConversationWorkspace({
         });
 
         if (
-          event.type === "generation.completed" &&
+          (event.type === "generation.completed" ||
+            event.type === "generation.cancelled") &&
           refreshedDetail.activeGeneration === null
         ) {
           clearProjection(conversationId);
@@ -157,7 +163,11 @@ export function ConversationWorkspace({
             const status = response.generation.status;
             const activeGeneration =
               status === "queued" || status === "running"
-                ? { id: response.generation.id, status }
+                ? {
+                    id: response.generation.id,
+                    status,
+                    cancelRequestedAt: null,
+                  }
                 : null;
 
             return { ...current, activeGeneration };

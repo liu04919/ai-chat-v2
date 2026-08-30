@@ -4,6 +4,10 @@ import IORedis from "ioredis";
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
+  createRedisGenerationCancellationPublisher,
+  createRedisGenerationCancellationSubscriber,
+} from "./redis-generation-cancellation";
+import {
   createRedisGenerationEventReader,
   createRedisGenerationEventWriter,
   type GenerationEventReader,
@@ -153,5 +157,33 @@ describe("Redis GenerationEvent writer and reader", () => {
         blockMs: 10,
       }),
     ).resolves.toEqual([]);
+  });
+});
+
+describe("Redis Generation cancellation Pub/Sub", () => {
+  it("订阅建立后把指定 Generation 的取消信号交给 Worker", async () => {
+    const channelPrefix = `generation-cancellation-${randomUUID()}`;
+    const generationId = `generation-${randomUUID()}`;
+    const publisher = createRedisGenerationCancellationPublisher({
+      redisUrl,
+      channelPrefix,
+    });
+    const subscriber = createRedisGenerationCancellationSubscriber({
+      redisUrl,
+      channelPrefix,
+    });
+    let notifyCancellation: (() => void) | undefined;
+    const received = new Promise<void>((resolve) => {
+      notifyCancellation = resolve;
+    });
+    const unsubscribe = await subscriber.subscribe(
+      generationId,
+      notifyCancellation!,
+    );
+
+    await publisher.publish(generationId);
+    await expect(received).resolves.toBeUndefined();
+    await unsubscribe();
+    await Promise.all([subscriber.close(), publisher.close()]);
   });
 });
