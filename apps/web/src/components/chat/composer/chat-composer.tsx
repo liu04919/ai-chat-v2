@@ -5,7 +5,7 @@ import type {
   ReasoningEffortDto,
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
-import { ArrowUp, Brain, Paperclip } from "lucide-react";
+import { ArrowUp, Brain, Paperclip, Square } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -39,18 +39,23 @@ export function ChatComposer({
   disabled = false,
   mode,
   onAttachmentPresenceChange,
+  onStopGeneration,
   onSubmit,
+  stopRequested = false,
   submitError,
 }: Readonly<{
   disabled?: boolean;
   mode: ConversationModeDto;
   onAttachmentPresenceChange?: (hasAttachments: boolean) => void;
+  onStopGeneration?: () => Promise<void>;
   onSubmit?: (submission: ChatComposerSubmission) => Promise<void>;
+  stopRequested?: boolean;
   submitError?: string | null;
 }>) {
   const [input, setInput] = useState("");
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffortDto>("medium");
+  const [isStopping, setIsStopping] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachments = useDraftAttachments({
@@ -76,6 +81,9 @@ export function ChatComposer({
     attachmentsReady &&
     hasContent &&
     !isSubmitting;
+  const hasActiveGeneration = Boolean(onStopGeneration);
+  const isStopPending = stopRequested || isStopping;
+  const contentDisabled = disabled || hasActiveGeneration || isSubmitting;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -115,14 +123,30 @@ export function ChatComposer({
     }
   }
 
+  async function handleStopGeneration() {
+    if (!onStopGeneration || isStopPending) {
+      return;
+    }
+
+    setIsStopping(true);
+
+    try {
+      await onStopGeneration();
+    } catch {
+      // 父组件展示具体错误；这里仅恢复停止按钮，允许用户重试。
+    } finally {
+      setIsStopping(false);
+    }
+  }
+
   return (
     <form
-      aria-busy={isSubmitting}
+      aria-busy={isSubmitting || isStopPending}
       className="w-full rounded-[1.75rem] border bg-background p-2 shadow-[0_18px_55px_-28px_rgba(15,23,42,0.35)]"
       onSubmit={handleSubmit}
     >
       <DraftAttachmentList
-        disabled={disabled || isSubmitting}
+        disabled={contentDisabled}
         items={attachments.items}
         onRemove={(item) => void attachments.removeItem(item)}
         onRetry={attachments.retryItem}
@@ -133,7 +157,7 @@ export function ChatComposer({
         className="min-h-20 max-h-64"
         placeholder={mode === "chat" ? "输入消息" : "描述你想生成的图片"}
         value={input}
-        disabled={disabled || isSubmitting}
+        disabled={contentDisabled}
         onChange={(event) => setInput(event.target.value)}
       />
 
@@ -153,7 +177,7 @@ export function ChatComposer({
           <Button
             aria-label={mode === "chat" ? "添加图片或 PDF" : "添加参考图片"}
             className="size-9 rounded-full p-0 hover:bg-foreground/10 active:bg-foreground/20"
-            disabled={!attachments.canAdd || disabled || isSubmitting}
+            disabled={!attachments.canAdd || contentDisabled}
             onClick={() => fileInputRef.current?.click()}
             title={mode === "chat" ? "添加附件" : "添加一张参考图片"}
             variant="ghost"
@@ -170,7 +194,7 @@ export function ChatComposer({
             }
           >
             <Select
-              disabled={mode !== "chat" || disabled || isSubmitting}
+              disabled={mode !== "chat" || contentDisabled}
               value={reasoningEffort}
               onValueChange={(value) =>
                 setReasoningEffort(value as ReasoningEffortDto)
@@ -207,17 +231,33 @@ export function ChatComposer({
           </div>
         </div>
 
-        <Button
-          aria-label={mode === "chat" ? "发送消息" : "生成图片"}
-          className="size-10 rounded-full p-0"
-          disabled={!canSubmit}
-          type="submit"
-        >
-          <ArrowUp className="size-5" aria-hidden="true" />
-        </Button>
+        {hasActiveGeneration ? (
+          <Button
+            aria-label={isStopPending ? "正在停止生成" : "停止生成"}
+            className="size-10 rounded-full p-0 disabled:opacity-70"
+            disabled={isStopPending}
+            title={isStopPending ? "正在停止" : "停止生成"}
+            onClick={() => void handleStopGeneration()}
+          >
+            <Square className="size-3.5 fill-current" aria-hidden="true" />
+          </Button>
+        ) : (
+          <Button
+            aria-label={mode === "chat" ? "发送消息" : "生成图片"}
+            className="size-10 rounded-full p-0"
+            disabled={!canSubmit}
+            type="submit"
+          >
+            <ArrowUp className="size-5" aria-hidden="true" />
+          </Button>
+        )}
       </div>
 
-      {submitError || attachments.notice ? (
+      {isStopPending ? (
+        <p className="px-3 pb-1 text-xs text-muted-foreground" role="status">
+          正在停止生成…
+        </p>
+      ) : submitError || attachments.notice ? (
         <p className="px-3 pb-1 text-xs text-destructive" role="alert">
           {submitError ?? attachments.notice}
         </p>

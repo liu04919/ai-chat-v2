@@ -1,6 +1,10 @@
 import {
+  cancelGenerationErrorResponseSchema,
+  cancelGenerationResponseSchema,
   createGenerationResponseSchema,
   generationErrorResponseSchema,
+  type CancelGenerationErrorResponse,
+  type CancelGenerationResponse,
   type CreateGenerationRequest,
   type CreateGenerationResponse,
   type GenerationErrorResponse,
@@ -19,12 +23,31 @@ const generationErrorMessages: Record<GenerationErrorResponse["code"], string> =
   ACTIVE_GENERATION: "当前对话仍在生成，请稍后再试",
 };
 
+const cancellationErrorMessages: Record<
+  CancelGenerationErrorResponse["code"],
+  string
+> = {
+  UNAUTHORIZED: "登录状态已失效，请重新登录",
+  GENERATION_NOT_FOUND: "当前回复已经结束或不存在",
+  CANCEL_SIGNAL_UNAVAILABLE: "暂时无法停止生成，请重试",
+};
+
 export class GenerationClientError extends Error {
   constructor(readonly response: GenerationErrorResponse | null) {
     super(
       response
         ? generationErrorMessages[response.code]
         : "消息发送失败，请稍后重试",
+    );
+  }
+}
+
+export class GenerationCancellationClientError extends Error {
+  constructor(readonly response: CancelGenerationErrorResponse | null) {
+    super(
+      response
+        ? cancellationErrorMessages[response.code]
+        : "停止生成失败，请稍后重试",
     );
   }
 }
@@ -49,8 +72,35 @@ export async function createGeneration(
   return createGenerationResponseSchema.parse(body);
 }
 
+export async function cancelGeneration(
+  generationId: string,
+): Promise<CancelGenerationResponse> {
+  const response = await fetch(
+    `/api/generations/${encodeURIComponent(generationId)}/cancel`,
+    { method: "POST" },
+  );
+  const body: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const parsedError = cancelGenerationErrorResponseSchema.safeParse(body);
+    throw new GenerationCancellationClientError(
+      parsedError.success ? parsedError.data : null,
+    );
+  }
+
+  return cancelGenerationResponseSchema.parse(body);
+}
+
 export function getGenerationClientErrorMessage(error: unknown): string {
   return error instanceof GenerationClientError
     ? error.message
     : "消息发送失败，请稍后重试";
+}
+
+export function getGenerationCancellationClientErrorMessage(
+  error: unknown,
+): string {
+  return error instanceof GenerationCancellationClientError
+    ? error.message
+    : "停止生成失败，请稍后重试";
 }

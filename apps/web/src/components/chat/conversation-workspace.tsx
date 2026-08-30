@@ -23,7 +23,9 @@ import {
   fetchConversation,
 } from "@/lib/conversations-client";
 import {
+  cancelGeneration,
   createGeneration,
+  getGenerationCancellationClientErrorMessage,
   getGenerationClientErrorMessage,
 } from "@/lib/generations-client";
 
@@ -187,6 +189,64 @@ export function ConversationWorkspace({
     [clearProjection, conversationId, queryClient],
   );
 
+  const stopGeneration = useCallback(async () => {
+    if (!activeGenerationId) {
+      return;
+    }
+
+    const queryKey = conversationDetailQueryKey(conversationId);
+
+    setSubmitError(null);
+
+    try {
+      await queryClient.cancelQueries({ queryKey });
+      const response = await cancelGeneration(activeGenerationId);
+
+      if (response.generation.id !== activeGenerationId) {
+        throw new Error("服务端返回了不一致的 Generation ID");
+      }
+
+      const activeGeneration =
+        response.generation.status === "queued" ||
+        response.generation.status === "running"
+          ? {
+              id: response.generation.id,
+              status: response.generation.status,
+              cancelRequestedAt: response.generation.cancelRequestedAt,
+            }
+          : null;
+
+      queryClient.setQueryData<ConversationDetailResponse>(
+        queryKey,
+        (current) => {
+          if (
+            !current ||
+            current.activeGeneration?.id !== response.generation.id
+          ) {
+            return current;
+          }
+
+          return {
+            ...current,
+            activeGeneration,
+          };
+        },
+      );
+
+      if (!activeGeneration) {
+        clearProjection(conversationId);
+        void queryClient.invalidateQueries({ queryKey });
+        void queryClient.invalidateQueries({
+          queryKey: conversationListQueryKey,
+        });
+      }
+    } catch (error) {
+      setSubmitError(getGenerationCancellationClientErrorMessage(error));
+      void queryClient.invalidateQueries({ queryKey });
+      throw error;
+    }
+  }, [activeGenerationId, clearProjection, conversationId, queryClient]);
+
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
 
@@ -246,7 +306,15 @@ export function ConversationWorkspace({
         <ChatComposer
           disabled={isGenerating}
           mode={conversation.mode}
+          onStopGeneration={
+            conversation.mode === "chat" && activeGenerationId
+              ? stopGeneration
+              : undefined
+          }
           onSubmit={conversation.mode === "chat" ? submitMessage : undefined}
+          stopRequested={Boolean(
+            detail.activeGeneration?.cancelRequestedAt,
+          )}
           submitError={submitError}
         />
       </div>
