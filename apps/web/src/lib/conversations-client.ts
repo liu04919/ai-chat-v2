@@ -1,9 +1,15 @@
 import {
+  conversationDetailResponseSchema,
   conversationListResponseSchema,
+  type ConversationDetailResponse,
   type ConversationSummaryDto,
 } from "@ai-chat/contracts";
 
 export const conversationListQueryKey = ["conversations"] as const;
+
+export function conversationDetailQueryKey(conversationId: string) {
+  return ["conversation", conversationId] as const;
+}
 
 export type ClientConversationSummary = ConversationSummaryDto & {
   isPending?: boolean;
@@ -21,6 +27,18 @@ export async function fetchConversations(): Promise<ClientConversationListRespon
   }
 
   return conversationListResponseSchema.parse(await response.json());
+}
+
+export async function fetchConversation(
+  conversationId: string,
+): Promise<ConversationDetailResponse> {
+  const response = await fetch(`/api/conversations/${conversationId}`);
+
+  if (!response.ok) {
+    throw new Error("无法加载对话");
+  }
+
+  return conversationDetailResponseSchema.parse(await response.json());
 }
 
 export function prependConversation(

@@ -6,7 +6,10 @@ import { Brain, Paperclip, Wrench } from "lucide-react";
 
 type MessagePartsDto = UserMessagePartsDto | AssistantMessagePartsDto;
 
-export function MessageParts({ parts }: Readonly<{ parts: MessagePartsDto }>) {
+export function MessageParts({
+  isStreaming = false,
+  parts,
+}: Readonly<{ isStreaming?: boolean; parts: MessagePartsDto }>) {
   return parts.map((part, index) => {
     switch (part.type) {
       case "text":
@@ -17,7 +20,11 @@ export function MessageParts({ parts }: Readonly<{ parts: MessagePartsDto }>) {
         );
       case "reasoning":
         return (
-          <details className="mb-3 text-muted-foreground" key={part.id}>
+          <details
+            className="mb-3 text-muted-foreground"
+            open={isStreaming || undefined}
+            key={part.id}
+          >
             <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium">
               <Brain className="size-4" aria-hidden="true" />
               思考过程

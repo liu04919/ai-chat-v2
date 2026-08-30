@@ -259,6 +259,18 @@ export function useDraftAttachments({
     [uploadItem],
   );
 
+  const clearSubmitted = useCallback(() => {
+    for (const previewUrl of previewUrlsRef.current) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    previewUrlsRef.current.clear();
+    itemCountRef.current = 0;
+    setItems([]);
+    setNotice(null);
+    onPresenceChange?.(false);
+  }, [onPresenceChange]);
+
   return {
     items,
     notice,
@@ -266,5 +278,6 @@ export function useDraftAttachments({
     addFiles,
     removeItem,
     retryItem,
+    clearSubmitted,
   };
 }
