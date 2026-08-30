@@ -2,6 +2,7 @@
 
 import type { GenerationEventDto } from "@ai-chat/contracts";
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 
 import {
   createGenerationProjection,
@@ -20,114 +21,84 @@ type GenerationProjectionState = {
 };
 
 export const useGenerationProjectionStore =
-  create<GenerationProjectionState>((set) => ({
-    projections: {},
+  create<GenerationProjectionState>()(
+    immer((set) => ({
+      projections: {},
 
-    start(conversationId, generationId) {
-      set((state) => ({
-        projections: {
-          ...state.projections,
-          [conversationId]: createGenerationProjection(
+      start(conversationId, generationId) {
+        set((state) => {
+          state.projections[conversationId] = createGenerationProjection(
             conversationId,
             generationId,
-          ),
-        },
-      }));
-    },
+          );
+        });
+      },
 
-    apply(conversationId, events) {
-      set((state) => {
-        const projection = state.projections[conversationId];
+      apply(conversationId, events) {
+        set((state) => {
+          const projection = state.projections[conversationId];
 
-        if (!projection || events.length === 0) {
-          return state;
-        }
+          if (!projection || events.length === 0) {
+            return;
+          }
 
-        return {
-          projections: {
-            ...state.projections,
-            [conversationId]: reduceGenerationEvents(projection, events),
-          },
-        };
-      });
-    },
+          state.projections[conversationId] = reduceGenerationEvents(
+            projection,
+            events,
+          );
+        });
+      },
 
-    setReconnecting(conversationId) {
-      set((state) => {
-        const projection = state.projections[conversationId];
+      setReconnecting(conversationId) {
+        set((state) => {
+          const projection = state.projections[conversationId];
 
-        if (
-          !projection ||
-          projection.status === "completed" ||
-          projection.status === "failed" ||
-          projection.status === "cancelled" ||
-          projection.status === "connection-error"
-        ) {
-          return state;
-        }
+          if (
+            !projection ||
+            projection.status === "completed" ||
+            projection.status === "failed" ||
+            projection.status === "cancelled" ||
+            projection.status === "connection-error"
+          ) {
+            return;
+          }
 
-        return {
-          projections: {
-            ...state.projections,
-            [conversationId]: {
-              ...projection,
-              status: "reconnecting",
-            },
-          },
-        };
-      });
-    },
+          projection.status = "reconnecting";
+        });
+      },
 
-    setConnected(conversationId) {
-      set((state) => {
-        const projection = state.projections[conversationId];
+      setConnected(conversationId) {
+        set((state) => {
+          const projection = state.projections[conversationId];
 
-        if (
-          !projection ||
-          (projection.status !== "connecting" &&
-            projection.status !== "reconnecting")
-        ) {
-          return state;
-        }
+          if (
+            !projection ||
+            (projection.status !== "connecting" &&
+              projection.status !== "reconnecting")
+          ) {
+            return;
+          }
 
-        return {
-          projections: {
-            ...state.projections,
-            [conversationId]: { ...projection, status: "running" },
-          },
-        };
-      });
-    },
+          projection.status = "running";
+        });
+      },
 
-    setConnectionError(conversationId) {
-      set((state) => {
-        const projection = state.projections[conversationId];
+      setConnectionError(conversationId) {
+        set((state) => {
+          const projection = state.projections[conversationId];
 
-        if (!projection) {
-          return state;
-        }
+          if (!projection) {
+            return;
+          }
 
-        return {
-          projections: {
-            ...state.projections,
-            [conversationId]: {
-              ...projection,
-              status: "connection-error",
-            },
-          },
-        };
-      });
-    },
+          projection.status = "connection-error";
+        });
+      },
 
-    clear(conversationId) {
-      set((state) => {
-        if (!state.projections[conversationId]) {
-          return state;
-        }
-
-        const projections = { ...state.projections };
-        delete projections[conversationId];
-        return { projections };
-      });
-    },
-  }));
+      clear(conversationId) {
+        set((state) => {
+          delete state.projections[conversationId];
+        });
+      },
+    })),
+  );
