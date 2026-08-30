@@ -5,9 +5,9 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import {
   createRedisGenerationEventReader,
-  createRedisGenerationEventStore,
+  createRedisGenerationEventWriter,
   type GenerationEventReader,
-  type RedisGenerationEventStore,
+  type RedisGenerationEventWriter,
 } from "./redis-generation-event-store";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6380";
@@ -16,7 +16,7 @@ const inspector = new IORedis(redisUrl, {
   lazyConnect: true,
   maxRetriesPerRequest: 1,
 });
-const store: RedisGenerationEventStore = createRedisGenerationEventStore({
+const writer: RedisGenerationEventWriter = createRedisGenerationEventWriter({
   redisUrl,
   keyPrefix,
   ttlSeconds: 60,
@@ -49,10 +49,10 @@ afterAll(async () => {
     await inspector.quit();
   }
 
-  await store.close();
+  await writer.close();
 });
 
-describe("Redis GenerationEvent store", () => {
+describe("Redis GenerationEvent writer and reader", () => {
   it("保持事件顺序，并从 cursor 之后继续读取", async () => {
     const generationId = `generation-${randomUUID()}`;
     keyFor(generationId);
@@ -73,23 +73,24 @@ describe("Redis GenerationEvent store", () => {
       { type: "generation.completed", generationId } as const,
     ];
     const cursors = [];
+    const reader = createReader();
 
     for (const event of events) {
-      cursors.push(await store.append(event));
+      cursors.push(await writer.append(event));
     }
 
-    await expect(store.read({ generationId, limit: 2 })).resolves.toEqual([
+    await expect(reader.read({ generationId, limit: 2 })).resolves.toEqual([
       { cursor: cursors[0], event: events[0] },
       { cursor: cursors[1], event: events[1] },
     ]);
     await expect(
-      store.read({ generationId, afterCursor: cursors[1], limit: 10 }),
+      reader.read({ generationId, afterCursor: cursors[1], limit: 10 }),
     ).resolves.toEqual([
       { cursor: cursors[2], event: events[2] },
       { cursor: cursors[3], event: events[3] },
     ]);
     await expect(
-      store.read({ generationId, afterCursor: cursors[3] }),
+      reader.read({ generationId, afterCursor: cursors[3] }),
     ).resolves.toEqual([]);
   });
 
@@ -97,9 +98,9 @@ describe("Redis GenerationEvent store", () => {
     const generationId = `generation-${randomUUID()}`;
     const key = keyFor(generationId);
 
-    await store.append({ type: "generation.started", generationId });
+    await writer.append({ type: "generation.started", generationId });
     await inspector.expire(key, 1);
-    await store.append({
+    await writer.append({
       type: "text.delta",
       generationId,
       partId: "text-1",
@@ -112,17 +113,18 @@ describe("Redis GenerationEvent store", () => {
   it("读取时拒绝不符合 GenerationEvent contract 的数据", async () => {
     const generationId = `generation-${randomUUID()}`;
     const key = keyFor(generationId);
+    const reader = createReader();
 
     await inspector.xadd(key, "*", "event", "not-json");
 
-    await expect(store.read({ generationId })).rejects.toThrow();
+    await expect(reader.read({ generationId })).rejects.toThrow();
   });
 
   it("使用独立连接阻塞等待 cursor 后的新事件", async () => {
     const generationId = `generation-${randomUUID()}`;
     keyFor(generationId);
     const reader = createReader();
-    const startedCursor = await store.append({
+    const startedCursor = await writer.append({
       type: "generation.started",
       generationId,
     });
@@ -132,7 +134,7 @@ describe("Redis GenerationEvent store", () => {
       blockMs: 2_000,
     });
     const completed = { type: "generation.completed", generationId } as const;
-    const completedCursor = await store.append(completed);
+    const completedCursor = await writer.append(completed);
 
     await expect(waiting).resolves.toEqual([
       { cursor: completedCursor, event: completed },

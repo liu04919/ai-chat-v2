@@ -33,12 +33,11 @@ export type ReadBlockingGenerationEventsInput = {
   blockMs?: number;
 };
 
-export interface GenerationEventStore {
+export interface GenerationEventWriter {
   append(event: GenerationEventDto): Promise<GenerationEventCursor>;
-  read(input: ReadGenerationEventsInput): Promise<GenerationEventEntry[]>;
 }
 
-export type RedisGenerationEventStore = GenerationEventStore & {
+export type RedisGenerationEventWriter = GenerationEventWriter & {
   close(): Promise<void>;
 };
 
@@ -50,7 +49,7 @@ export interface GenerationEventReader {
   close(): Promise<void>;
 }
 
-export type RedisGenerationEventStoreConfig = {
+export type RedisGenerationEventWriterConfig = {
   redisUrl: string;
   keyPrefix?: string;
   ttlSeconds?: number;
@@ -119,9 +118,9 @@ function parseEntry(
   return { cursor, event };
 }
 
-export function createRedisGenerationEventStore(
-  config: RedisGenerationEventStoreConfig,
-): RedisGenerationEventStore {
+export function createRedisGenerationEventWriter(
+  config: RedisGenerationEventWriterConfig,
+): RedisGenerationEventWriter {
   const keyPrefix = assertNonEmpty(
     config.keyPrefix ?? DEFAULT_KEY_PREFIX,
     "keyPrefix",
@@ -160,24 +159,6 @@ export function createRedisGenerationEventStore(
       }
 
       return generationEventCursorSchema.parse(result[0]?.[1]);
-    },
-
-    async read(input) {
-      const generationId = assertNonEmpty(input.generationId, "generationId");
-      const afterCursor = input.afterCursor
-        ? generationEventCursorSchema.parse(input.afterCursor)
-        : undefined;
-      const limit = readLimit(input.limit);
-
-      const entries = await connection.xrange(
-        streamKey(keyPrefix, generationId),
-        afterCursor ? `(${afterCursor}` : "-",
-        "+",
-        "COUNT",
-        limit,
-      );
-
-      return entries.map((entry) => parseEntry(generationId, entry));
     },
 
     async close() {

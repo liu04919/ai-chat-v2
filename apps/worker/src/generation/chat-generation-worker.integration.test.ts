@@ -15,7 +15,10 @@ import {
   migrateDatabase,
   user,
 } from "@ai-chat/db";
-import { createRedisGenerationEventStore } from "@ai-chat/event-store";
+import {
+  createRedisGenerationEventReader,
+  createRedisGenerationEventWriter,
+} from "@ai-chat/event-store";
 import { Job, Queue, QueueEvents } from "bullmq";
 import IORedis from "ioredis";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -60,10 +63,15 @@ const queue = new Queue(queueName, { connection: queueConnection });
 const queueEvents = new QueueEvents(queueName, {
   connection: eventsConnection,
 });
-const eventStore = createRedisGenerationEventStore({
+const eventKeyPrefix = `worker-integration-${randomUUID()}`;
+const eventWriter = createRedisGenerationEventWriter({
   redisUrl,
-  keyPrefix: `worker-integration-${randomUUID()}`,
+  keyPrefix: eventKeyPrefix,
   ttlSeconds: 60,
+});
+const eventReader = createRedisGenerationEventReader({
+  redisUrl,
+  keyPrefix: eventKeyPrefix,
 });
 const capturedRequests: ChatModelRequest[] = [];
 let modelCalls = 0;
@@ -111,7 +119,7 @@ const worker = createBullMqGenerationWorker({
   processGeneration: (generationId) =>
     executeChatGeneration(generationId, {
       chatModel: fakeChatModel,
-      eventStore,
+      eventWriter,
       objectStorage: { createDownloadUrl },
       coalescing: { maxDelayMs: 1000, maxCharacters: 128 },
       createAssistantMessageId: () => `assistant-${randomUUID()}`,
@@ -201,7 +209,8 @@ afterAll(async () => {
   await queue.close();
   queueConnection.disconnect();
   eventsConnection.disconnect();
-  await eventStore.close();
+  await eventReader.close();
+  await eventWriter.close();
   await database.client`DELETE FROM "user" WHERE id = ${ownerId}`;
   await database.close();
   await closeApplicationDatabase();
@@ -257,7 +266,7 @@ describe("Chat Generation Worker 主链", () => {
     });
     expect(createDownloadUrl).toHaveBeenCalledWith(objectKey, 900);
     expect(
-      (await eventStore.read({ generationId })).map((entry) => entry.event),
+      (await eventReader.read({ generationId })).map((entry) => entry.event),
     ).toEqual([
       { type: "generation.started", generationId },
       {
@@ -385,7 +394,7 @@ describe("Chat Generation Worker 主链", () => {
       errorCode: "CHAT_GENERATION_FAILED",
     });
     expect(
-      (await eventStore.read({ generationId })).map((entry) => entry.event),
+      (await eventReader.read({ generationId })).map((entry) => entry.event),
     ).toEqual([
       { type: "generation.started", generationId },
       {

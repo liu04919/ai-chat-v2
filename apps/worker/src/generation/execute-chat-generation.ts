@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { AssistantMessagePartDto } from "@ai-chat/contracts";
-import type { GenerationEventStore } from "@ai-chat/event-store";
+import type { GenerationEventWriter } from "@ai-chat/event-store";
 import type { ObjectStorage } from "@ai-chat/storage";
 import {
   claimGenerationExecution,
@@ -20,7 +20,7 @@ const CHAT_GENERATION_FAILED = "CHAT_GENERATION_FAILED";
 
 export type ExecuteChatGenerationDependencies = {
   chatModel: ChatModel;
-  eventStore: GenerationEventStore;
+  eventWriter: GenerationEventWriter;
   objectStorage: Pick<ObjectStorage, "createDownloadUrl">;
   coalescing?: DeltaCoalescingOptions;
   createAssistantMessageId?: () => string;
@@ -77,7 +77,7 @@ async function recordFailure(
     });
 
     if (failed) {
-      await dependencies.eventStore.append({
+      await dependencies.eventWriter.append({
         type: "generation.failed",
         generationId,
       });
@@ -106,7 +106,7 @@ export async function executeChatGeneration(
   }
 
   try {
-    await dependencies.eventStore.append({
+    await dependencies.eventWriter.append({
       type: "generation.started",
       generationId,
     });
@@ -125,7 +125,7 @@ export async function executeChatGeneration(
       switch (part.type) {
         case "text":
           appendAssistantDelta(assistantParts, part);
-          await dependencies.eventStore.append({
+          await dependencies.eventWriter.append({
             type: "text.delta",
             generationId,
             partId: part.partId,
@@ -134,7 +134,7 @@ export async function executeChatGeneration(
           break;
         case "reasoning":
           appendAssistantDelta(assistantParts, part);
-          await dependencies.eventStore.append({
+          await dependencies.eventWriter.append({
             type: "reasoning.delta",
             generationId,
             partId: part.partId,
@@ -165,7 +165,7 @@ export async function executeChatGeneration(
       throw new Error("Generation 已不再处于 running，无法完成落库");
     }
 
-    await dependencies.eventStore.append({
+    await dependencies.eventWriter.append({
       type: "generation.completed",
       generationId,
     });

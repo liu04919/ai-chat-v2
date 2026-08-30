@@ -1,13 +1,13 @@
 export {
   GENERATION_EVENT_TTL_SECONDS,
   createRedisGenerationEventReader,
-  createRedisGenerationEventStore,
+  createRedisGenerationEventWriter,
   type GenerationEventReader,
   type GenerationEventEntry,
-  type GenerationEventStore,
+  type GenerationEventWriter,
   type ReadBlockingGenerationEventsInput,
   type ReadGenerationEventsInput,
   type RedisGenerationEventReaderConfig,
-  type RedisGenerationEventStore,
-  type RedisGenerationEventStoreConfig,
+  type RedisGenerationEventWriter,
+  type RedisGenerationEventWriterConfig,
 } from "./redis-generation-event-store";

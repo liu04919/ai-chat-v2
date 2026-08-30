@@ -13,7 +13,7 @@ import {
 } from "@ai-chat/db";
 import {
   createRedisGenerationEventReader,
-  createRedisGenerationEventStore,
+  createRedisGenerationEventWriter,
   type GenerationEventReader,
 } from "@ai-chat/event-store";
 import IORedis from "ioredis";
@@ -40,7 +40,7 @@ const testDatabaseUrl = configuredTestDatabaseUrl;
 const redisUrl = configuredRedisUrl;
 const database = createDatabase(testDatabaseUrl);
 const keyPrefix = `generation-sse-integration-${randomUUID()}`;
-const eventStore = createRedisGenerationEventStore({
+const eventWriter = createRedisGenerationEventWriter({
   redisUrl,
   keyPrefix,
   ttlSeconds: 60,
@@ -144,7 +144,7 @@ afterAll(async () => {
     await inspector.quit();
   }
 
-  await eventStore.close();
+  await eventWriter.close();
   await database.client`DELETE FROM "user" WHERE id IN (${ownerId}, ${otherOwnerId})`;
   await database.close();
 });
@@ -159,8 +159,8 @@ describe("Generation SSE stream", () => {
       partId: "reasoning-1",
       delta: "先分析",
     } as const;
-    const startedCursor = await eventStore.append(started);
-    const reasoningCursor = await eventStore.append(reasoning);
+    const startedCursor = await eventWriter.append(started);
+    const reasoningCursor = await eventWriter.append(reasoning);
     const stream = await openGenerationEventStreamForOwner(
       ownerId,
       generationId,
@@ -185,8 +185,8 @@ describe("Generation SSE stream", () => {
       delta: "答案",
     } as const;
     const completed = { type: "generation.completed", generationId } as const;
-    const textCursor = await eventStore.append(text);
-    const completedCursor = await eventStore.append(completed);
+    const textCursor = await eventWriter.append(text);
+    const completedCursor = await eventWriter.append(completed);
 
     await expect(readFrame(reader)).resolves.toBe(
       `id: ${textCursor}\ndata: ${JSON.stringify(text)}\n\n`,
@@ -199,7 +199,7 @@ describe("Generation SSE stream", () => {
 
   it("从 Last-Event-ID 之后续传，不重复旧事件", async () => {
     const generationId = await createGeneration("completed");
-    const startedCursor = await eventStore.append({
+    const startedCursor = await eventWriter.append({
       type: "generation.started",
       generationId,
     });
@@ -210,8 +210,8 @@ describe("Generation SSE stream", () => {
       delta: "续传",
     } as const;
     const completed = { type: "generation.completed", generationId } as const;
-    const textCursor = await eventStore.append(text);
-    const completedCursor = await eventStore.append(completed);
+    const textCursor = await eventWriter.append(text);
+    const completedCursor = await eventWriter.append(completed);
     const stream = await openGenerationEventStreamForOwner(
       ownerId,
       generationId,
