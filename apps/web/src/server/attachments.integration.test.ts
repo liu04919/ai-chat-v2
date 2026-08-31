@@ -15,12 +15,13 @@ import type {
   ObjectStorage,
   StoredObjectMetadata,
 } from "@ai-chat/storage";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   completeAttachmentUploadForOwner,
   createAttachmentUploadForOwner,
   deleteAttachmentForOwner,
+  readAttachmentForOwner,
 } from "./attachments";
 
 const localEnvironment = fileURLToPath(
@@ -39,9 +40,10 @@ if (!testDatabaseUrl) {
 
 process.env.DATABASE_URL = testDatabaseUrl;
 
-class FakeObjectStorage
-  implements Pick<ObjectStorage, "createUploadUrl" | "headObject" | "deleteObject">
-{
+class FakeObjectStorage implements Pick<
+  ObjectStorage,
+  "createUploadUrl" | "headObject" | "deleteObject"
+> {
   readonly objects = new Map<string, StoredObjectMetadata>();
 
   async createUploadUrl(input: CreateObjectUploadUrlInput) {
@@ -97,6 +99,44 @@ afterAll(async () => {
 });
 
 describe("Attachment upload service", () => {
+  it("读取前校验所有者与 ready 状态，只有授权用户获得短期签名", async () => {
+    const storage = new FakeObjectStorage();
+    const sign = vi.spyOn(storage, "createDownloadUrl");
+    const attachmentId = `read-${randomUUID()}`;
+    await createAttachmentUploadForOwner(
+      ownerId,
+      { originalName: "private.png", mediaType: "image/png", sizeBytes: 100 },
+      { storage, createId: () => attachmentId },
+    );
+    await expect(
+      readAttachmentForOwner(otherOwnerId, attachmentId, { storage }),
+    ).rejects.toMatchObject({ code: "ATTACHMENT_NOT_FOUND", status: 404 });
+    await expect(
+      readAttachmentForOwner(ownerId, "missing", { storage }),
+    ).rejects.toMatchObject({ code: "ATTACHMENT_NOT_FOUND", status: 404 });
+    await expect(
+      readAttachmentForOwner(ownerId, attachmentId, { storage }),
+    ).rejects.toMatchObject({ code: "ATTACHMENT_NOT_READY", status: 409 });
+    expect(sign).not.toHaveBeenCalled();
+    storage.objects.set(`attachments/${attachmentId}`, {
+      contentType: "image/png",
+      sizeBytes: 100,
+    });
+    await completeAttachmentUploadForOwner(ownerId, attachmentId, { storage });
+    const response = await readAttachmentForOwner(ownerId, attachmentId, {
+      storage,
+      now: () => new Date("2026-08-31T00:00:00Z"),
+    });
+    expect(sign).toHaveBeenCalledWith(`attachments/${attachmentId}`, 300);
+    expect(response).toMatchObject({
+      attachment: { id: attachmentId, status: "ready" },
+      download: { expiresAt: "2026-08-31T00:05:00.000Z" },
+    });
+    expect(response.attachment).not.toHaveProperty("objectKey");
+    expect(response.attachment).not.toHaveProperty("ownerId");
+    const record = await getAttachmentRecordForOwner(ownerId, attachmentId);
+    expect(record).not.toHaveProperty("download");
+  });
   it("创建 pending Attachment，并只向 Browser 返回上传所需信息", async () => {
     const storage = new FakeObjectStorage();
     const attachmentId = `attachment-${randomUUID()}`;

@@ -1,5 +1,6 @@
 export {
   ATTACHMENT_MAX_SIZE_BYTES,
+  ATTACHMENT_DOWNLOAD_TTL_SECONDS,
   ATTACHMENT_UPLOAD_TTL_SECONDS,
   attachmentErrorCodeSchema,
   attachmentErrorResponseSchema,
@@ -11,6 +12,7 @@ export {
   createAttachmentUploadRequestSchema,
   createAttachmentUploadResponseSchema,
   deleteAttachmentResponseSchema,
+  readAttachmentResponseSchema,
   type AttachmentDto,
   type AttachmentErrorCode,
   type AttachmentMediaType,
@@ -20,6 +22,7 @@ export {
   type CreateAttachmentUploadRequest,
   type CreateAttachmentUploadResponse,
   type DeleteAttachmentResponse,
+  type ReadAttachmentResponse,
 } from "./attachment";
 export {
   conversationDetailResponseSchema,

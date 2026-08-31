@@ -42,6 +42,16 @@ export function createGenerationEventBuffer(
       }
 
       queuedEvents.push(event);
+      if (
+        event.type === "generation.completed" ||
+        event.type === "generation.failed" ||
+        event.type === "generation.cancelled"
+      ) {
+        // 终态不能被路由卸载或详情刷新丢弃；此前的 delta 仍按顺序一起交付。
+        if (frameHandle !== null) scheduler.cancel(frameHandle);
+        flushFrame();
+        return;
+      }
       frameHandle ??= scheduler.request(flushFrame);
     },
 

@@ -1,5 +1,6 @@
 import type {
   AssistantMessagePartsDto,
+  ConversationDetailResponse,
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
 import {
@@ -30,6 +31,7 @@ export type ConversationDetailRecord = {
     status: (typeof activeGenerationStatuses)[number];
     cancelRequestedAt: Date | null;
   } | null;
+  latestGeneration: ConversationDetailResponse["latestGeneration"];
   messages: Array<
     | {
         id: string;
@@ -110,17 +112,25 @@ export async function getConversationRecordForOwner(
           cancelRequestedAt: row.generationCancelRequestedAt,
         }
       : null;
-  const rawMessageRecords = await database
-    .select({
-      id: messages.id,
-      role: messages.role,
-      parts: messages.parts,
-      sequence: messages.sequence,
-      createdAt: messages.createdAt,
-    })
-    .from(messages)
-    .where(eq(messages.conversationId, row.id))
-    .orderBy(asc(messages.sequence));
+  const [rawMessageRecords, [latestGeneration]] = await Promise.all([
+    database
+      .select({
+        id: messages.id,
+        role: messages.role,
+        parts: messages.parts,
+        sequence: messages.sequence,
+        createdAt: messages.createdAt,
+      })
+      .from(messages)
+      .where(eq(messages.conversationId, row.id))
+      .orderBy(asc(messages.sequence)),
+    database
+      .select({ id: generations.id, status: generations.status })
+      .from(generations)
+      .where(eq(generations.conversationId, row.id))
+      .orderBy(desc(generations.createdAt), desc(generations.id))
+      .limit(1),
+  ]);
   const messageRecords: ConversationDetailRecord["messages"] =
     rawMessageRecords.map((message) =>
       message.role === "user"
@@ -145,6 +155,7 @@ export async function getConversationRecordForOwner(
       updatedAt: row.updatedAt,
     },
     activeGeneration,
+    latestGeneration: latestGeneration ?? null,
     messages: messageRecords,
   };
 }

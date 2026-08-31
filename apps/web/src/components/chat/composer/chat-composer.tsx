@@ -74,9 +74,10 @@ export function ChatComposer({
   );
   const hasContent =
     input.trim().length > 0 ||
-    attachments.items.some(
-      (item) => item.status === "ready" && item.attachment !== null,
-    );
+    (mode === "chat" &&
+      attachments.items.some(
+        (item) => item.status === "ready" && item.attachment !== null,
+      ));
   const canSubmit =
     Boolean(onSubmit) &&
     !disabled &&

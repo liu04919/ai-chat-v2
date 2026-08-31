@@ -25,10 +25,12 @@ import { createGeneration } from "../../../lib/generations-client";
 import { useGenerationProjectionStore } from "./generation-projection-store";
 
 function nextMessageSequence(messages: readonly MessageDto[]): number {
-  return messages.reduce(
-    (largest, message) => Math.max(largest, message.sequence),
-    -1,
-  ) + 1;
+  return (
+    messages.reduce(
+      (largest, message) => Math.max(largest, message.sequence),
+      -1,
+    ) + 1
+  );
 }
 
 export function createGenerationMutationOptions(queryClient: QueryClient) {
@@ -116,7 +118,11 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
                 ? { id, status, cancelRequestedAt: null }
                 : null;
 
-            return { ...current, activeGeneration };
+            return {
+              ...current,
+              activeGeneration,
+              latestGeneration: { id, status },
+            };
           },
         );
         void queryClient.invalidateQueries({ queryKey });

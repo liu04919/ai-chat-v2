@@ -55,6 +55,7 @@ function createResponse(request: CreateGenerationRequest): Response {
 function createDetail(running = false): ConversationDetailResponse {
   return {
     conversation,
+    latestGeneration: running ? { id: generationId, status: "running" } : null,
     activeGeneration: running
       ? { id: generationId, status: "running", cancelRequestedAt: null }
       : null,
@@ -181,7 +182,8 @@ describe("创建 Generation mutation", () => {
     deferred.resolve(createResponse(request));
     await sending;
 
-    const detail = queryClient.getQueryData<ConversationDetailResponse>(queryKey);
+    const detail =
+      queryClient.getQueryData<ConversationDetailResponse>(queryKey);
     expect(detail?.activeGeneration).toEqual({
       id: generationId,
       status: "queued",
@@ -194,9 +196,11 @@ describe("创建 Generation mutation", () => {
   it("已有会话发送失败恢复详情，显式关闭自动重试", async () => {
     const previousDetail = createDetail();
     queryClient.setQueryData(queryKey, previousDetail);
-    const fetchMock = vi.fn().mockResolvedValue(
-      Response.json({ code: "QUEUE_UNAVAILABLE" }, { status: 503 }),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ code: "QUEUE_UNAVAILABLE" }, { status: 503 }),
+      );
     vi.stubGlobal("fetch", fetchMock);
     const mutation = new MutationObserver(
       queryClient,
@@ -268,13 +272,18 @@ describe("停止 Generation mutation", () => {
 
     deferred.resolve(
       Response.json({
-        generation: { id: generationId, status: "running", cancelRequestedAt: now },
+        generation: {
+          id: generationId,
+          status: "running",
+          cancelRequestedAt: now,
+        },
       }),
     );
     await stopping;
 
     expect(mutation.getCurrentResult().isSuccess).toBe(true);
-    const detail = queryClient.getQueryData<ConversationDetailResponse>(queryKey);
+    const detail =
+      queryClient.getQueryData<ConversationDetailResponse>(queryKey);
     expect(detail?.activeGeneration).toEqual({
       id: generationId,
       status: "running",
@@ -286,11 +295,18 @@ describe("停止 Generation mutation", () => {
   });
 
   it("返回终态才清理当前投影并刷新消息", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
-      Response.json({
-        generation: { id: generationId, status: "cancelled", cancelRequestedAt: now },
-      }),
-    ));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          generation: {
+            id: generationId,
+            status: "cancelled",
+            cancelRequestedAt: now,
+          },
+        }),
+      ),
+    );
     const mutation = new MutationObserver(
       queryClient,
       cancelGenerationMutationOptions(queryClient),
@@ -298,7 +314,8 @@ describe("停止 Generation mutation", () => {
 
     await mutation.mutate({ conversationId, generationId });
 
-    const detail = queryClient.getQueryData<ConversationDetailResponse>(queryKey);
+    const detail =
+      queryClient.getQueryData<ConversationDetailResponse>(queryKey);
     expect(detail?.activeGeneration).toBeNull();
     expect(
       useGenerationProjectionStore.getState().projections[conversationId],
@@ -306,19 +323,54 @@ describe("停止 Generation mutation", () => {
     expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true);
   });
 
-  it("停止失败保留生成状态和投影，并结束 pending 以允许重试", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      Response.json({ code: "CANCEL_SIGNAL_UNAVAILABLE" }, { status: 503 }),
+  it("图片取消保留停止提示，不往消息缓存插入假 Assistant Message", async () => {
+    const detail = createDetail(true);
+    detail.conversation.mode = "image";
+    queryClient.setQueryData(queryKey, detail);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          generation: {
+            id: generationId,
+            status: "cancelled",
+            cancelRequestedAt: now,
+          },
+        }),
+      ),
     );
+    const mutation = new MutationObserver(
+      queryClient,
+      cancelGenerationMutationOptions(queryClient),
+    );
+    await mutation.mutate({ conversationId, generationId });
+    expect(
+      queryClient.getQueryData<ConversationDetailResponse>(queryKey)?.messages,
+    ).toEqual(detail.messages);
+    expect(
+      queryClient.getQueryData<ConversationDetailResponse>(queryKey)
+        ?.latestGeneration,
+    ).toEqual({ id: generationId, status: "cancelled" });
+    expect(
+      useGenerationProjectionStore.getState().projections[conversationId],
+    ).toBeUndefined();
+  });
+
+  it("停止失败保留生成状态和投影，并结束 pending 以允许重试", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ code: "CANCEL_SIGNAL_UNAVAILABLE" }, { status: 503 }),
+      );
     vi.stubGlobal("fetch", fetchMock);
     const mutation = new MutationObserver(
       queryClient,
       cancelGenerationMutationOptions(queryClient),
     );
 
-    await expect(mutation.mutate({ conversationId, generationId })).rejects.toThrow(
-      "暂时无法停止生成",
-    );
+    await expect(
+      mutation.mutate({ conversationId, generationId }),
+    ).rejects.toThrow("暂时无法停止生成");
 
     expect(mutation.getCurrentResult().isError).toBe(true);
     expect(mutation.getCurrentResult().isPending).toBe(false);
@@ -348,14 +400,19 @@ describe("停止 Generation mutation", () => {
       .start(conversationId, "newer_generation");
     deferred.resolve(
       Response.json({
-        generation: { id: generationId, status: "cancelled", cancelRequestedAt: now },
+        generation: {
+          id: generationId,
+          status: "cancelled",
+          cancelRequestedAt: now,
+        },
       }),
     );
     await stopping;
 
     expect(queryClient.getQueryData(queryKey)).toEqual(newerDetail);
     expect(
-      useGenerationProjectionStore.getState().projections[conversationId]?.generationId,
+      useGenerationProjectionStore.getState().projections[conversationId]
+        ?.generationId,
     ).toBe("newer_generation");
   });
 });

@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import {
   ATTACHMENT_UPLOAD_TTL_SECONDS,
+  ATTACHMENT_DOWNLOAD_TTL_SECONDS,
   type AttachmentDto,
   type AttachmentErrorCode,
   type CreateAttachmentUploadRequest,
   type CreateAttachmentUploadResponse,
+  type ReadAttachmentResponse,
 } from "@ai-chat/contracts";
 import {
   createPendingAttachmentRecord,
@@ -28,7 +30,10 @@ export class AttachmentServiceError extends Error {
 }
 
 type AttachmentServiceDependencies = {
-  storage?: Pick<ObjectStorage, "createUploadUrl" | "headObject" | "deleteObject">;
+  storage?: Pick<
+    ObjectStorage,
+    "createUploadUrl" | "headObject" | "deleteObject"
+  >;
   createId?: () => string;
   now?: () => Date;
 };
@@ -47,6 +52,38 @@ function toAttachmentDto(attachment: AttachmentRecord): AttachmentDto {
 
 function normalizeMediaType(mediaType: string | null): string | null {
   return mediaType?.split(";", 1)[0]?.trim().toLowerCase() ?? null;
+}
+
+export async function readAttachmentForOwner(
+  ownerId: string,
+  attachmentId: string,
+  dependencies: {
+    storage?: Pick<ObjectStorage, "createDownloadUrl">;
+    now?: () => Date;
+  } = {},
+): Promise<ReadAttachmentResponse> {
+  const attachment = await getAttachmentRecordForOwner(ownerId, attachmentId);
+  if (!attachment) {
+    throw new AttachmentServiceError("ATTACHMENT_NOT_FOUND", 404);
+  }
+  if (attachment.status !== "ready") {
+    throw new AttachmentServiceError("ATTACHMENT_NOT_READY", 409);
+  }
+  const now = (dependencies.now ?? (() => new Date()))();
+  const storage = dependencies.storage ?? getAttachmentObjectStorage();
+  const url = await storage.createDownloadUrl(
+    attachment.objectKey,
+    ATTACHMENT_DOWNLOAD_TTL_SECONDS,
+  );
+  return {
+    attachment: { ...toAttachmentDto(attachment), status: "ready" },
+    download: {
+      url,
+      expiresAt: new Date(
+        now.getTime() + ATTACHMENT_DOWNLOAD_TTL_SECONDS * 1000,
+      ).toISOString(),
+    },
+  };
 }
 
 export async function createAttachmentUploadForOwner(

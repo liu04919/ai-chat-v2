@@ -13,6 +13,8 @@ import {
   type ChatComposerSubmission,
 } from "./composer/chat-composer";
 import { GenerationResponse } from "./generation/generation-response";
+import { ImageGenerationResponse } from "./generation/image-generation-response";
+import { getImageGenerationStatus } from "./generation/image-generation-status";
 import { useGenerationEventStream } from "./generation/use-generation-event-stream";
 import { useGenerationProjectionStore } from "./generation/generation-projection-store";
 import { useCreateGeneration } from "./generation/use-create-generation";
@@ -31,10 +33,7 @@ import {
 type TerminalGenerationEvent = Extract<
   GenerationEventDto,
   {
-    type:
-      | "generation.completed"
-      | "generation.failed"
-      | "generation.cancelled";
+    type: "generation.completed" | "generation.failed" | "generation.cancelled";
   }
 >;
 
@@ -52,9 +51,7 @@ export function ConversationWorkspace({
       : null;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
-  const clearProjection = useGenerationProjectionStore(
-    (state) => state.clear,
-  );
+  const clearProjection = useGenerationProjectionStore((state) => state.clear);
   const storedProjection = useGenerationProjectionStore(
     (state) => state.projections[conversationId] ?? null,
   );
@@ -65,15 +62,15 @@ export function ConversationWorkspace({
     staleTime: 30_000,
   });
 
-  const activeGenerationId =
-    detail.conversation.mode === "chat"
-      ? (detail.activeGeneration?.id ?? null)
-      : null;
+  const activeGenerationId = detail.activeGeneration?.id ?? null;
   const projection =
     storedProjection &&
-    (detail.activeGeneration?.id === storedProjection.generationId ||
-      storedProjection.status === "failed" ||
-      storedProjection.status === "connection-error")
+    (activeGenerationId
+      ? activeGenerationId === storedProjection.generationId
+      : detail.latestGeneration?.id === storedProjection.generationId &&
+        (storedProjection.status === "failed" ||
+          storedProjection.status === "cancelled" ||
+          storedProjection.status === "connection-error"))
       ? storedProjection
       : null;
 
@@ -88,7 +85,8 @@ export function ConversationWorkspace({
 
         if (
           (event.type === "generation.completed" ||
-            event.type === "generation.cancelled") &&
+            (event.type === "generation.cancelled" &&
+              detail.conversation.mode === "chat")) &&
           refreshedDetail.activeGeneration === null
         ) {
           clearProjection(conversationId);
@@ -101,7 +99,7 @@ export function ConversationWorkspace({
         // 保留当前投影；用户刷新后仍以 PostgreSQL 中的详情为准。
       }
     },
-    [clearProjection, conversationId, queryClient],
+    [clearProjection, conversationId, queryClient, detail.conversation.mode],
   );
 
   useGenerationEventStream({
@@ -153,7 +151,7 @@ export function ConversationWorkspace({
     if (container && shouldStickToBottomRef.current) {
       container.scrollTop = container.scrollHeight;
     }
-  }, [detail.messages.length, projection]);
+  }, [detail.messages.length, projection, createMutation.isPending]);
 
   const { conversation } = detail;
   const ModeIcon =
@@ -182,11 +180,26 @@ export function ConversationWorkspace({
               }
               key={message.id}
             >
-              <MessageParts parts={message.parts} />
+              <MessageParts
+                parts={message.parts}
+                imageAttachments={conversation.mode === "image"}
+              />
             </article>
           ))}
 
-          <GenerationResponse projection={projection} />
+          {conversation.mode === "image" ? (
+            <ImageGenerationResponse
+              status={getImageGenerationStatus({
+                activeGeneration: detail.activeGeneration,
+                latestGeneration: detail.latestGeneration,
+                projection,
+                isSubmitting: createMutation.isPending,
+                isStopping: cancelMutation.isPending,
+              })}
+            />
+          ) : (
+            <GenerationResponse projection={projection} />
+          )}
         </div>
       </div>
 
@@ -196,15 +209,9 @@ export function ConversationWorkspace({
           isSubmitting={createMutation.isPending}
           isStopping={cancelMutation.isPending}
           mode={conversation.mode}
-          onStopGeneration={
-            conversation.mode === "chat" && activeGenerationId
-              ? stopGeneration
-              : undefined
-          }
-          onSubmit={conversation.mode === "chat" ? submitMessage : undefined}
-          stopRequested={Boolean(
-            detail.activeGeneration?.cancelRequestedAt,
-          )}
+          onStopGeneration={activeGenerationId ? stopGeneration : undefined}
+          onSubmit={submitMessage}
+          stopRequested={Boolean(detail.activeGeneration?.cancelRequestedAt)}
           submitError={submitError}
         />
       </div>

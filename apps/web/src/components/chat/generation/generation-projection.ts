@@ -16,6 +16,7 @@ export type GenerationProjection = {
   conversationId: string;
   generationId: string;
   status: GenerationProjectionStatus;
+  hasStarted: boolean;
   parts: AssistantMessagePartDto[];
 };
 
@@ -27,6 +28,7 @@ export function createGenerationProjection(
     conversationId,
     generationId,
     status: "connecting",
+    hasStarted: false,
     parts: [],
   };
 }
@@ -47,6 +49,7 @@ function appendDelta(
     return {
       ...projection,
       status: "running",
+      hasStarted: true,
       parts: [
         ...projection.parts,
         { id: event.partId, type: partType, text: event.delta },
@@ -70,7 +73,7 @@ function appendDelta(
     text: currentPart.text + event.delta,
   };
 
-  return { ...projection, status: "running", parts };
+  return { ...projection, status: "running", hasStarted: true, parts };
 }
 
 export function reduceGenerationEvents(
@@ -93,7 +96,7 @@ export function reduceGenerationEvents(
 
     switch (event.type) {
       case "generation.started":
-        return { ...current, status: "running" };
+        return { ...current, status: "running", hasStarted: true };
       case "reasoning.delta":
       case "text.delta":
         return appendDelta(current, event);

@@ -7,6 +7,7 @@ import {
   createAttachmentUploadRequestSchema,
   createAttachmentUploadResponseSchema,
   deleteAttachmentResponseSchema,
+  readAttachmentResponseSchema,
 } from "./attachment";
 import {
   conversationDetailResponseSchema,
@@ -27,6 +28,10 @@ function readExample(name: string): unknown {
 }
 
 describe("contract examples", () => {
+  it("attachment read response 与 Schema 保持一致", () => {
+    const response = readExample("http/attachment/read.response.json");
+    expect(readAttachmentResponseSchema.parse(response)).toEqual(response);
+  });
   it("conversation list response 与 Schema 保持一致", () => {
     const example = readExample("http/conversation/list.response.json");
 
@@ -44,7 +49,9 @@ describe("contract examples", () => {
     const response = readExample("http/attachment/upload.response.json");
 
     expect(createAttachmentUploadRequestSchema.parse(request)).toEqual(request);
-    expect(createAttachmentUploadResponseSchema.parse(response)).toEqual(response);
+    expect(createAttachmentUploadResponseSchema.parse(response)).toEqual(
+      response,
+    );
   });
 
   it("attachment complete response 与 Schema 保持一致", () => {

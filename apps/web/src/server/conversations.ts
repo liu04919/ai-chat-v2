@@ -40,6 +40,7 @@ export async function getConversationForOwner(
 
   return {
     conversation: toConversationSummary(detail.conversation),
+    latestGeneration: detail.latestGeneration,
     activeGeneration: detail.activeGeneration
       ? {
           ...detail.activeGeneration,

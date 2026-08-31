@@ -53,7 +53,11 @@ export function cancelGenerationMutationOptions(queryClient: QueryClient) {
             return current;
           }
 
-          return { ...current, activeGeneration };
+          return {
+            ...current,
+            activeGeneration,
+            latestGeneration: { id, status },
+          };
         },
       );
 

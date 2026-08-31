@@ -67,4 +67,28 @@ describe("Generation event frame buffer", () => {
     expect(scheduler.cancel).toHaveBeenCalledWith(7);
     expect(flush).not.toHaveBeenCalled();
   });
+
+  it.each([
+    "generation.completed",
+    "generation.failed",
+    "generation.cancelled",
+  ] as const)("%s 立即连同已有增量 flush，不被页面清理丢弃", (type) => {
+    const { scheduler, flushFrame } = createFakeScheduler();
+    const flush = vi.fn();
+    const buffer = createGenerationEventBuffer(flush, scheduler);
+    const delta: GenerationEventDto = {
+      type: "text.delta",
+      generationId: "g1",
+      partId: "p1",
+      delta: "最后几个字",
+    };
+    const terminal: GenerationEventDto = { type, generationId: "g1" };
+    buffer.enqueue(delta);
+    buffer.enqueue(terminal);
+    expect(scheduler.cancel).toHaveBeenCalledWith(7);
+    expect(flush).toHaveBeenCalledExactlyOnceWith([delta, terminal]);
+    buffer.dispose();
+    flushFrame();
+    expect(flush).toHaveBeenCalledOnce();
+  });
 });

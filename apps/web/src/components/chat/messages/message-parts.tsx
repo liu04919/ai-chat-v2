@@ -2,19 +2,29 @@ import type {
   AssistantMessagePartsDto,
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
-import { Brain, Paperclip, Wrench } from "lucide-react";
+import { Brain, Wrench } from "lucide-react";
+
+import { MessageAttachment } from "./message-attachment";
 
 type MessagePartsDto = UserMessagePartsDto | AssistantMessagePartsDto;
 
 export function MessageParts({
   isStreaming = false,
+  imageAttachments = false,
   parts,
-}: Readonly<{ isStreaming?: boolean; parts: MessagePartsDto }>) {
+}: Readonly<{
+  isStreaming?: boolean;
+  imageAttachments?: boolean;
+  parts: MessagePartsDto;
+}>) {
   return parts.map((part, index) => {
     switch (part.type) {
       case "text":
         return (
-          <p className="whitespace-pre-wrap" key={"id" in part ? part.id : `text-${index}`}>
+          <p
+            className="whitespace-pre-wrap"
+            key={"id" in part ? part.id : `text-${index}`}
+          >
             {part.text}
           </p>
         );
@@ -37,11 +47,13 @@ export function MessageParts({
       case "attachment":
         return (
           <div
-            className="mt-2 flex w-fit items-center gap-2 rounded-xl border bg-background px-3 py-2 text-muted-foreground"
+            className="mt-2"
             key={"id" in part ? part.id : part.attachmentId}
           >
-            <Paperclip className="size-4" aria-hidden="true" />
-            <span>附件</span>
+            <MessageAttachment
+              attachmentId={part.attachmentId}
+              imagePlaceholder={imageAttachments}
+            />
           </div>
         );
       case "tool-call":

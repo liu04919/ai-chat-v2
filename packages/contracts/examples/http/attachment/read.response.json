@@ -1,0 +1,15 @@
+{
+  "attachment": {
+    "id": "attachment_example",
+    "originalName": "generated.png",
+    "mediaType": "image/png",
+    "sizeBytes": 1024,
+    "status": "ready",
+    "createdAt": "2026-08-31T00:00:00.000Z",
+    "updatedAt": "2026-08-31T00:00:00.000Z"
+  },
+  "download": {
+    "url": "https://storage.example.com/temporary-signed-image",
+    "expiresAt": "2026-08-31T00:05:00.000Z"
+  }
+}

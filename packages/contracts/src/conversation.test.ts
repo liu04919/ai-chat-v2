@@ -23,6 +23,7 @@ describe("Conversation response schemas", () => {
   it("接受包含 Active Generation 的详情响应", () => {
     const detail = {
       conversation,
+      latestGeneration: { id: "generation_example", status: "running" },
       activeGeneration: {
         id: "generation_example",
         status: "running",
@@ -75,9 +76,28 @@ describe("Conversation response schemas", () => {
       conversationDetailResponseSchema.parse({
         conversation,
         activeGeneration: null,
+        latestGeneration: null,
         messages: [],
         model: "gpt-5.6-sol",
       }),
     ).toThrow();
+  });
+
+  it("最近一次 Generation 可为终态，但不能充当 Active Generation", () => {
+    for (const status of ["completed", "failed", "cancelled"]) {
+      const detail = {
+        conversation,
+        activeGeneration: null,
+        latestGeneration: { id: "g1", status },
+        messages: [],
+      };
+      expect(conversationDetailResponseSchema.parse(detail)).toEqual(detail);
+      expect(() =>
+        conversationDetailResponseSchema.parse({
+          ...detail,
+          activeGeneration: { id: "g1", status, cancelRequestedAt: null },
+        }),
+      ).toThrow();
+    }
   });
 });

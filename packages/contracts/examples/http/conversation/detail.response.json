@@ -11,6 +11,10 @@
     "status": "running",
     "cancelRequestedAt": null
   },
+  "latestGeneration": {
+    "id": "generation_example",
+    "status": "running"
+  },
   "messages": [
     {
       "id": "message_example",

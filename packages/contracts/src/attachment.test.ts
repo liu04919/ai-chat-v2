@@ -6,6 +6,7 @@ import {
   createAttachmentUploadRequestSchema,
   createAttachmentUploadResponseSchema,
   deleteAttachmentResponseSchema,
+  readAttachmentResponseSchema,
 } from "./attachment";
 
 const attachment = {
@@ -19,6 +20,26 @@ const attachment = {
 };
 
 describe("Attachment contracts", () => {
+  it("读取响应只包含 ready 附件及有过期时间的下载地址", () => {
+    const response = {
+      attachment: { ...attachment, status: "ready" },
+      download: {
+        url: "https://example.com/signed-image",
+        expiresAt: "2026-08-31T00:05:00.000Z",
+      },
+    };
+    expect(readAttachmentResponseSchema.parse(response)).toEqual(response);
+    expect(
+      readAttachmentResponseSchema.safeParse({ ...response, attachment })
+        .success,
+    ).toBe(false);
+    expect(
+      readAttachmentResponseSchema.safeParse({
+        ...response,
+        attachment: { ...response.attachment, objectKey: "secret" },
+      }).success,
+    ).toBe(false);
+  });
   it("接受受支持的上传意图", () => {
     expect(
       createAttachmentUploadRequestSchema.parse({
@@ -68,7 +89,9 @@ describe("Attachment contracts", () => {
       },
     };
 
-    expect(createAttachmentUploadResponseSchema.parse(response)).toEqual(response);
+    expect(createAttachmentUploadResponseSchema.parse(response)).toEqual(
+      response,
+    );
     expect(attachmentSchema.parse(attachment)).not.toHaveProperty("objectKey");
   });
 

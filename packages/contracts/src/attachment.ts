@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const ATTACHMENT_MAX_SIZE_BYTES = 10 * 1024 * 1024;
 export const ATTACHMENT_UPLOAD_TTL_SECONDS = 5 * 60;
+export const ATTACHMENT_DOWNLOAD_TTL_SECONDS = 5 * 60;
 
 export const attachmentMediaTypeSchema = z.enum([
   "image/png",
@@ -60,10 +61,18 @@ export const deleteAttachmentResponseSchema = z
   })
   .strict();
 
+export const readAttachmentResponseSchema = z
+  .object({
+    attachment: attachmentSchema.extend({ status: z.literal("ready") }),
+    download: z.object({ url: z.url(), expiresAt: z.iso.datetime() }).strict(),
+  })
+  .strict();
+
 export const attachmentErrorCodeSchema = z.enum([
   "UNAUTHORIZED",
   "INVALID_REQUEST",
   "ATTACHMENT_NOT_FOUND",
+  "ATTACHMENT_NOT_READY",
   "ATTACHMENT_UPLOAD_NOT_FOUND",
   "ATTACHMENT_METADATA_MISMATCH",
   "ATTACHMENT_IN_USE",
@@ -94,3 +103,6 @@ export type DeleteAttachmentResponse = z.infer<
   typeof deleteAttachmentResponseSchema
 >;
 export type AttachmentErrorCode = z.infer<typeof attachmentErrorCodeSchema>;
+export type ReadAttachmentResponse = z.infer<
+  typeof readAttachmentResponseSchema
+>;

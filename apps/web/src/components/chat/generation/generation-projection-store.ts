@@ -79,7 +79,7 @@ export const useGenerationProjectionStore =
             return;
           }
 
-          projection.status = "running";
+          projection.status = projection.hasStarted ? "running" : "connecting";
         });
       },
 

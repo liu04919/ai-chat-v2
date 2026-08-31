@@ -13,6 +13,7 @@ import {
   type ChatComposerSubmission,
 } from "./composer/chat-composer";
 import { MessageParts } from "./messages/message-parts";
+import { ImageGenerationResponse } from "./generation/image-generation-response";
 import { useCreateGeneration } from "./generation/use-create-generation";
 import { createConversationTitle } from "@/lib/conversation-title";
 import { getGenerationClientErrorMessage } from "@/lib/generations-client";
@@ -28,10 +29,11 @@ const modes: ReadonlyArray<{
 
 function OptimisticUserMessage({
   parts,
-}: Readonly<{ parts: UserMessagePartsDto }>) {
+  mode,
+}: Readonly<{ parts: UserMessagePartsDto; mode: ConversationModeDto }>) {
   return (
     <div className="ml-auto max-w-2xl rounded-3xl bg-muted px-5 py-3 text-sm shadow-sm">
-      <MessageParts parts={parts} />
+      <MessageParts parts={parts} imageAttachments={mode === "image"} />
     </div>
   );
 }
@@ -118,7 +120,15 @@ export function DraftWorkspace() {
         >
           {pendingConversation ? (
             <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-y-auto py-8">
-              <OptimisticUserMessage parts={pendingConversation.parts} />
+              <OptimisticUserMessage
+                parts={pendingConversation.parts}
+                mode={pendingConversation.mode}
+              />
+              {pendingConversation.mode === "image" ? (
+                <div className="mt-6">
+                  <ImageGenerationResponse status="queued" />
+                </div>
+              ) : null}
               <p className="mt-6 text-sm text-muted-foreground">
                 正在准备回复…
               </p>

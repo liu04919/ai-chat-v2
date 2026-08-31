@@ -3,6 +3,7 @@ import {
   completeAttachmentUploadResponseSchema,
   createAttachmentUploadResponseSchema,
   deleteAttachmentResponseSchema,
+  readAttachmentResponseSchema,
   type AttachmentErrorCode,
   type AttachmentUploadInstruction,
 } from "@ai-chat/contracts";
@@ -20,6 +21,7 @@ const errorMessages: Record<AttachmentClientError["code"], string> = {
   UNAUTHORIZED: "登录状态已失效，请重新登录",
   INVALID_REQUEST: "文件类型或大小不符合要求",
   ATTACHMENT_NOT_FOUND: "附件不存在或已被移除",
+  ATTACHMENT_NOT_READY: "附件尚未上传完成",
   ATTACHMENT_UPLOAD_NOT_FOUND: "没有找到已上传的文件，请重试",
   ATTACHMENT_METADATA_MISMATCH: "上传后的文件信息不一致，请重试",
   ATTACHMENT_IN_USE: "附件已经进入消息，不能再作为草稿移除",
@@ -27,7 +29,9 @@ const errorMessages: Record<AttachmentClientError["code"], string> = {
   UNKNOWN: "附件操作失败，请稍后重试",
 };
 
-async function throwAttachmentResponseError(response: Response): Promise<never> {
+async function throwAttachmentResponseError(
+  response: Response,
+): Promise<never> {
   const body = await response.json().catch(() => null);
   const parsed = attachmentErrorResponseSchema.safeParse(body);
   const code = parsed.success ? parsed.data.code : "UNKNOWN";
@@ -51,6 +55,23 @@ export async function createAttachmentUpload(file: File) {
   }
 
   return createAttachmentUploadResponseSchema.parse(await response.json());
+}
+
+export async function readAttachment(
+  attachmentId: string,
+  signal?: AbortSignal,
+) {
+  const response = await fetch(
+    `/api/attachments/${encodeURIComponent(attachmentId)}`,
+    {
+      cache: "no-store",
+      signal,
+    },
+  );
+  if (!response.ok) {
+    await throwAttachmentResponseError(response);
+  }
+  return readAttachmentResponseSchema.parse(await response.json());
 }
 
 export async function uploadAttachmentObject(

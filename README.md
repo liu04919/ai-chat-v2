@@ -30,7 +30,9 @@ pnpm dev:worker
 
 Web 与 Worker 的环境变量分别参考各自的 `.env.example`。真实密钥写入对应的 `.env.local`，这些文件不会进入 Git。
 
-图片 Worker 使用独立的 `IMAGE_BASE_URL`、`IMAGE_MODEL`、`IMAGE_API_KEY`，不复用聊天渠道凭证。未配置时图片任务会明确失败，Chat 不受影响。图片后端执行链已接入同一队列；前端图片展示与发送入口尚未开放。
+图片 Worker 使用独立的 `IMAGE_BASE_URL`、`IMAGE_MODEL`、`IMAGE_API_KEY`，不复用聊天渠道凭证。未配置时图片任务会明确失败，Chat 不受影响。图片会话支持发送、参考图续改、停止、生成骨架与大图预览；刷新或切换会话后由服务端状态恢复。骨架仅用于展示，不写入 Assistant 消息。
+
+附件读取校验登录身份与归属后签发短期 R2 下载地址，不保存签名 URL。会话详情中的 `activeGeneration` 用于发现正在执行的任务，`latestGeneration` 用于恢复最近一次失败或停止的状态。
 
 ## 验证
 

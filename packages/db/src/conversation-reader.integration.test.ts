@@ -96,9 +96,9 @@ describe("Conversation ownership queries", () => {
       newerConversationId,
       olderConversationId,
     ]);
-    expect(result.some((conversation) => conversation.id === otherConversationId)).toBe(
-      false,
-    );
+    expect(
+      result.some((conversation) => conversation.id === otherConversationId),
+    ).toBe(false);
     expect(result[0]?.updatedAt).toBeInstanceOf(Date);
   });
 
@@ -115,6 +115,7 @@ describe("Conversation ownership queries", () => {
         id: activeGenerationId,
         status: "running",
       },
+      latestGeneration: { id: activeGenerationId, status: "running" },
       messages: [
         {
           id: activeUserMessageId,
@@ -130,5 +131,32 @@ describe("Conversation ownership queries", () => {
     await expect(
       getConversationRecordForOwner(ownerId, otherConversationId, database.db),
     ).resolves.toBeNull();
+  });
+
+  it("任务结束后保留最近一次状态，不需要创建占位 Assistant 消息", async () => {
+    for (const status of ["failed", "cancelled"] as const) {
+      await database.db
+        .update(generations)
+        .set({ status, finishedAt: new Date() })
+        .where(eq(generations.id, activeGenerationId));
+      const detail = await getConversationRecordForOwner(
+        ownerId,
+        newerConversationId,
+        database.db,
+      );
+      expect(detail?.activeGeneration).toBeNull();
+      expect(detail?.latestGeneration).toEqual({
+        id: activeGenerationId,
+        status,
+      });
+      expect(detail?.messages).toHaveLength(1);
+      expect(detail?.messages[0]?.role).toBe("user");
+    }
+    const emptyDetail = await getConversationRecordForOwner(
+      ownerId,
+      olderConversationId,
+      database.db,
+    );
+    expect(emptyDetail?.latestGeneration).toBeNull();
   });
 });
