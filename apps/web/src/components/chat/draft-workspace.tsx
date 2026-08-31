@@ -4,28 +4,18 @@ import type {
   ConversationModeDto,
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
-import { useQueryClient } from "@tanstack/react-query";
 import { ImageIcon, MessageSquareText } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import {
   ChatComposer,
   type ChatComposerSubmission,
 } from "./composer/chat-composer";
 import { MessageParts } from "./messages/message-parts";
+import { useCreateGeneration } from "./generation/use-create-generation";
 import { createConversationTitle } from "@/lib/conversation-title";
-import {
-  conversationListQueryKey,
-  confirmConversation,
-  prependConversation,
-  removeConversation,
-  type ClientConversationListResponse,
-} from "@/lib/conversations-client";
-import {
-  createGeneration,
-  getGenerationClientErrorMessage,
-} from "@/lib/generations-client";
+import { getGenerationClientErrorMessage } from "@/lib/generations-client";
 
 const modes: ReadonlyArray<{
   value: ConversationModeDto;
@@ -35,13 +25,6 @@ const modes: ReadonlyArray<{
   { value: "chat", label: "对话", icon: MessageSquareText },
   { value: "image", label: "图片", icon: ImageIcon },
 ];
-
-type PendingConversation = {
-  id: string;
-  mode: ConversationModeDto;
-  title: string;
-  parts: UserMessagePartsDto;
-};
 
 function OptimisticUserMessage({
   parts,
@@ -56,70 +39,39 @@ function OptimisticUserMessage({
 export function DraftWorkspace() {
   const [mode, setMode] = useState<ConversationModeDto>("chat");
   const [hasAttachments, setHasAttachments] = useState(false);
-  const [pendingConversation, setPendingConversation] =
-    useState<PendingConversation | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [, startNavigation] = useTransition();
-  const queryClient = useQueryClient();
   const router = useRouter();
-
-  const submitDraft = useCallback(
-    async ({ parts, reasoningEffort }: ChatComposerSubmission) => {
-      const conversationId = crypto.randomUUID();
-      const userMessageId = crypto.randomUUID();
-      const now = new Date().toISOString();
-      const title = createConversationTitle(parts);
-      const optimisticConversation = {
-        id: conversationId,
-        mode,
-        title,
-        createdAt: now,
-        updatedAt: now,
-        isPending: true,
-      };
-
-      setSubmitError(null);
-      setPendingConversation({ id: conversationId, mode, title, parts });
-      queryClient.setQueryData<ClientConversationListResponse>(
-        conversationListQueryKey,
-        (current) => prependConversation(current, optimisticConversation),
-      );
-
-      try {
-        const response = await createGeneration({
-          target: { type: "new", conversationId, mode },
-          userMessageId,
-          parts,
-          reasoningEffort,
-        });
-
-        if (response.conversationId !== conversationId) {
-          throw new Error("服务端返回了不一致的 Conversation ID");
+  const createMutation = useCreateGeneration();
+  const request = createMutation.variables;
+  // 成功确认后仍显示草稿预览，直到路由切换完成，避免页面闪回空白状态。
+  const pendingConversation =
+    request?.target.type === "new" &&
+    (createMutation.isPending || createMutation.isSuccess)
+      ? {
+          mode: request.target.mode,
+          title: createConversationTitle(request.parts),
+          parts: request.parts,
         }
+      : null;
+  const submitError = createMutation.error
+    ? getGenerationClientErrorMessage(createMutation.error)
+    : null;
 
-        queryClient.setQueryData<ClientConversationListResponse>(
-          conversationListQueryKey,
-          (current) => confirmConversation(current, conversationId),
-        );
-
-        void queryClient.invalidateQueries({
-          queryKey: conversationListQueryKey,
-        });
-        startNavigation(() => {
-          router.replace(`/chat/${conversationId}`);
-        });
-      } catch (error) {
-        queryClient.setQueryData<ClientConversationListResponse>(
-          conversationListQueryKey,
-          (current) => removeConversation(current, conversationId),
-        );
-        setPendingConversation(null);
-        setSubmitError(getGenerationClientErrorMessage(error));
-        throw error;
-      }
-    },
-    [mode, queryClient, router, startNavigation],
-  );
+  async function submitDraft({
+    parts,
+    reasoningEffort,
+  }: ChatComposerSubmission) {
+    const conversationId = crypto.randomUUID();
+    await createMutation.mutateAsync({
+      target: { type: "new", conversationId, mode },
+      userMessageId: crypto.randomUUID(),
+      parts,
+      reasoningEffort,
+    });
+    startNavigation(() => {
+      router.replace(`/chat/${conversationId}`);
+    });
+  }
 
   const pendingModeIcon =
     pendingConversation?.mode === "image" ? ImageIcon : MessageSquareText;
@@ -248,6 +200,8 @@ export function DraftWorkspace() {
             }
           >
             <ChatComposer
+              disabled={createMutation.isSuccess}
+              isSubmitting={createMutation.isPending}
               mode={mode}
               onAttachmentPresenceChange={setHasAttachments}
               onSubmit={submitDraft}

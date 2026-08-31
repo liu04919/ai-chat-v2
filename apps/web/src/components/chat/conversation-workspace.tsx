@@ -3,11 +3,10 @@
 import type {
   ConversationDetailResponse,
   GenerationEventDto,
-  MessageDto,
 } from "@ai-chat/contracts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ImageIcon, MessageSquareText } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import {
   ChatComposer,
@@ -16,6 +15,8 @@ import {
 import { GenerationResponse } from "./generation/generation-response";
 import { useGenerationEventStream } from "./generation/use-generation-event-stream";
 import { useGenerationProjectionStore } from "./generation/generation-projection-store";
+import { useCreateGeneration } from "./generation/use-create-generation";
+import { useCancelGeneration } from "./generation/use-cancel-generation";
 import { MessageParts } from "./messages/message-parts";
 import {
   conversationDetailQueryKey,
@@ -23,8 +24,6 @@ import {
   fetchConversation,
 } from "@/lib/conversations-client";
 import {
-  cancelGeneration,
-  createGeneration,
   getGenerationCancellationClientErrorMessage,
   getGenerationClientErrorMessage,
 } from "@/lib/generations-client";
@@ -39,19 +38,18 @@ type TerminalGenerationEvent = Extract<
   }
 >;
 
-function nextMessageSequence(messages: readonly MessageDto[]): number {
-  return messages.reduce(
-    (largest, message) => Math.max(largest, message.sequence),
-    -1,
-  ) + 1;
-}
-
 export function ConversationWorkspace({
   initialDetail,
 }: Readonly<{ initialDetail: ConversationDetailResponse }>) {
   const conversationId = initialDetail.conversation.id;
   const queryClient = useQueryClient();
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const createMutation = useCreateGeneration();
+  const cancelMutation = useCancelGeneration();
+  const submitError = createMutation.error
+    ? getGenerationClientErrorMessage(createMutation.error)
+    : cancelMutation.error
+      ? getGenerationCancellationClientErrorMessage(cancelMutation.error)
+      : null;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
   const clearProjection = useGenerationProjectionStore(
@@ -112,140 +110,30 @@ export function ConversationWorkspace({
     onTerminal: handleTerminal,
   });
 
-  const submitMessage = useCallback(
-    async ({ parts, reasoningEffort }: ChatComposerSubmission) => {
-      const queryKey = conversationDetailQueryKey(conversationId);
-      const userMessageId = crypto.randomUUID();
+  async function submitMessage({
+    parts,
+    reasoningEffort,
+  }: ChatComposerSubmission) {
+    cancelMutation.reset();
+    await createMutation.mutateAsync({
+      target: { type: "existing", conversationId },
+      userMessageId: crypto.randomUUID(),
+      parts,
+      reasoningEffort,
+    });
+  }
 
-      setSubmitError(null);
-      clearProjection(conversationId);
-      await queryClient.cancelQueries({ queryKey });
-
-      const previousDetail =
-        queryClient.getQueryData<ConversationDetailResponse>(queryKey);
-
-      if (!previousDetail) {
-        const error = new Error("对话详情尚未加载完成");
-        setSubmitError("对话详情尚未加载完成，请稍后重试");
-        throw error;
-      }
-
-      const optimisticMessage: MessageDto = {
-        id: userMessageId,
-        role: "user",
-        sequence: nextMessageSequence(previousDetail.messages),
-        parts,
-        createdAt: new Date().toISOString(),
-      };
-
-      queryClient.setQueryData<ConversationDetailResponse>(queryKey, {
-        ...previousDetail,
-        messages: [...previousDetail.messages, optimisticMessage],
-      });
-
-      try {
-        const response = await createGeneration({
-          target: { type: "existing", conversationId },
-          userMessageId,
-          parts,
-          reasoningEffort,
-        });
-
-        if (response.conversationId !== conversationId) {
-          throw new Error("服务端返回了不一致的 Conversation ID");
-        }
-
-        queryClient.setQueryData<ConversationDetailResponse>(
-          queryKey,
-          (current) => {
-            if (!current) {
-              return current;
-            }
-
-            const status = response.generation.status;
-            const activeGeneration =
-              status === "queued" || status === "running"
-                ? {
-                    id: response.generation.id,
-                    status,
-                    cancelRequestedAt: null,
-                  }
-                : null;
-
-            return { ...current, activeGeneration };
-          },
-        );
-
-        void queryClient.invalidateQueries({ queryKey });
-        void queryClient.invalidateQueries({
-          queryKey: conversationListQueryKey,
-        });
-      } catch (error) {
-        queryClient.setQueryData(queryKey, previousDetail);
-        setSubmitError(getGenerationClientErrorMessage(error));
-        throw error;
-      }
-    },
-    [clearProjection, conversationId, queryClient],
-  );
-
-  const stopGeneration = useCallback(async () => {
+  async function stopGeneration() {
     if (!activeGenerationId) {
       return;
     }
 
-    const queryKey = conversationDetailQueryKey(conversationId);
-
-    setSubmitError(null);
-
-    try {
-      await queryClient.cancelQueries({ queryKey });
-      const response = await cancelGeneration(activeGenerationId);
-
-      if (response.generation.id !== activeGenerationId) {
-        throw new Error("服务端返回了不一致的 Generation ID");
-      }
-
-      const activeGeneration =
-        response.generation.status === "queued" ||
-        response.generation.status === "running"
-          ? {
-              id: response.generation.id,
-              status: response.generation.status,
-              cancelRequestedAt: response.generation.cancelRequestedAt,
-            }
-          : null;
-
-      queryClient.setQueryData<ConversationDetailResponse>(
-        queryKey,
-        (current) => {
-          if (
-            !current ||
-            current.activeGeneration?.id !== response.generation.id
-          ) {
-            return current;
-          }
-
-          return {
-            ...current,
-            activeGeneration,
-          };
-        },
-      );
-
-      if (!activeGeneration) {
-        clearProjection(conversationId);
-        void queryClient.invalidateQueries({ queryKey });
-        void queryClient.invalidateQueries({
-          queryKey: conversationListQueryKey,
-        });
-      }
-    } catch (error) {
-      setSubmitError(getGenerationCancellationClientErrorMessage(error));
-      void queryClient.invalidateQueries({ queryKey });
-      throw error;
-    }
-  }, [activeGenerationId, clearProjection, conversationId, queryClient]);
+    createMutation.reset();
+    await cancelMutation.mutateAsync({
+      conversationId,
+      generationId: activeGenerationId,
+    });
+  }
 
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -305,6 +193,8 @@ export function ConversationWorkspace({
       <div className="mx-auto w-full max-w-3xl shrink-0 px-5 pb-6">
         <ChatComposer
           disabled={isGenerating}
+          isSubmitting={createMutation.isPending}
+          isStopping={cancelMutation.isPending}
           mode={conversation.mode}
           onStopGeneration={
             conversation.mode === "chat" && activeGenerationId

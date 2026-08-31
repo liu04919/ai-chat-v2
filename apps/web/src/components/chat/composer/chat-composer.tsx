@@ -37,6 +37,8 @@ export type ChatComposerSubmission = {
 
 export function ChatComposer({
   disabled = false,
+  isStopping = false,
+  isSubmitting = false,
   mode,
   onAttachmentPresenceChange,
   onStopGeneration,
@@ -45,6 +47,8 @@ export function ChatComposer({
   submitError,
 }: Readonly<{
   disabled?: boolean;
+  isStopping?: boolean;
+  isSubmitting?: boolean;
   mode: ConversationModeDto;
   onAttachmentPresenceChange?: (hasAttachments: boolean) => void;
   onStopGeneration?: () => Promise<void>;
@@ -55,8 +59,6 @@ export function ChatComposer({
   const [input, setInput] = useState("");
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffortDto>("medium");
-  const [isStopping, setIsStopping] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachments = useDraftAttachments({
     mode,
@@ -107,8 +109,6 @@ export function ChatComposer({
       ),
     ];
 
-    setIsSubmitting(true);
-
     try {
       await onSubmit({
         parts,
@@ -118,8 +118,6 @@ export function ChatComposer({
       attachments.clearSubmitted();
     } catch {
       // 父组件保留并展示具体错误，Composer 只负责保留当前草稿。
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -128,14 +126,10 @@ export function ChatComposer({
       return;
     }
 
-    setIsStopping(true);
-
     try {
       await onStopGeneration();
     } catch {
-      // 父组件展示具体错误；这里仅恢复停止按钮，允许用户重试。
-    } finally {
-      setIsStopping(false);
+      // 父组件的 mutation 管理错误和 pending 状态。
     }
   }
 
