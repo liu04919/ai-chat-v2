@@ -7,7 +7,7 @@ import type {
 } from "@ai-chat/event-store";
 import type { ObjectStorage } from "@ai-chat/storage";
 import {
-  claimGenerationExecution,
+  type ClaimedGenerationExecution,
   cancelGenerationExecution,
   completeGenerationExecution,
   failGenerationExecution,
@@ -15,7 +15,7 @@ import {
 } from "@ai-chat/db";
 
 import type { ChatModel, ChatModelStreamPart } from "../llm/chat-model";
-import { buildChatModelRequest } from "./context-builder";
+import { buildChatModelRequest } from "./chat-context-builder";
 import {
   coalesceChatModelStream,
   type DeltaCoalescingOptions,
@@ -35,8 +35,7 @@ export type ExecuteChatGenerationDependencies = {
 
 export type ExecuteChatGenerationResult =
   | { kind: "completed"; assistantMessageId: string }
-  | { kind: "cancelled"; assistantMessageId: string | null }
-  | { kind: "skipped" };
+  | { kind: "cancelled"; assistantMessageId: string | null };
 
 function asError(error: unknown): Error {
   return error instanceof Error
@@ -135,18 +134,10 @@ async function recordCancellation(
 }
 
 export async function executeChatGeneration(
-  generationId: string,
+  execution: ClaimedGenerationExecution,
   dependencies: ExecuteChatGenerationDependencies,
 ): Promise<ExecuteChatGenerationResult> {
-  const claim = await claimGenerationExecution(
-    generationId,
-    (dependencies.now ?? (() => new Date()))(),
-  );
-
-  if (claim.kind === "not_queued") {
-    return { kind: "skipped" };
-  }
-
+  const generationId = execution.id;
   const abortController = new AbortController();
   const assistantParts: AssistantMessagePartDto[] = [];
   let unsubscribe: () => Promise<void>;
@@ -177,7 +168,7 @@ export async function executeChatGeneration(
     });
 
     const request = await buildChatModelRequest(
-      claim.execution,
+      execution,
       dependencies.objectStorage,
     );
     abortController.signal.throwIfAborted();

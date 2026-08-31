@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ClaimedGenerationExecution } from "@ai-chat/db";
 
-import { buildChatModelRequest } from "./context-builder";
+import { buildChatModelRequest } from "./chat-context-builder";
 
 const execution: ClaimedGenerationExecution = {
   id: "generation_123",
+  userMessageId: "message_3",
   conversationId: "conversation_123",
   ownerId: "owner_123",
   mode: "chat",

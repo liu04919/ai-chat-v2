@@ -30,6 +30,8 @@ pnpm dev:worker
 
 Web 与 Worker 的环境变量分别参考各自的 `.env.example`。真实密钥写入对应的 `.env.local`，这些文件不会进入 Git。
 
+图片 Worker 使用独立的 `IMAGE_BASE_URL`、`IMAGE_MODEL`、`IMAGE_API_KEY`，不复用聊天渠道凭证。未配置时图片任务会明确失败，Chat 不受影响。图片后端执行链已接入同一队列；前端图片展示与发送入口尚未开放。
+
 ## 验证
 
 ```bash
@@ -37,4 +39,4 @@ pnpm check
 pnpm test:r2
 ```
 
-`pnpm check` 依次执行 ESLint、TypeScript、领域/契约测试、真实 PostgreSQL 集成测试和 Next.js production build。`pnpm test:r2` 使用本地 R2 配置执行会自动清理测试对象的外部集成测试，不包含在默认检查中。
+`pnpm check` 依次执行 ESLint、TypeScript、单元测试、Docker PostgreSQL/Redis 集成测试和 Next.js production build。图片执行测试使用假模型和内存对象存储，不产生模型调用费用。`pnpm test:r2` 使用本地 R2 配置执行会自动清理测试对象的外部集成测试，不包含在默认检查中。

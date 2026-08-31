@@ -39,7 +39,9 @@ if (!testDatabaseUrl) {
 
 process.env.DATABASE_URL = testDatabaseUrl;
 
-class FakeObjectStorage implements ObjectStorage {
+class FakeObjectStorage
+  implements Pick<ObjectStorage, "createUploadUrl" | "headObject" | "deleteObject">
+{
   readonly objects = new Map<string, StoredObjectMetadata>();
 
   async createUploadUrl(input: CreateObjectUploadUrlInput) {

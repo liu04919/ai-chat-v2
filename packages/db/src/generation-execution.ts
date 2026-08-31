@@ -46,6 +46,7 @@ export type GenerationExecutionAttachmentRecord = {
 
 export type ClaimedGenerationExecution = {
   id: string;
+  userMessageId: string;
   conversationId: string;
   ownerId: string;
   mode: "chat" | "image";
@@ -90,6 +91,7 @@ export async function claimGenerationExecution(
       )
       .returning({
         id: generations.id,
+        userMessageId: generations.userMessageId,
         conversationId: generations.conversationId,
         reasoningEffort: generations.reasoningEffort,
       });
@@ -169,6 +171,7 @@ export async function claimGenerationExecution(
       kind: "claimed",
       execution: {
         id: claimed.id,
+        userMessageId: claimed.userMessageId,
         conversationId: claimed.conversationId,
         ownerId: conversation.ownerId,
         mode: conversation.mode,

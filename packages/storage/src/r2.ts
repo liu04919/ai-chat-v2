@@ -37,6 +37,13 @@ export interface ObjectStorage {
   createDownloadUrl(objectKey: string, expiresInSeconds: number): Promise<string>;
   headObject(objectKey: string): Promise<StoredObjectMetadata | null>;
   deleteObject(objectKey: string): Promise<void>;
+  readObject(objectKey: string, abortSignal?: AbortSignal): Promise<Uint8Array>;
+  writeObject(input: {
+    objectKey: string;
+    data: Uint8Array;
+    contentType: string;
+    abortSignal?: AbortSignal;
+  }): Promise<void>;
 }
 
 export function createR2ObjectStorage(
@@ -54,6 +61,32 @@ export function createR2ObjectStorage(
   });
 
   return {
+    async readObject(objectKey, abortSignal) {
+      const result = await client.send(
+        new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+        { abortSignal },
+      );
+
+      if (!result.Body) {
+        throw new Error("R2 对象缺少响应体");
+      }
+
+      return result.Body.transformToByteArray();
+    },
+
+    async writeObject({ objectKey, data, contentType, abortSignal }) {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: config.bucket,
+          Key: objectKey,
+          Body: data,
+          ContentType: contentType,
+          ContentLength: data.byteLength,
+        }),
+        { abortSignal },
+      );
+    },
+
     async createUploadUrl(input) {
       const command = new PutObjectCommand({
         Bucket: config.bucket,

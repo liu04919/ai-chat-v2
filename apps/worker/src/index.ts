@@ -10,8 +10,10 @@ import {
 import { createR2ObjectStorage } from "@ai-chat/storage";
 
 import { createBullMqGenerationWorker } from "./generation/bullmq-generation-worker";
-import { executeChatGeneration } from "./generation/execute-chat-generation";
+import { executeGeneration } from "./generation/execute-generation";
 import { createCatApiChatModel } from "./llm/cat-api-chat-model";
+import { createCatApiImageModel } from "./llm/cat-api-image-model";
+import type { ImageModel } from "./llm/image-model";
 
 const localEnvironment = fileURLToPath(
   new URL("../.env.local", import.meta.url),
@@ -25,7 +27,7 @@ function requireEnvironment(name: string): string {
   const value = process.env[name];
 
   if (!value) {
-    throw new Error(`缺少 ${name}，Worker 无法启动`);
+    throw new Error(`缺少环境变量 ${name}`);
   }
 
   return value;
@@ -48,11 +50,22 @@ const chatModel = createCatApiChatModel({
   apiKey: requireEnvironment("LLM_API_KEY"),
   modelId: requireEnvironment("LLM_MODEL"),
 });
+// 图片渠道使用独立凭证；尚未配置时只让图片任务明确失败，不影响 Chat。
+const imageModel: ImageModel = {
+  generate(request) {
+    return createCatApiImageModel({
+      baseUrl: requireEnvironment("IMAGE_BASE_URL"),
+      apiKey: requireEnvironment("IMAGE_API_KEY"),
+      modelId: requireEnvironment("IMAGE_MODEL"),
+    }).generate(request);
+  },
+};
 const worker = createBullMqGenerationWorker({
   redisUrl,
   processGeneration: (generationId) =>
-    executeChatGeneration(generationId, {
+    executeGeneration(generationId, {
       chatModel,
+      imageModel,
       cancellationSubscriber,
       eventWriter,
       objectStorage,

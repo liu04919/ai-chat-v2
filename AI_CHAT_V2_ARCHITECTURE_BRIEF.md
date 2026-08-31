@@ -372,6 +372,10 @@ Chat 与 Image 共享账户、Conversation 外壳和基础设施，但拥有独�
 
 Image 管线使用 CatAPI `gpt-image-2`：无参考图调用 `/v1/images/generations`，一张参考图调用 multipart `/v1/images/edits`。第一版只允许一张参考图片，不接受 PDF 作为 Image 模式输入。
 
+Chat/Image 各自构建上下文。Image Context Builder 将本轮之前的有序可见文字与本轮指令组成 prompt；本轮上传图优先，否则延续最近一张 Assistant 生成图，不默认携带所有历史图片。参考图从自有 R2 读取，不依赖供应商保存上下文。
+
+生成图片先保存到 R2，再在一个 PostgreSQL 事务内创建 ready/linked Attachment、Assistant Message 并完成 Generation，最后发布终态事件。取消时不创建半成品图片消息；本次已上传但未发布的对象在失败或取消路径中即时清理，已完成入库的图片不因事件发布失败而删除。
+
 ## 10. Auth 与安全边界
 
 Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和存放在 PostgreSQL 的 Session，通过 HttpOnly Session Cookie 识别用户；原生 EventSource 自然携带同源 Cookie。当前不接入社交登录。

@@ -45,4 +45,5 @@ export {
   type GenerationRecord,
 } from "./generation-reader";
 export { migrateDatabase } from "./migration";
+export { completeImageGenerationExecution } from "./image-generation-execution";
 export * from "./schema/index";

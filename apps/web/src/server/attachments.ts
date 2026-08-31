@@ -28,7 +28,7 @@ export class AttachmentServiceError extends Error {
 }
 
 type AttachmentServiceDependencies = {
-  storage?: ObjectStorage;
+  storage?: Pick<ObjectStorage, "createUploadUrl" | "headObject" | "deleteObject">;
   createId?: () => string;
   now?: () => Date;
 };

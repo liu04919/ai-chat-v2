@@ -32,7 +32,7 @@ import type {
   ChatModelStreamPart,
 } from "../llm/chat-model";
 import { createBullMqGenerationWorker } from "./bullmq-generation-worker";
-import { executeChatGeneration } from "./execute-chat-generation";
+import { executeGeneration } from "./execute-generation";
 
 const localEnvironment = fileURLToPath(
   new URL("../../../web/.env.local", import.meta.url),
@@ -159,11 +159,27 @@ const worker = createBullMqGenerationWorker({
   redisUrl,
   queueName,
   processGeneration: (generationId) =>
-    executeChatGeneration(generationId, {
+    executeGeneration(generationId, {
       chatModel: fakeChatModel,
+      imageModel: {
+        generate: async () => {
+          throw new Error("Chat 不能进入 Image Model");
+        },
+      },
       cancellationSubscriber,
       eventWriter,
-      objectStorage: { createDownloadUrl },
+      objectStorage: {
+        createDownloadUrl,
+        readObject: async () => {
+          throw new Error("Chat 不能读取图片二进制");
+        },
+        writeObject: async () => {
+          throw new Error("Chat 不能写入图片二进制");
+        },
+        deleteObject: async () => {
+          throw new Error("Chat 不能删除图片");
+        },
+      },
       coalescing: { maxDelayMs: 1000, maxCharacters: 128 },
       createAssistantMessageId: () => `assistant-${randomUUID()}`,
     }),
