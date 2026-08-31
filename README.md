@@ -18,7 +18,7 @@ packages/event-store Web/Worker 共享的 Redis GenerationEvent 日志边界
 
 ## 本地运行
 
-需要 Node.js 24+、pnpm 10 和 Docker Desktop。本项目 PostgreSQL 使用宿主机 `5433`，避免占用 monitor-platform 的 `5432`。
+需要 Node.js 24.5+、pnpm 10 和 Docker Desktop。本项目 PostgreSQL 使用宿主机 `5433`，避免占用 monitor-platform 的 `5432`。
 
 ```bash
 pnpm install
@@ -29,6 +29,8 @@ pnpm dev:worker
 ```
 
 Web 与 Worker 的环境变量分别参考各自的 `.env.example`。真实密钥写入对应的 `.env.local`，这些文件不会进入 Git。
+
+Worker 的 `dev` / `start` 命令在 Node 启动时读取 `.env.local` 并启用原生环境代理：配置 `HTTP_PROXY` / `HTTPS_PROXY` 时走代理，不配置则直连；`NO_PROXY` 用于绕过本机地址。代理连接失败时不自动切换直连重发。修改代理配置后重启 Worker，已有系统环境变量优先于 `.env.local`。
 
 图片 Worker 使用独立的 `IMAGE_BASE_URL`、`IMAGE_MODEL`、`IMAGE_API_KEY`，不复用聊天渠道凭证。未配置时图片任务会明确失败，Chat 不受影响。图片会话支持发送、参考图续改、停止、生成骨架与大图预览；刷新或切换会话后由服务端状态恢复。骨架仅用于展示，不写入 Assistant 消息。
 

@@ -24,7 +24,7 @@ export function AttachmentImage({
   );
   if (loadState === "error") {
     return (
-      <div className="flex aspect-[3/2] w-[480px] max-w-full flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/50">
+      <div className="flex aspect-3/2 w-[480px] max-w-full flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/50">
         <p className="text-sm text-muted-foreground" role="alert">
           图片加载失败
         </p>
@@ -41,7 +41,7 @@ export function AttachmentImage({
   }
   return (
     <Dialog.Root>
-      <div className="relative aspect-[3/2] w-[480px] max-w-full overflow-hidden rounded-2xl border bg-muted/40">
+      <div className="relative aspect-3/2 w-[480px] max-w-full overflow-hidden rounded-2xl border bg-muted/40">
         {loadState === "loading" ? (
           <div className="absolute inset-0">
             <ImagePlaceholder label="正在加载图片…" />

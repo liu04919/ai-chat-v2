@@ -1,7 +1,3 @@
-import { existsSync } from "node:fs";
-import { loadEnvFile } from "node:process";
-import { fileURLToPath } from "node:url";
-
 import { closeApplicationDatabase } from "@ai-chat/db";
 import {
   createRedisGenerationCancellationSubscriber,
@@ -14,14 +10,6 @@ import { executeGeneration } from "./generation/execute-generation";
 import { createCatApiChatModel } from "./llm/cat-api-chat-model";
 import { createCatApiImageModel } from "./llm/cat-api-image-model";
 import type { ImageModel } from "./llm/image-model";
-
-const localEnvironment = fileURLToPath(
-  new URL("../.env.local", import.meta.url),
-);
-
-if (existsSync(localEnvironment)) {
-  loadEnvFile(localEnvironment);
-}
 
 function requireEnvironment(name: string): string {
   const value = process.env[name];
