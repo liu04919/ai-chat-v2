@@ -22,6 +22,7 @@ export function AttachmentImage({
   const [loadState, setLoadState] = useState<"loading" | "loaded" | "error">(
     "loading",
   );
+  const [imageSize, setImageSize] = useState({ width: 480, height: 320 });
   if (loadState === "error") {
     return (
       <div className="flex aspect-3/2 w-[480px] max-w-full flex-col items-center justify-center gap-3 rounded-2xl border bg-muted/50">
@@ -41,7 +42,16 @@ export function AttachmentImage({
   }
   return (
     <Dialog.Root>
-      <div className="relative aspect-3/2 w-[480px] max-w-full overflow-hidden rounded-2xl border bg-muted/40">
+      <div
+        className="relative max-w-full overflow-hidden rounded-2xl border bg-muted/40"
+        style={{
+          width: Math.min(
+            480,
+            imageSize.width,
+            (480 * imageSize.width) / imageSize.height,
+          ),
+        }}
+      >
         {loadState === "loading" ? (
           <div className="absolute inset-0">
             <ImagePlaceholder label="正在加载图片…" />
@@ -52,7 +62,8 @@ export function AttachmentImage({
             type="button"
             aria-label={`查看大图：${name}`}
             disabled={loadState !== "loaded"}
-            className="group relative block h-full w-full cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-default"
+            className="group relative block w-full cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-default"
+            style={{ aspectRatio: `${imageSize.width} / ${imageSize.height}` }}
           >
             <Image
               src={url}
@@ -62,7 +73,14 @@ export function AttachmentImage({
               unoptimized
               referrerPolicy="no-referrer"
               className={`object-contain transition-opacity duration-300 motion-reduce:transition-none ${loadState === "loaded" ? "opacity-100" : "opacity-0"}`}
-              onLoad={() => setLoadState("loaded")}
+              onLoad={(event) => {
+                const image = event.currentTarget;
+                setImageSize({
+                  width: image.naturalWidth,
+                  height: image.naturalHeight,
+                });
+                setLoadState("loaded");
+              }}
               onError={() => setLoadState("error")}
             />
             {loadState === "loaded" ? (

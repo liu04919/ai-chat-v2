@@ -44,3 +44,7 @@ pnpm test:r2
 ```
 
 `pnpm check` 依次执行 ESLint、TypeScript、单元测试、Docker PostgreSQL/Redis 集成测试和 Next.js production build。图片执行测试使用假模型和内存对象存储，不产生模型调用费用。`pnpm test:r2` 使用本地 R2 配置执行会自动清理测试对象的外部集成测试，不包含在默认检查中。
+
+## 图标来源
+
+浏览器 favicon 使用 Twitter, Inc. 与其他贡献者的 [Twemoji](https://github.com/twitter/twemoji) 聊天气泡图标（U+1F4AC），遵循 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)；仅缩放并转换为 ICO，本地提供，不依赖外部图标服务。

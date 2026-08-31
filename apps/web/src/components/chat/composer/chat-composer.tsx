@@ -19,6 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 import { DraftAttachmentList } from "./draft-attachment-list";
+import { handleComposerKeyDown } from "./composer-keyboard";
 import { useDraftAttachments } from "./use-draft-attachments";
 
 const reasoningOptions: ReadonlyArray<{
@@ -81,6 +82,7 @@ export function ChatComposer({
   const canSubmit =
     Boolean(onSubmit) &&
     !disabled &&
+    !onStopGeneration &&
     attachmentsReady &&
     hasContent &&
     !isSubmitting;
@@ -154,6 +156,7 @@ export function ChatComposer({
         value={input}
         disabled={contentDisabled}
         onChange={(event) => setInput(event.target.value)}
+        onKeyDown={(event) => handleComposerKeyDown(event, canSubmit)}
       />
 
       <div className="flex items-center justify-between gap-3 px-2 pb-1">
