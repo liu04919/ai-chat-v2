@@ -14,6 +14,7 @@ import {
 import { useGenerationProjectionStore } from "./generation-projection-store";
 import { createGenerationMutationOptions } from "./use-create-generation";
 import { cancelGenerationMutationOptions } from "./use-cancel-generation";
+import { initialConversationHistory, type ConversationHistoryData } from "../messages/conversation-history-query";
 
 const conversationId = "conversation_123";
 const generationId = "generation_123";
@@ -54,6 +55,7 @@ function createResponse(request: CreateGenerationRequest): Response {
 
 function createDetail(running = false): ConversationDetailResponse {
   return {
+    nextCursor: null,
     conversation,
     latestGeneration: running ? { id: generationId, status: "running" } : null,
     activeGeneration: running
@@ -72,6 +74,14 @@ function createDetail(running = false): ConversationDetailResponse {
 }
 
 let queryClient: QueryClient;
+
+function setDetail(detail: ConversationDetailResponse) {
+  queryClient.setQueryData(queryKey, initialConversationHistory(detail));
+}
+
+function getDetail() {
+  return queryClient.getQueryData<ConversationHistoryData>(queryKey)?.pages[0];
+}
 
 beforeEach(() => {
   queryClient = new QueryClient({
@@ -152,7 +162,7 @@ describe("创建 Generation mutation", () => {
 
   it("已有会话先追加乐观消息，成功后由 activeGeneration 驱动订阅", async () => {
     const previousDetail = createDetail();
-    queryClient.setQueryData(queryKey, previousDetail);
+    setDetail(previousDetail);
     useGenerationProjectionStore
       .getState()
       .start(conversationId, "old_generation");
@@ -168,7 +178,7 @@ describe("创建 Generation mutation", () => {
     const sending = mutation.mutate(request);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     const optimistic =
-      queryClient.getQueryData<ConversationDetailResponse>(queryKey);
+      getDetail();
     expect(optimistic?.messages).toHaveLength(2);
     expect(optimistic?.messages[1]).toMatchObject({
       id: request.userMessageId,
@@ -183,7 +193,7 @@ describe("创建 Generation mutation", () => {
     await sending;
 
     const detail =
-      queryClient.getQueryData<ConversationDetailResponse>(queryKey);
+      getDetail();
     expect(detail?.activeGeneration).toEqual({
       id: generationId,
       status: "queued",
@@ -195,7 +205,7 @@ describe("创建 Generation mutation", () => {
 
   it("已有会话发送失败恢复详情，显式关闭自动重试", async () => {
     const previousDetail = createDetail();
-    queryClient.setQueryData(queryKey, previousDetail);
+    setDetail(previousDetail);
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
@@ -211,7 +221,7 @@ describe("创建 Generation mutation", () => {
       "生成服务暂时不可用",
     );
 
-    expect(queryClient.getQueryData(queryKey)).toEqual(previousDetail);
+    expect(getDetail()).toEqual(previousDetail);
     expect(mutation.getCurrentResult().isPending).toBe(false);
     expect(fetchMock).toHaveBeenCalledOnce();
   });
@@ -228,12 +238,36 @@ describe("创建 Generation mutation", () => {
       "对话详情尚未加载完成",
     );
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(queryClient.getQueryData(queryKey)).toBeUndefined();
+    expect(getDetail()).toBeUndefined();
+  });
+
+  it("发送失败只撤回乐观消息，保留发送期间新加载的历史页", async () => {
+    const previousDetail = { ...createDetail(), nextCursor: 5 };
+    setDetail(previousDetail);
+    const deferred = Promise.withResolvers<Response>();
+    const fetchMock = vi.fn().mockReturnValue(deferred.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const mutation = new MutationObserver(queryClient, createGenerationMutationOptions(queryClient));
+    const sending = mutation.mutate(createRequest("existing"));
+    const rejection = expect(sending).rejects.toThrow("生成服务暂时不可用");
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    const older = {
+      ...createDetail(),
+      messages: [{ ...createDetail().messages[0]!, id: "older", sequence: 1 }],
+    };
+    queryClient.setQueryData<ConversationHistoryData>(queryKey, (current) => ({
+      pages: [...current!.pages, older], pageParams: [...current!.pageParams, 5],
+    }));
+    deferred.resolve(Response.json({ code: "QUEUE_UNAVAILABLE" }, { status: 503 }));
+    await rejection;
+    const history = queryClient.getQueryData<ConversationHistoryData>(queryKey)!;
+    expect(history.pages).toEqual([previousDetail, older]);
+    expect(history.pageParams).toEqual([null, 5]);
   });
 
   it("响应的会话 ID 不匹配时仍进入失败回滚", async () => {
     const previousDetail = createDetail();
-    queryClient.setQueryData(queryKey, previousDetail);
+    setDetail(previousDetail);
     const otherRequest = createRequest("existing");
     otherRequest.target.conversationId = "other_conversation";
     vi.stubGlobal(
@@ -248,13 +282,13 @@ describe("创建 Generation mutation", () => {
     await expect(mutation.mutate(createRequest("existing"))).rejects.toThrow(
       "不一致的 Conversation ID",
     );
-    expect(queryClient.getQueryData(queryKey)).toEqual(previousDetail);
+    expect(getDetail()).toEqual(previousDetail);
   });
 });
 
 describe("停止 Generation mutation", () => {
   beforeEach(() => {
-    queryClient.setQueryData(queryKey, createDetail(true));
+    setDetail(createDetail(true));
     useGenerationProjectionStore.getState().start(conversationId, generationId);
   });
 
@@ -283,7 +317,7 @@ describe("停止 Generation mutation", () => {
 
     expect(mutation.getCurrentResult().isSuccess).toBe(true);
     const detail =
-      queryClient.getQueryData<ConversationDetailResponse>(queryKey);
+      getDetail();
     expect(detail?.activeGeneration).toEqual({
       id: generationId,
       status: "running",
@@ -315,7 +349,7 @@ describe("停止 Generation mutation", () => {
     await mutation.mutate({ conversationId, generationId });
 
     const detail =
-      queryClient.getQueryData<ConversationDetailResponse>(queryKey);
+      getDetail();
     expect(detail?.activeGeneration).toBeNull();
     expect(
       useGenerationProjectionStore.getState().projections[conversationId],
@@ -326,7 +360,7 @@ describe("停止 Generation mutation", () => {
   it("图片取消保留停止提示，不往消息缓存插入假 Assistant Message", async () => {
     const detail = createDetail(true);
     detail.conversation.mode = "image";
-    queryClient.setQueryData(queryKey, detail);
+    setDetail(detail);
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -345,10 +379,10 @@ describe("停止 Generation mutation", () => {
     );
     await mutation.mutate({ conversationId, generationId });
     expect(
-      queryClient.getQueryData<ConversationDetailResponse>(queryKey)?.messages,
+      getDetail()?.messages,
     ).toEqual(detail.messages);
     expect(
-      queryClient.getQueryData<ConversationDetailResponse>(queryKey)
+      getDetail()
         ?.latestGeneration,
     ).toEqual({ id: generationId, status: "cancelled" });
     expect(
@@ -374,7 +408,7 @@ describe("停止 Generation mutation", () => {
 
     expect(mutation.getCurrentResult().isError).toBe(true);
     expect(mutation.getCurrentResult().isPending).toBe(false);
-    expect(queryClient.getQueryData(queryKey)).toEqual(createDetail(true));
+    expect(getDetail()).toEqual(createDetail(true));
     expect(
       useGenerationProjectionStore.getState().projections[conversationId],
     ).toBeDefined();
@@ -394,7 +428,7 @@ describe("停止 Generation mutation", () => {
 
     const newerDetail = createDetail(true);
     newerDetail.activeGeneration!.id = "newer_generation";
-    queryClient.setQueryData(queryKey, newerDetail);
+    setDetail(newerDetail);
     useGenerationProjectionStore
       .getState()
       .start(conversationId, "newer_generation");
@@ -409,7 +443,7 @@ describe("停止 Generation mutation", () => {
     );
     await stopping;
 
-    expect(queryClient.getQueryData(queryKey)).toEqual(newerDetail);
+    expect(getDetail()).toEqual(newerDetail);
     expect(
       useGenerationProjectionStore.getState().projections[conversationId]
         ?.generationId,

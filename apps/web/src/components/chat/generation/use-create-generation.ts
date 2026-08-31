@@ -1,7 +1,6 @@
 "use client";
 
 import type {
-  ConversationDetailResponse,
   CreateGenerationRequest,
   MessageDto,
 } from "@ai-chat/contracts";
@@ -23,6 +22,11 @@ import {
 } from "../../../lib/conversations-client";
 import { createGeneration } from "../../../lib/generations-client";
 import { useGenerationProjectionStore } from "./generation-projection-store";
+import {
+  invalidateConversationHistory,
+  updateConversationHead,
+  type ConversationHistoryData,
+} from "../messages/conversation-history-query";
 
 function nextMessageSequence(messages: readonly MessageDto[]): number {
   return (
@@ -72,14 +76,14 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
       const queryKey = conversationDetailQueryKey(target.conversationId);
       useGenerationProjectionStore.getState().clear(target.conversationId);
       await queryClient.cancelQueries({ queryKey });
-      const previousDetail =
-        queryClient.getQueryData<ConversationDetailResponse>(queryKey);
+      const previousHistory = queryClient.getQueryData<ConversationHistoryData>(queryKey);
+      const previousDetail = previousHistory?.pages[0];
 
       if (!previousDetail) {
         throw new Error("对话详情尚未加载完成");
       }
 
-      queryClient.setQueryData<ConversationDetailResponse>(queryKey, {
+      updateConversationHead(queryClient, target.conversationId, () => ({
         ...previousDetail,
         messages: [
           ...previousDetail.messages,
@@ -91,7 +95,7 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
             createdAt: now,
           },
         ],
-      });
+      }));
 
       return previousDetail;
     },
@@ -104,15 +108,10 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
           (current) => confirmConversation(current, conversationId),
         );
       } else {
-        const queryKey = conversationDetailQueryKey(conversationId);
         const { id, status } = response.generation;
-        queryClient.setQueryData<ConversationDetailResponse>(
-          queryKey,
+        updateConversationHead(
+          queryClient, conversationId,
           (current) => {
-            if (!current) {
-              return current;
-            }
-
             const activeGeneration =
               status === "queued" || status === "running"
                 ? { id, status, cancelRequestedAt: null }
@@ -125,7 +124,7 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
             };
           },
         );
-        void queryClient.invalidateQueries({ queryKey });
+        invalidateConversationHistory(queryClient, conversationId);
       }
 
       // 命令确认后即可结束 pending，不等待详情刷新或 AI 生成完成。
@@ -133,17 +132,17 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
         queryKey: conversationListQueryKey,
       });
     },
-    onError: (_error, { target }, previousDetail) => {
+    onError: (_error, { target, userMessageId }, previousDetail) => {
       if (target.type === "new") {
         queryClient.setQueryData<ClientConversationListResponse>(
           conversationListQueryKey,
           (current) => removeConversation(current, target.conversationId),
         );
       } else if (previousDetail) {
-        queryClient.setQueryData(
-          conversationDetailQueryKey(target.conversationId),
-          previousDetail,
-        );
+        updateConversationHead(queryClient, target.conversationId, (current) => ({
+          ...current,
+          messages: current.messages.filter((message) => message.id !== userMessageId),
+        }));
       }
     },
   });

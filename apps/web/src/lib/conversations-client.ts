@@ -31,8 +31,13 @@ export async function fetchConversations(): Promise<ClientConversationListRespon
 
 export async function fetchConversation(
   conversationId: string,
+  options: { before?: number; signal?: AbortSignal } = {},
 ): Promise<ConversationDetailResponse> {
-  const response = await fetch(`/api/conversations/${conversationId}`);
+  const query = options.before === undefined ? "" : `?before=${options.before}`;
+  const response = await fetch(`/api/conversations/${encodeURIComponent(conversationId)}${query}`, {
+    signal: options.signal,
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     throw new Error("无法加载对话");

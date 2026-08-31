@@ -25,6 +25,9 @@ export {
   type ReadAttachmentResponse,
 } from "./attachment";
 export {
+  CONVERSATION_MESSAGE_PAGE_SIZE,
+  conversationMessageCursorSchema,
+  conversationPageQuerySchema,
   conversationDetailResponseSchema,
   conversationListResponseSchema,
   conversationModeSchema,

@@ -12,6 +12,7 @@ import {
 import { migrateDatabase } from "./migration";
 import { conversations, generations, messages, user } from "./schema/index";
 import { loadIntegrationTestEnvironment } from "./test-environment";
+import { claimGenerationExecution } from "./generation-execution";
 
 const testDatabaseUrl = loadIntegrationTestEnvironment();
 const database = createDatabase(testDatabaseUrl, 1);
@@ -89,6 +90,63 @@ afterAll(async () => {
 });
 
 describe("Conversation ownership queries", () => {
+  it("最新 30 条向前分页，新增消息不打乱游标；Worker 仍读取完整上下文", async () => {
+    const id = randomUUID();
+    const rows = Array.from({ length: 75 }, (_, index) => ({
+      id: randomUUID(), conversationId: id, role: "user" as const,
+      sequence: index * 2,
+      parts: [{ type: "text" as const, text: `历史 ${index}` }],
+    }));
+    await database.db.insert(conversations).values({ id, ownerId, mode: "chat", title: "分页测试" });
+    try {
+      await database.db.insert(messages).values(rows);
+      const read = (before?: number) => getConversationRecordForOwner(ownerId, id, { database: database.db, before });
+      const first = (await read())!;
+      expect(first.messages.map((message) => message.sequence)).toEqual(rows.slice(-30).map((row) => row.sequence));
+      expect(first.nextCursor).toBe(90);
+      const newMessageId = randomUUID();
+      await database.db.insert(messages).values({
+        id: newMessageId, conversationId: id, role: "user", sequence: 150,
+        parts: [{ type: "text", text: "分页期间新消息" }],
+      });
+      const second = (await read(first.nextCursor!))!;
+      const third = (await read(second.nextCursor!))!;
+      expect(second.messages).toHaveLength(30);
+      expect(third.messages).toHaveLength(15);
+      expect(third.nextCursor).toBeNull();
+      const all = [...third.messages, ...second.messages, ...first.messages];
+      expect(all.map((message) => message.id)).toEqual(rows.map((row) => row.id));
+      expect((await read(0))?.messages).toEqual([]);
+      expect((await read(0))?.nextCursor).toBeNull();
+      expect(await getConversationRecordForOwner(otherOwnerId, id, { database: database.db, before: 90 })).toBeNull();
+
+      const generationId = randomUUID();
+      await database.db.insert(generations).values({ id: generationId, conversationId: id, userMessageId: newMessageId, reasoningEffort: "medium" });
+      const claimed = await claimGenerationExecution(generationId, new Date(), database.db);
+      expect(claimed.kind).toBe("claimed");
+      if (claimed.kind !== "claimed") throw new Error("expected claimed generation");
+      expect(claimed.execution.messages).toHaveLength(76);
+      expect(claimed.execution.messages[0]?.parts).toEqual(rows[0]!.parts);
+    } finally {
+      await database.db.delete(conversations).where(eq(conversations.id, id));
+    }
+  });
+
+  it("恰好一页不返回多余游标", async () => {
+    const id = randomUUID();
+    await database.db.insert(conversations).values({ id, ownerId, mode: "image", title: "整页测试" });
+    try {
+      await database.db.insert(messages).values(Array.from({ length: 30 }, (_, sequence) => ({
+        id: randomUUID(), conversationId: id, role: "user" as const, sequence,
+        parts: [{ type: "text" as const, text: "图片描述" }],
+      })));
+      const result = await getConversationRecordForOwner(ownerId, id, { database: database.db });
+      expect(result?.messages).toHaveLength(30);
+      expect(result?.nextCursor).toBeNull();
+    } finally {
+      await database.db.delete(conversations).where(eq(conversations.id, id));
+    }
+  });
   it("只返回当前用户的 Conversation，并按更新时间倒序排列", async () => {
     const result = await listConversationRecordsForOwner(ownerId, database.db);
 
@@ -104,7 +162,7 @@ describe("Conversation ownership queries", () => {
 
   it("详情包含数据库确认的 Active Generation", async () => {
     await expect(
-      getConversationRecordForOwner(ownerId, newerConversationId, database.db),
+      getConversationRecordForOwner(ownerId, newerConversationId, { database: database.db }),
     ).resolves.toMatchObject({
       conversation: {
         id: newerConversationId,
@@ -129,7 +187,7 @@ describe("Conversation ownership queries", () => {
 
   it("其他用户的 Conversation 对当前用户表现为不存在", async () => {
     await expect(
-      getConversationRecordForOwner(ownerId, otherConversationId, database.db),
+      getConversationRecordForOwner(ownerId, otherConversationId, { database: database.db }),
     ).resolves.toBeNull();
   });
 
@@ -142,7 +200,7 @@ describe("Conversation ownership queries", () => {
       const detail = await getConversationRecordForOwner(
         ownerId,
         newerConversationId,
-        database.db,
+        { database: database.db },
       );
       expect(detail?.activeGeneration).toBeNull();
       expect(detail?.latestGeneration).toEqual({
@@ -155,7 +213,7 @@ describe("Conversation ownership queries", () => {
     const emptyDetail = await getConversationRecordForOwner(
       ownerId,
       olderConversationId,
-      database.db,
+      { database: database.db },
     );
     expect(emptyDetail?.latestGeneration).toBeNull();
   });

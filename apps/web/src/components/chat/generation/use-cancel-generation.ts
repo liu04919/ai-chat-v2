@@ -1,6 +1,5 @@
 "use client";
 
-import type { ConversationDetailResponse } from "@ai-chat/contracts";
 import {
   mutationOptions,
   useMutation,
@@ -14,6 +13,7 @@ import {
 } from "../../../lib/conversations-client";
 import { cancelGeneration } from "../../../lib/generations-client";
 import { useGenerationProjectionStore } from "./generation-projection-store";
+import { invalidateConversationHistory, updateConversationHead } from "../messages/conversation-history-query";
 
 type CancelGenerationVariables = {
   conversationId: string;
@@ -39,15 +39,14 @@ export function cancelGenerationMutationOptions(queryClient: QueryClient) {
       });
     },
     onSuccess: (response, { conversationId }) => {
-      const queryKey = conversationDetailQueryKey(conversationId);
       const { id, status, cancelRequestedAt } = response.generation;
       const activeGeneration =
         status === "queued" || status === "running"
           ? { id, status, cancelRequestedAt }
           : null;
 
-      queryClient.setQueryData<ConversationDetailResponse>(
-        queryKey,
+      updateConversationHead(
+        queryClient, conversationId,
         (current) => {
           if (!current || current.activeGeneration?.id !== id) {
             return current;
@@ -67,16 +66,14 @@ export function cancelGenerationMutationOptions(queryClient: QueryClient) {
         if (store.projections[conversationId]?.generationId === id) {
           store.clear(conversationId);
         }
-        void queryClient.invalidateQueries({ queryKey });
+        invalidateConversationHistory(queryClient, conversationId);
         void queryClient.invalidateQueries({
           queryKey: conversationListQueryKey,
         });
       }
     },
     onError: (_error, { conversationId }) => {
-      void queryClient.invalidateQueries({
-        queryKey: conversationDetailQueryKey(conversationId),
-      });
+      invalidateConversationHistory(queryClient, conversationId);
     },
   });
 }

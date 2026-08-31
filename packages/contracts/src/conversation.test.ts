@@ -22,6 +22,7 @@ describe("Conversation response schemas", () => {
 
   it("接受包含 Active Generation 的详情响应", () => {
     const detail = {
+      nextCursor: null,
       conversation,
       latestGeneration: { id: "generation_example", status: "running" },
       activeGeneration: {
@@ -86,6 +87,7 @@ describe("Conversation response schemas", () => {
   it("最近一次 Generation 可为终态，但不能充当 Active Generation", () => {
     for (const status of ["completed", "failed", "cancelled"]) {
       const detail = {
+        nextCursor: null,
         conversation,
         activeGeneration: null,
         latestGeneration: { id: "g1", status },

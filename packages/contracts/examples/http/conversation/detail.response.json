@@ -1,4 +1,5 @@
 {
+  "nextCursor": null,
   "conversation": {
     "id": "conversation_example",
     "mode": "chat",

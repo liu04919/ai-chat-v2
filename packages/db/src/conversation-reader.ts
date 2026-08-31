@@ -4,10 +4,11 @@ import type {
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
 import {
+  CONVERSATION_MESSAGE_PAGE_SIZE,
   assistantMessagePartsSchema,
   userMessagePartsSchema,
 } from "@ai-chat/contracts";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 
 import { getDatabase } from "./client";
 import { conversations, generations, messages } from "./schema/index";
@@ -32,6 +33,7 @@ export type ConversationDetailRecord = {
     cancelRequestedAt: Date | null;
   } | null;
   latestGeneration: ConversationDetailResponse["latestGeneration"];
+  nextCursor: number | null;
   messages: Array<
     | {
         id: string;
@@ -70,7 +72,7 @@ export async function listConversationRecordsForOwner(
 export async function getConversationRecordForOwner(
   ownerId: string,
   conversationId: string,
-  database: Database = getDatabase(),
+  { before, database = getDatabase() }: { before?: number; database?: Database } = {},
 ): Promise<ConversationDetailRecord | null> {
   const [row] = await database
     .select({
@@ -122,8 +124,14 @@ export async function getConversationRecordForOwner(
         createdAt: messages.createdAt,
       })
       .from(messages)
-      .where(eq(messages.conversationId, row.id))
-      .orderBy(asc(messages.sequence)),
+      .where(
+        and(
+          eq(messages.conversationId, row.id),
+          before === undefined ? undefined : lt(messages.sequence, before),
+        ),
+      )
+      .orderBy(desc(messages.sequence))
+      .limit(CONVERSATION_MESSAGE_PAGE_SIZE + 1),
     database
       .select({ id: generations.id, status: generations.status })
       .from(generations)
@@ -132,7 +140,10 @@ export async function getConversationRecordForOwner(
       .limit(1),
   ]);
   const messageRecords: ConversationDetailRecord["messages"] =
-    rawMessageRecords.map((message) =>
+    rawMessageRecords
+      .slice(0, CONVERSATION_MESSAGE_PAGE_SIZE)
+      .reverse()
+      .map((message) =>
       message.role === "user"
         ? {
             ...message,
@@ -157,5 +168,8 @@ export async function getConversationRecordForOwner(
     activeGeneration,
     latestGeneration: latestGeneration ?? null,
     messages: messageRecords,
+    nextCursor: rawMessageRecords.length > CONVERSATION_MESSAGE_PAGE_SIZE
+      ? messageRecords[0]!.sequence
+      : null,
   };
 }

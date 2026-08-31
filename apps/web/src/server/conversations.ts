@@ -31,8 +31,9 @@ export async function listConversationsForOwner(
 export async function getConversationForOwner(
   ownerId: string,
   conversationId: string,
+  before?: number,
 ): Promise<ConversationDetailResponse | null> {
-  const detail = await getConversationRecordForOwner(ownerId, conversationId);
+  const detail = await getConversationRecordForOwner(ownerId, conversationId, { before });
 
   if (!detail) {
     return null;
@@ -52,5 +53,6 @@ export async function getConversationForOwner(
       ...message,
       createdAt: message.createdAt.toISOString(),
     })),
+    nextCursor: detail.nextCursor,
   };
 }

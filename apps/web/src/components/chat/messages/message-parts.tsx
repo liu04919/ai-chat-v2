@@ -12,10 +12,14 @@ export function MessageParts({
   isStreaming = false,
   imageAttachments = false,
   parts,
+  expandedReasoningIds,
+  onReasoningToggle,
 }: Readonly<{
   isStreaming?: boolean;
   imageAttachments?: boolean;
   parts: MessagePartsDto;
+  expandedReasoningIds?: ReadonlySet<string>;
+  onReasoningToggle?: (partId: string, open: boolean) => void;
 }>) {
   return parts.map((part, index) => {
     switch (part.type) {
@@ -32,7 +36,10 @@ export function MessageParts({
         return (
           <details
             className="mb-3 text-muted-foreground"
-            open={isStreaming || undefined}
+            open={isStreaming || expandedReasoningIds?.has(part.id) || undefined}
+            onToggle={onReasoningToggle
+              ? (event) => onReasoningToggle(part.id, event.currentTarget.open)
+              : undefined}
             key={part.id}
           >
             <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium">

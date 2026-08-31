@@ -1,10 +1,10 @@
-import { conversationDetailResponseSchema } from "@ai-chat/contracts";
+import { conversationDetailResponseSchema, conversationPageQuerySchema } from "@ai-chat/contracts";
 
 import { getCurrentSession } from "@/lib/session";
 import { getConversationForOwner } from "@/server/conversations";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ conversationId: string }> },
 ) {
   const session = await getCurrentSession();
@@ -14,9 +14,16 @@ export async function GET(
   }
 
   const { conversationId } = await params;
+  const query = conversationPageQuerySchema.safeParse(
+    Object.fromEntries(new URL(request.url).searchParams),
+  );
+  if (!query.success) {
+    return Response.json({ code: "INVALID_REQUEST" }, { status: 400 });
+  }
   const conversation = await getConversationForOwner(
     session.user.id,
     conversationId,
+    query.data.before,
   );
 
   if (!conversation) {
