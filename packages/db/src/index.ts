@@ -32,6 +32,12 @@ export {
   type GenerationCommandRecord,
 } from "./generation-command";
 export {
+  createRegenerationCommandRecord,
+  type CreateRegenerationCommandRecordInput,
+  type CreateRegenerationCommandRecordResult,
+  type RegenerationCommandRecord,
+} from "./generation-regeneration";
+export {
   claimGenerationExecution,
   completeGenerationExecution,
   failGenerationExecution,

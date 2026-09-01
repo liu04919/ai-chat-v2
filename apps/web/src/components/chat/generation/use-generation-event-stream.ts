@@ -22,10 +22,12 @@ type TerminalGenerationEvent = Extract<
 export function useGenerationEventStream({
   conversationId,
   generationId,
+  replacesAssistantMessageId,
   onTerminal,
 }: {
   conversationId: string;
   generationId: string | null;
+  replacesAssistantMessageId: string | null;
   onTerminal: (event: TerminalGenerationEvent) => void;
 }) {
   const onTerminalEvent = useEffectEvent(onTerminal);
@@ -36,7 +38,11 @@ export function useGenerationEventStream({
     }
 
     const store = useGenerationProjectionStore.getState();
-    store.start(conversationId, generationId);
+    store.start(
+      conversationId,
+      generationId,
+      replacesAssistantMessageId,
+    );
 
     const source = new EventSource(
       `/api/generations/${encodeURIComponent(generationId)}/events`,
@@ -109,5 +115,5 @@ export function useGenerationEventStream({
       source.close();
       buffer.dispose();
     };
-  }, [conversationId, generationId]);
+  }, [conversationId, generationId, replacesAssistantMessageId]);
 }

@@ -53,6 +53,14 @@ export {
   type CancelGenerationResponse,
 } from "./generation-cancellation";
 export {
+  regenerateGenerationRequestSchema,
+  regenerateGenerationResponseSchema,
+  regenerationErrorResponseSchema,
+  type RegenerateGenerationRequest,
+  type RegenerateGenerationResponse,
+  type RegenerationErrorResponse,
+} from "./generation-regeneration";
+export {
   generationCancelledEventSchema,
   generationCompletedEventSchema,
   generationEventCursorSchema,

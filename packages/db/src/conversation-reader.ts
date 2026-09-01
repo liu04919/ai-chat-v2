@@ -31,6 +31,7 @@ export type ConversationDetailRecord = {
     id: string;
     status: (typeof activeGenerationStatuses)[number];
     cancelRequestedAt: Date | null;
+    replacesAssistantMessageId: string | null;
   } | null;
   latestGeneration: ConversationDetailResponse["latestGeneration"];
   nextCursor: number | null;
@@ -84,6 +85,8 @@ export async function getConversationRecordForOwner(
       generationId: generations.id,
       generationStatus: generations.status,
       generationCancelRequestedAt: generations.cancelRequestedAt,
+      generationReplacesAssistantMessageId:
+        generations.replacesAssistantMessageId,
     })
     .from(conversations)
     .leftJoin(
@@ -112,6 +115,8 @@ export async function getConversationRecordForOwner(
           id: row.generationId,
           status: row.generationStatus,
           cancelRequestedAt: row.generationCancelRequestedAt,
+          replacesAssistantMessageId:
+            row.generationReplacesAssistantMessageId,
         }
       : null;
   const [rawMessageRecords, [latestGeneration]] = await Promise.all([

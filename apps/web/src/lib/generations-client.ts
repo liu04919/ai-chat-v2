@@ -8,6 +8,11 @@ import {
   type CreateGenerationRequest,
   type CreateGenerationResponse,
   type GenerationErrorResponse,
+  regenerateGenerationResponseSchema,
+  regenerationErrorResponseSchema,
+  type RegenerateGenerationRequest,
+  type RegenerateGenerationResponse,
+  type RegenerationErrorResponse,
 } from "@ai-chat/contracts";
 
 const generationErrorMessages: Record<GenerationErrorResponse["code"], string> = {
@@ -32,6 +37,19 @@ const cancellationErrorMessages: Record<
   CANCEL_SIGNAL_UNAVAILABLE: "暂时无法停止生成，请重试",
 };
 
+const regenerationErrorMessages: Record<
+  RegenerationErrorResponse["code"],
+  string
+> = {
+  UNAUTHORIZED: "登录状态已失效，请重新登录",
+  INVALID_REQUEST: "重新生成请求无效，请刷新后重试",
+  CONVERSATION_NOT_FOUND: "对话不存在或已被删除",
+  ASSISTANT_MESSAGE_NOT_FOUND: "原回答不存在或已被替换",
+  REGENERATION_NOT_ALLOWED: "只能重新生成当前对话的最新回答",
+  QUEUE_UNAVAILABLE: "生成服务暂时不可用，请重试",
+  ACTIVE_GENERATION: "当前对话仍在生成，请稍后再试",
+};
+
 export class GenerationClientError extends Error {
   constructor(readonly response: GenerationErrorResponse | null) {
     super(
@@ -48,6 +66,16 @@ export class GenerationCancellationClientError extends Error {
       response
         ? cancellationErrorMessages[response.code]
         : "停止生成失败，请稍后重试",
+    );
+  }
+}
+
+export class GenerationRegenerationClientError extends Error {
+  constructor(readonly response: RegenerationErrorResponse | null) {
+    super(
+      response
+        ? regenerationErrorMessages[response.code]
+        : "重新生成失败，请稍后重试",
     );
   }
 }
@@ -91,6 +119,26 @@ export async function cancelGeneration(
   return cancelGenerationResponseSchema.parse(body);
 }
 
+export async function regenerateGeneration(
+  request: RegenerateGenerationRequest,
+): Promise<RegenerateGenerationResponse> {
+  const response = await fetch("/api/generations/regenerate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const body: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const parsedError = regenerationErrorResponseSchema.safeParse(body);
+    throw new GenerationRegenerationClientError(
+      parsedError.success ? parsedError.data : null,
+    );
+  }
+
+  return regenerateGenerationResponseSchema.parse(body);
+}
+
 export function getGenerationClientErrorMessage(error: unknown): string {
   return error instanceof GenerationClientError
     ? error.message
@@ -103,4 +151,12 @@ export function getGenerationCancellationClientErrorMessage(
   return error instanceof GenerationCancellationClientError
     ? error.message
     : "停止生成失败，请稍后重试";
+}
+
+export function getGenerationRegenerationClientErrorMessage(
+  error: unknown,
+): string {
+  return error instanceof GenerationRegenerationClientError
+    ? error.message
+    : "重新生成失败，请稍后重试";
 }

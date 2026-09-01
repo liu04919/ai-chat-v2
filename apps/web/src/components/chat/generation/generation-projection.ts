@@ -15,6 +15,7 @@ export type GenerationProjectionStatus =
 export type GenerationProjection = {
   conversationId: string;
   generationId: string;
+  replacesAssistantMessageId: string | null;
   status: GenerationProjectionStatus;
   hasStarted: boolean;
   parts: AssistantMessagePartDto[];
@@ -23,10 +24,12 @@ export type GenerationProjection = {
 export function createGenerationProjection(
   conversationId: string,
   generationId: string,
+  replacesAssistantMessageId: string | null = null,
 ): GenerationProjection {
   return {
     conversationId,
     generationId,
+    replacesAssistantMessageId,
     status: "connecting",
     hasStarted: false,
     parts: [],

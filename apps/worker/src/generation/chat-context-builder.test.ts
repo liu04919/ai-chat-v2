@@ -7,6 +7,7 @@ import { buildChatModelRequest } from "./chat-context-builder";
 const execution: ClaimedGenerationExecution = {
   id: "generation_123",
   userMessageId: "message_3",
+  replacesAssistantMessageId: null,
   conversationId: "conversation_123",
   ownerId: "owner_123",
   mode: "chat",

@@ -29,6 +29,10 @@ import {
   type GenerationQueueProducer,
   GenerationServiceError,
 } from "./generations";
+import {
+  regenerateGenerationForOwner,
+  RegenerationServiceError,
+} from "./generation-regeneration";
 
 const localEnvironment = fileURLToPath(
   new URL("../../.env.local", import.meta.url),
@@ -335,6 +339,135 @@ describe("Generation creation service", () => {
     await expect(createWithAttachment(pdfAttachmentId, "image")).rejects.toMatchObject({
       response: { code: "ATTACHMENT_MODE_MISMATCH", attachmentId: pdfAttachmentId },
     });
+  });
+});
+
+describe("Generation regeneration service", () => {
+  it("复用原 User Message 与思考等级创建 queued Generation，并按新 Generation ID 入队", async () => {
+    const conversationId = `regeneration-conversation-${randomUUID()}`;
+    const userMessageId = `regeneration-user-${randomUUID()}`;
+    const assistantMessageId = `regeneration-assistant-${randomUUID()}`;
+    const sourceGenerationId = `regeneration-source-${randomUUID()}`;
+    const regenerationId = `regeneration-${randomUUID()}`;
+    const now = new Date("2026-09-01T12:00:00.000Z");
+    await database.db.insert(conversations).values({
+      id: conversationId,
+      ownerId,
+      mode: "chat",
+      title: "重新生成",
+    });
+    await database.db.insert(messages).values([
+      {
+        id: userMessageId,
+        conversationId,
+        role: "user",
+        parts: [{ type: "text", text: "换一种方式回答" }],
+        sequence: 0,
+      },
+      {
+        id: assistantMessageId,
+        conversationId,
+        role: "assistant",
+        parts: [{ id: "old", type: "text", text: "旧回答" }],
+        sequence: 1,
+      },
+    ]);
+    await database.db.insert(generations).values({
+      id: sourceGenerationId,
+      conversationId,
+      userMessageId,
+      assistantMessageId,
+      status: "completed",
+      reasoningEffort: "high",
+    });
+
+    await expect(
+      regenerateGenerationForOwner(
+        ownerId,
+        { conversationId, assistantMessageId },
+        {
+          queue,
+          createGenerationId: () => regenerationId,
+          now: () => now,
+        },
+      ),
+    ).resolves.toEqual({
+      conversationId,
+      generation: {
+        id: regenerationId,
+        userMessageId,
+        status: "queued",
+        reasoningEffort: "high",
+        createdAt: now.toISOString(),
+      },
+    });
+    expect(queue.jobs.get(regenerationId)).toEqual({
+      generationId: regenerationId,
+    });
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, regenerationId),
+      }),
+    ).resolves.toMatchObject({
+      userMessageId,
+      replacesAssistantMessageId: assistantMessageId,
+      reasoningEffort: "high",
+      status: "queued",
+    });
+  });
+
+  it("拒绝重新生成非末尾回答，并且不创建新 Generation", async () => {
+    const conversationId = `regeneration-non-latest-${randomUUID()}`;
+    const userMessageId = `regeneration-non-latest-user-${randomUUID()}`;
+    const assistantMessageId = `regeneration-non-latest-assistant-${randomUUID()}`;
+    await database.db.insert(conversations).values({
+      id: conversationId,
+      ownerId,
+      mode: "chat",
+      title: "非末尾回答",
+    });
+    await database.db.insert(messages).values([
+      {
+        id: userMessageId,
+        conversationId,
+        role: "user",
+        parts: [{ type: "text", text: "第一问" }],
+        sequence: 0,
+      },
+      {
+        id: assistantMessageId,
+        conversationId,
+        role: "assistant",
+        parts: [{ id: "old", type: "text", text: "第一答" }],
+        sequence: 1,
+      },
+      {
+        id: `regeneration-newer-user-${randomUUID()}`,
+        conversationId,
+        role: "user",
+        parts: [{ type: "text", text: "第二问" }],
+        sequence: 2,
+      },
+    ]);
+    await database.db.insert(generations).values({
+      id: `regeneration-non-latest-source-${randomUUID()}`,
+      conversationId,
+      userMessageId,
+      assistantMessageId,
+      status: "completed",
+      reasoningEffort: "medium",
+    });
+
+    await expect(
+      regenerateGenerationForOwner(
+        ownerId,
+        { conversationId, assistantMessageId },
+        { queue },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: "REGENERATION_NOT_ALLOWED" },
+      status: 409,
+    } satisfies Partial<RegenerationServiceError>);
   });
 });
 

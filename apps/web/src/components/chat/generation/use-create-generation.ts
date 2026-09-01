@@ -114,7 +114,12 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
           (current) => {
             const activeGeneration =
               status === "queued" || status === "running"
-                ? { id, status, cancelRequestedAt: null }
+                ? {
+                    id,
+                    status,
+                    cancelRequestedAt: null,
+                    replacesAssistantMessageId: null,
+                  }
                 : null;
 
             return {

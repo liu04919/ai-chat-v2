@@ -40,10 +40,6 @@ export function cancelGenerationMutationOptions(queryClient: QueryClient) {
     },
     onSuccess: (response, { conversationId }) => {
       const { id, status, cancelRequestedAt } = response.generation;
-      const activeGeneration =
-        status === "queued" || status === "running"
-          ? { id, status, cancelRequestedAt }
-          : null;
 
       updateConversationHead(
         queryClient, conversationId,
@@ -51,6 +47,17 @@ export function cancelGenerationMutationOptions(queryClient: QueryClient) {
           if (!current || current.activeGeneration?.id !== id) {
             return current;
           }
+
+          const activeGeneration =
+            status === "queued" || status === "running"
+              ? {
+                  id,
+                  status,
+                  cancelRequestedAt,
+                  replacesAssistantMessageId:
+                    current.activeGeneration.replacesAssistantMessageId,
+                }
+              : null;
 
           return {
             ...current,
@@ -61,7 +68,7 @@ export function cancelGenerationMutationOptions(queryClient: QueryClient) {
       );
 
       // 收到停止请求不等于 Worker 已结束；只在服务端返回终态时清理投影。
-      if (!activeGeneration) {
+      if (status !== "queued" && status !== "running") {
         const store = useGenerationProjectionStore.getState();
         if (store.projections[conversationId]?.generationId === id) {
           store.clear(conversationId);

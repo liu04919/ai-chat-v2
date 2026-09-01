@@ -14,6 +14,7 @@ import {
 import { useGenerationProjectionStore } from "./generation-projection-store";
 import { createGenerationMutationOptions } from "./use-create-generation";
 import { cancelGenerationMutationOptions } from "./use-cancel-generation";
+import { regenerateGenerationMutationOptions } from "./use-regenerate-generation";
 import { initialConversationHistory, type ConversationHistoryData } from "../messages/conversation-history-query";
 
 const conversationId = "conversation_123";
@@ -59,7 +60,12 @@ function createDetail(running = false): ConversationDetailResponse {
     conversation,
     latestGeneration: running ? { id: generationId, status: "running" } : null,
     activeGeneration: running
-      ? { id: generationId, status: "running", cancelRequestedAt: null }
+      ? {
+          id: generationId,
+          status: "running",
+          cancelRequestedAt: null,
+          replacesAssistantMessageId: null,
+        }
       : null,
     messages: [
       {
@@ -198,6 +204,7 @@ describe("创建 Generation mutation", () => {
       id: generationId,
       status: "queued",
       cancelRequestedAt: null,
+      replacesAssistantMessageId: null,
     });
     expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true);
     expect(mutation.getCurrentResult().isPending).toBe(false);
@@ -286,6 +293,89 @@ describe("创建 Generation mutation", () => {
   });
 });
 
+describe("重新生成 mutation", () => {
+  const assistantMessageId = "assistant_message_123";
+
+  beforeEach(() => {
+    const detail = createDetail();
+    detail.messages.push({
+      id: assistantMessageId,
+      role: "assistant",
+      sequence: 6,
+      parts: [{ id: "old-text", type: "text", text: "旧回答" }],
+      createdAt: now,
+    });
+    setDetail(detail);
+  });
+
+  it("命令确认后标记被替换的回答，同时保留旧消息等待终态", async () => {
+    useGenerationProjectionStore
+      .getState()
+      .start(conversationId, "stale_generation");
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        conversationId,
+        generation: {
+          id: generationId,
+          userMessageId: "previous_user_message",
+          status: "queued",
+          reasoningEffort: "medium",
+          createdAt: now,
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const mutation = new MutationObserver(
+      queryClient,
+      regenerateGenerationMutationOptions(queryClient),
+    );
+
+    await mutation.mutate({ conversationId, assistantMessageId });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toEqual({
+      conversationId,
+      assistantMessageId,
+    });
+    expect(getDetail()?.messages.at(-1)).toMatchObject({
+      id: assistantMessageId,
+      parts: [{ id: "old-text", type: "text", text: "旧回答" }],
+    });
+    expect(getDetail()?.activeGeneration).toEqual({
+      id: generationId,
+      status: "queued",
+      cancelRequestedAt: null,
+      replacesAssistantMessageId: assistantMessageId,
+    });
+    expect(
+      useGenerationProjectionStore.getState().projections[conversationId],
+    ).toBeUndefined();
+  });
+
+  it("只允许当前详情中位于末尾的 Assistant Message", async () => {
+    const detail = getDetail()!;
+    detail.messages.push({
+      id: "newer_user",
+      role: "user",
+      sequence: 7,
+      parts: [{ type: "text", text: "后续问题" }],
+      createdAt: now,
+    });
+    setDetail(detail);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const mutation = new MutationObserver(
+      queryClient,
+      regenerateGenerationMutationOptions(queryClient),
+    );
+
+    await expect(
+      mutation.mutate({ conversationId, assistantMessageId }),
+    ).rejects.toThrow("只能重新生成当前对话的最新回答");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("停止 Generation mutation", () => {
   beforeEach(() => {
     setDetail(createDetail(true));
@@ -322,6 +412,7 @@ describe("停止 Generation mutation", () => {
       id: generationId,
       status: "running",
       cancelRequestedAt: now,
+      replacesAssistantMessageId: null,
     });
     expect(
       useGenerationProjectionStore.getState().projections[conversationId],

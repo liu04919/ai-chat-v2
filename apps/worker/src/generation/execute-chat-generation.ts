@@ -71,11 +71,12 @@ function appendAssistantDelta(
 }
 
 async function recordFailure(
-  generationId: string,
+  execution: ClaimedGenerationExecution,
   error: Error,
   assistantParts: AssistantMessagePartDto[],
   dependencies: ExecuteChatGenerationDependencies,
 ): Promise<ExecuteChatGenerationResult> {
+  const generationId = execution.id;
   try {
     const failed = await failGenerationExecution({
       generationId,
@@ -90,7 +91,7 @@ async function recordFailure(
       });
     } else if (await isGenerationCancellationRequested(generationId)) {
       return recordCancellation(
-        generationId,
+        execution,
         assistantParts,
         dependencies,
       );
@@ -106,18 +107,22 @@ async function recordFailure(
 }
 
 async function recordCancellation(
-  generationId: string,
+  execution: ClaimedGenerationExecution,
   assistantParts: AssistantMessagePartDto[],
   dependencies: ExecuteChatGenerationDependencies,
 ): Promise<Extract<ExecuteChatGenerationResult, { kind: "cancelled" }>> {
+  const generationId = execution.id;
+  const visibleParts = execution.replacesAssistantMessageId
+    ? []
+    : assistantParts;
   const assistantMessageId =
-    assistantParts.length > 0
+    visibleParts.length > 0
       ? (dependencies.createAssistantMessageId ?? randomUUID)()
       : null;
   const cancelled = await cancelGenerationExecution({
     generationId,
     assistantMessageId,
-    assistantParts,
+    assistantParts: visibleParts,
     now: (dependencies.now ?? (() => new Date()))(),
   });
 
@@ -149,7 +154,7 @@ export async function executeChatGeneration(
     );
   } catch (error) {
     return recordFailure(
-      generationId,
+      execution,
       asError(error),
       assistantParts,
       dependencies,
@@ -208,20 +213,19 @@ export async function executeChatGeneration(
       throw new Error("Chat Model 流在 generation.finish 前结束");
     }
 
-    const assistantMessageId = (
-      dependencies.createAssistantMessageId ?? randomUUID
-    )();
-    const completed = await completeGenerationExecution({
+    const assistantMessageId = await completeGenerationExecution({
       generationId,
-      assistantMessageId,
+      assistantMessageId: (
+        dependencies.createAssistantMessageId ?? randomUUID
+      )(),
       assistantParts,
       now: (dependencies.now ?? (() => new Date()))(),
     });
 
-    if (!completed) {
+    if (!assistantMessageId) {
       if (await isGenerationCancellationRequested(generationId)) {
         return recordCancellation(
-          generationId,
+          execution,
           assistantParts,
           dependencies,
         );
@@ -238,11 +242,11 @@ export async function executeChatGeneration(
     return { kind: "completed", assistantMessageId };
   } catch (error) {
     if (await isGenerationCancellationRequested(generationId)) {
-      return recordCancellation(generationId, assistantParts, dependencies);
+      return recordCancellation(execution, assistantParts, dependencies);
     }
 
     return recordFailure(
-      generationId,
+      execution,
       asError(error),
       assistantParts,
       dependencies,

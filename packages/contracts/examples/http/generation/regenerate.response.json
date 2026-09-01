@@ -1,0 +1,10 @@
+{
+  "conversationId": "conversation_example",
+  "generation": {
+    "id": "generation_regeneration_example",
+    "userMessageId": "message_example",
+    "status": "queued",
+    "reasoningEffort": "medium",
+    "createdAt": "2026-09-01T12:00:00.000Z"
+  }
+}

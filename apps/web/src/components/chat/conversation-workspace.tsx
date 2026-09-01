@@ -19,6 +19,7 @@ import { useGenerationEventStream } from "./generation/use-generation-event-stre
 import { useGenerationProjectionStore } from "./generation/generation-projection-store";
 import { useCreateGeneration } from "./generation/use-create-generation";
 import { useCancelGeneration } from "./generation/use-cancel-generation";
+import { useRegenerateGeneration } from "./generation/use-regenerate-generation";
 import { VirtualMessageList } from "./messages/virtual-message-list";
 import { useConversationHistory } from "./messages/use-conversation-history";
 import { refreshConversationHistory } from "./messages/conversation-history-query";
@@ -26,6 +27,7 @@ import { conversationListQueryKey } from "@/lib/conversations-client";
 import {
   getGenerationCancellationClientErrorMessage,
   getGenerationClientErrorMessage,
+  getGenerationRegenerationClientErrorMessage,
 } from "@/lib/generations-client";
 
 type TerminalGenerationEvent = Extract<
@@ -42,8 +44,11 @@ export function ConversationWorkspace({
   const queryClient = useQueryClient();
   const createMutation = useCreateGeneration();
   const cancelMutation = useCancelGeneration();
+  const regenerateMutation = useRegenerateGeneration();
   const submitError = createMutation.error
     ? getGenerationClientErrorMessage(createMutation.error)
+    : regenerateMutation.error
+      ? getGenerationRegenerationClientErrorMessage(regenerateMutation.error)
     : cancelMutation.error
       ? getGenerationCancellationClientErrorMessage(cancelMutation.error)
       : null;
@@ -96,6 +101,8 @@ export function ConversationWorkspace({
   useGenerationEventStream({
     conversationId,
     generationId: activeGenerationId,
+    replacesAssistantMessageId:
+      detail.activeGeneration?.replacesAssistantMessageId ?? null,
     onTerminal: handleTerminal,
   });
 
@@ -124,10 +131,36 @@ export function ConversationWorkspace({
     });
   }
 
+  const regenerateAnswer = useCallback((assistantMessageId: string) => {
+    createMutation.reset();
+    cancelMutation.reset();
+    regenerateMutation.mutate({
+      conversationId,
+      assistantMessageId,
+    });
+  }, [cancelMutation, conversationId, createMutation, regenerateMutation]);
+
   const { conversation } = detail;
   const ModeIcon =
     conversation.mode === "image" ? ImageIcon : MessageSquareText;
-  const isGenerating = detail.activeGeneration !== null;
+  const isGenerating =
+    detail.activeGeneration !== null || regenerateMutation.isPending;
+  const replacedAssistantMessageId =
+    detail.activeGeneration?.replacesAssistantMessageId ?? null;
+  const messages = replacedAssistantMessageId
+    ? history.messages.filter(
+        (message) => message.id !== replacedAssistantMessageId,
+      )
+    : history.messages;
+  const latestAssistantMessageId = history.messages.findLast(
+    (message) => message.role === "assistant",
+  )?.id;
+  const regeneratableAssistantMessageId =
+    conversation.mode === "chat" &&
+    !isGenerating &&
+    latestAssistantMessageId === history.messages.at(-1)?.id
+      ? latestAssistantMessageId ?? null
+      : null;
   const imageStatus = conversation.mode === "image"
     ? getImageGenerationStatus({
         activeGeneration: detail.activeGeneration,
@@ -149,7 +182,7 @@ export function ConversationWorkspace({
       </header>
 
       <VirtualMessageList
-        messages={history.messages}
+        messages={messages}
         mode={conversation.mode}
         tail={tail}
         tailKey={`generation:${activeGenerationId ?? detail.latestGeneration?.id ?? "pending"}`}
@@ -157,6 +190,8 @@ export function ConversationWorkspace({
         isLoadingOlder={history.isLoadingOlder}
         olderError={history.olderError}
         loadOlder={history.loadOlder}
+        regeneratableAssistantMessageId={regeneratableAssistantMessageId}
+        onRegenerate={regenerateAnswer}
       />
 
       <div className="mx-auto w-full max-w-3xl shrink-0 px-5 pb-6">

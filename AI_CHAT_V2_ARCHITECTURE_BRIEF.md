@@ -192,6 +192,12 @@ POST 不运行模型，不把生成生命周期绑在 HTTP 请求上。
 
 模型调用开始后不做隐式自动 retry，避免重复扣费和不可见的重复回答。失败后由用户显式重新生成。
 
+### 重新生成命令
+
+重新生成只作用于 Chat 会话最末尾的 Assistant Message。客户端只提交 `conversationId` 和 `assistantMessageId`；服务端沿用原回答关联的 User Message、Attachment 与 reasoning effort，不新增 User Message。
+
+Worker 构建上下文时截止到被替换回答之前。生成期间 PostgreSQL 继续保留旧回答，浏览器仅在展示层用新流临时占据原位置；成功后事务内更新同一条 Assistant Message 的 parts，保持原 Message ID 与 sequence。失败或取消不持久化新流的半截内容，旧回答恢复显示。第一版不做回答版本树，不支持 Image 会话重新生成。
+
 ### 事件订阅与恢复
 
 ```text
@@ -209,7 +215,7 @@ Reader 先用非阻塞批量读取追到当前最新 cursor，再从同一 curso
 首次消费从 stream beginning 开始；自动重连从 `Last-Event-ID` 之后继续。页面刷新时：
 
 1. 浏览器获取 Chat Detail
-2. 服务端从 PostgreSQL 返回持久化 Message 与 `activeGeneration: { id, status } | null`
+2. 服务端从 PostgreSQL 返回持久化 Message 与 `activeGeneration: { id, status, cancelRequestedAt, replacesAssistantMessageId } | null`
 3. 存在 Active Generation 时，浏览器使用该 ID 重新建立 EventSource
 
 浏览器不得根据 Redis、本地缓存、旧连接或 UI 残留状态猜测 Active Generation。首次消费和恢复使用同一 endpoint 与同一事件协议，不增加 Snapshot Stream 或 recovery 专用协议。

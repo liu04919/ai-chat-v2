@@ -5,7 +5,12 @@ import {
 } from "./generation-projection";
 import { getImageGenerationStatus as deriveStatus } from "./image-generation-status";
 
-const queued = { id: "g1", status: "queued" as const, cancelRequestedAt: null };
+const queued = {
+  id: "g1",
+  status: "queued" as const,
+  cancelRequestedAt: null,
+  replacesAssistantMessageId: null,
+};
 const projection = createGenerationProjection("c1", "g1");
 const getImageGenerationStatus = (
   input: Omit<Parameters<typeof deriveStatus>[0], "latestGeneration"> &

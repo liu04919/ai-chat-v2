@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { MessageParts } from "./message-parts";
@@ -19,11 +20,15 @@ const MessageRow = memo(function MessageRow({
   mode,
   expanded,
   onToggle,
+  canRegenerate,
+  onRegenerate,
 }: {
   message: MessageDto;
   mode: ConversationModeDto;
   expanded: ReadonlySet<string>;
   onToggle: (id: string, open: boolean) => void;
+  canRegenerate: boolean;
+  onRegenerate?: (assistantMessageId: string) => void;
 }) {
   return (
     <article
@@ -40,6 +45,17 @@ const MessageRow = memo(function MessageRow({
         expandedReasoningIds={expanded}
         onReasoningToggle={onToggle}
       />
+      {message.role === "assistant" && canRegenerate && onRegenerate ? (
+        <Button
+          className="mt-2 -ml-2 gap-1.5 text-muted-foreground hover:text-foreground"
+          variant="ghost"
+          size="sm"
+          onClick={() => onRegenerate(message.id)}
+        >
+          <RotateCcw className="size-3.5" aria-hidden="true" />
+          重新生成
+        </Button>
+      ) : null}
     </article>
   );
 });
@@ -53,6 +69,8 @@ export function VirtualMessageList({
   isLoadingOlder,
   olderError,
   loadOlder,
+  regeneratableAssistantMessageId,
+  onRegenerate,
 }: {
   messages: MessageDto[];
   mode: ConversationModeDto;
@@ -62,6 +80,8 @@ export function VirtualMessageList({
   isLoadingOlder: boolean;
   olderError: boolean;
   loadOlder: () => Promise<void>;
+  regeneratableAssistantMessageId: string | null;
+  onRegenerate?: (assistantMessageId: string) => void;
 }) {
   "use no memo";
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -180,6 +200,11 @@ export function VirtualMessageList({
                 mode={mode}
                 expanded={expanded}
                 onToggle={onToggle}
+                canRegenerate={
+                  messages[item.index]!.id ===
+                  regeneratableAssistantMessageId
+                }
+                onRegenerate={onRegenerate}
               />
             ) : (
               tail

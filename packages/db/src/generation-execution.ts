@@ -47,6 +47,7 @@ export type GenerationExecutionAttachmentRecord = {
 export type ClaimedGenerationExecution = {
   id: string;
   userMessageId: string;
+  replacesAssistantMessageId: string | null;
   conversationId: string;
   ownerId: string;
   mode: "chat" | "image";
@@ -92,6 +93,7 @@ export async function claimGenerationExecution(
       .returning({
         id: generations.id,
         userMessageId: generations.userMessageId,
+        replacesAssistantMessageId: generations.replacesAssistantMessageId,
         conversationId: generations.conversationId,
         reasoningEffort: generations.reasoningEffort,
       });
@@ -123,22 +125,41 @@ export async function claimGenerationExecution(
       .from(messages)
       .where(eq(messages.conversationId, claimed.conversationId))
       .orderBy(asc(messages.sequence));
+    const replacementSequence = claimed.replacesAssistantMessageId
+      ? rawMessageRecords.find(
+          (message) => message.id === claimed.replacesAssistantMessageId,
+        )?.sequence
+      : undefined;
+
+    if (
+      claimed.replacesAssistantMessageId &&
+      replacementSequence === undefined
+    ) {
+      throw new Error("Regeneration 要替换的 Assistant Message 不存在");
+    }
+
     const messageRecords: GenerationExecutionMessageRecord[] =
-      rawMessageRecords.map((message) =>
-        message.role === "user"
-          ? {
-              id: message.id,
-              role: "user",
-              parts: userMessagePartsSchema.parse(message.parts),
-              sequence: message.sequence,
-            }
-          : {
-              id: message.id,
-              role: "assistant",
-              parts: assistantMessagePartsSchema.parse(message.parts),
-              sequence: message.sequence,
-            },
-      );
+      rawMessageRecords
+        .filter(
+          (message) =>
+            replacementSequence === undefined ||
+            message.sequence < replacementSequence,
+        )
+        .map((message) =>
+          message.role === "user"
+            ? {
+                id: message.id,
+                role: "user",
+                parts: userMessagePartsSchema.parse(message.parts),
+                sequence: message.sequence,
+              }
+            : {
+                id: message.id,
+                role: "assistant",
+                parts: assistantMessagePartsSchema.parse(message.parts),
+                sequence: message.sequence,
+              },
+        );
     const attachmentIds = [
       ...new Set(
         messageRecords.flatMap((message) =>
@@ -172,6 +193,7 @@ export async function claimGenerationExecution(
       execution: {
         id: claimed.id,
         userMessageId: claimed.userMessageId,
+        replacesAssistantMessageId: claimed.replacesAssistantMessageId,
         conversationId: claimed.conversationId,
         ownerId: conversation.ownerId,
         mode: conversation.mode,
@@ -191,7 +213,7 @@ export async function completeGenerationExecution(
     now: Date;
   },
   database: Database = getDatabase(),
-): Promise<boolean> {
+): Promise<string | null> {
   assertNonEmpty(input.generationId, "generationId");
   assertNonEmpty(input.assistantMessageId, "assistantMessageId");
 
@@ -213,6 +235,7 @@ export async function completeGenerationExecution(
         conversationId: generations.conversationId,
         status: generations.status,
         cancelRequestedAt: generations.cancelRequestedAt,
+        replacesAssistantMessageId: generations.replacesAssistantMessageId,
       })
       .from(generations)
       .where(eq(generations.id, input.generationId))
@@ -224,28 +247,54 @@ export async function completeGenerationExecution(
       generation.status !== "running" ||
       generation.cancelRequestedAt
     ) {
-      return false;
+      return null;
     }
 
-    const [sequenceRow] = await transaction
-      .select({ sequence: max(messages.sequence) })
-      .from(messages)
-      .where(eq(messages.conversationId, generation.conversationId));
-    const nextSequence = Number(sequenceRow?.sequence ?? -1) + 1;
+    let assistantMessageId = input.assistantMessageId;
 
-    await transaction.insert(messages).values({
-      id: input.assistantMessageId,
-      conversationId: generation.conversationId,
-      role: "assistant",
-      parts: assistantParts,
-      sequence: nextSequence,
-      createdAt: input.now,
-    });
+    if (generation.replacesAssistantMessageId) {
+      const [replaced] = await transaction
+        .update(messages)
+        .set({ parts: assistantParts, createdAt: input.now })
+        .where(
+          and(
+            eq(messages.id, generation.replacesAssistantMessageId),
+            eq(messages.conversationId, generation.conversationId),
+            eq(messages.role, "assistant"),
+          ),
+        )
+        .returning({ id: messages.id });
+
+      if (!replaced) {
+        throw new Error("Regeneration 要替换的 Assistant Message 不存在");
+      }
+
+      assistantMessageId = replaced.id;
+      await transaction
+        .update(generations)
+        .set({ assistantMessageId: null })
+        .where(eq(generations.assistantMessageId, assistantMessageId));
+    } else {
+      const [sequenceRow] = await transaction
+        .select({ sequence: max(messages.sequence) })
+        .from(messages)
+        .where(eq(messages.conversationId, generation.conversationId));
+      const nextSequence = Number(sequenceRow?.sequence ?? -1) + 1;
+
+      await transaction.insert(messages).values({
+        id: assistantMessageId,
+        conversationId: generation.conversationId,
+        role: "assistant",
+        parts: assistantParts,
+        sequence: nextSequence,
+        createdAt: input.now,
+      });
+    }
     await transaction
       .update(generations)
       .set({
         status: "completed",
-        assistantMessageId: input.assistantMessageId,
+        assistantMessageId,
         finishedAt: input.now,
         errorCode: null,
       })
@@ -255,7 +304,7 @@ export async function completeGenerationExecution(
       .set({ updatedAt: input.now })
       .where(eq(conversations.id, generation.conversationId));
 
-    return true;
+    return assistantMessageId;
   });
 }
 

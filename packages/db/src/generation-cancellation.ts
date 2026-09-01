@@ -160,6 +160,7 @@ export async function cancelGenerationExecution(
         conversationId: generations.conversationId,
         status: generations.status,
         cancelRequestedAt: generations.cancelRequestedAt,
+        replacesAssistantMessageId: generations.replacesAssistantMessageId,
       })
       .from(generations)
       .where(eq(generations.id, input.generationId))
@@ -174,7 +175,12 @@ export async function cancelGenerationExecution(
       return false;
     }
 
-    if (input.assistantMessageId && assistantParts.length > 0) {
+    const shouldPersistPartial =
+      !generation.replacesAssistantMessageId &&
+      input.assistantMessageId !== null &&
+      assistantParts.length > 0;
+
+    if (shouldPersistPartial && input.assistantMessageId) {
       const [sequenceRow] = await transaction
         .select({ sequence: max(messages.sequence) })
         .from(messages)
@@ -195,7 +201,9 @@ export async function cancelGenerationExecution(
       .update(generations)
       .set({
         status: "cancelled",
-        assistantMessageId: input.assistantMessageId,
+        assistantMessageId: shouldPersistPartial
+          ? input.assistantMessageId
+          : null,
         finishedAt: input.now,
         errorCode: null,
       })

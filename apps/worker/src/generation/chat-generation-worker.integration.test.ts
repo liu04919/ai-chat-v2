@@ -10,8 +10,12 @@ import {
 import {
   attachments,
   closeApplicationDatabase,
+  conversations,
   createDatabase,
   createGenerationCommandRecord,
+  createRegenerationCommandRecord,
+  generations,
+  messages,
   migrateDatabase,
   requestGenerationCancellationForOwner,
   user,
@@ -238,6 +242,66 @@ async function createExistingQueuedGeneration(input: {
   expect(result.kind).toBe("created");
 }
 
+async function seedCompletedAnswer(input: {
+  conversationId: string;
+  userMessageId: string;
+  assistantMessageId: string;
+  sourceGenerationId: string;
+  userText: string;
+  assistantText: string;
+}) {
+  await database.db.insert(conversations).values({
+    id: input.conversationId,
+    ownerId,
+    mode: "chat",
+    title: input.userText,
+  });
+  await database.db.insert(messages).values([
+    {
+      id: input.userMessageId,
+      conversationId: input.conversationId,
+      role: "user",
+      parts: [{ type: "text", text: input.userText }],
+      sequence: 0,
+    },
+    {
+      id: input.assistantMessageId,
+      conversationId: input.conversationId,
+      role: "assistant",
+      parts: [{ id: "old-text", type: "text", text: input.assistantText }],
+      sequence: 1,
+    },
+  ]);
+  await database.db.insert(generations).values({
+    id: input.sourceGenerationId,
+    conversationId: input.conversationId,
+    userMessageId: input.userMessageId,
+    assistantMessageId: input.assistantMessageId,
+    status: "completed",
+    reasoningEffort: "medium",
+    finishedAt: new Date(),
+  });
+}
+
+async function createQueuedRegeneration(input: {
+  generationId: string;
+  conversationId: string;
+  assistantMessageId: string;
+}) {
+  const result = await createRegenerationCommandRecord(
+    {
+      ownerId,
+      generationId: input.generationId,
+      conversationId: input.conversationId,
+      assistantMessageId: input.assistantMessageId,
+      now: new Date(),
+    },
+    database.db,
+  );
+
+  expect(result.kind).toBe("created");
+}
+
 async function enqueue(generationId: string): Promise<Job> {
   return queue.add(
     GENERATION_JOB_NAME,
@@ -448,6 +512,147 @@ describe("Chat Generation Worker 主链", () => {
         },
       ],
     });
+  });
+
+  it("重新生成只携带目标回答之前的上下文，并原位替换同一条 Assistant Message", async () => {
+    const conversationId = `worker-regenerate-conversation-${randomUUID()}`;
+    const userMessageId = `worker-regenerate-user-${randomUUID()}`;
+    const assistantMessageId = `worker-regenerate-assistant-${randomUUID()}`;
+    const sourceGenerationId = `worker-regenerate-source-${randomUUID()}`;
+    const regenerationId = `worker-regenerate-${randomUUID()}`;
+    const requestOffset = capturedRequests.length;
+    await seedCompletedAnswer({
+      conversationId,
+      userMessageId,
+      assistantMessageId,
+      sourceGenerationId,
+      userText: "请重新回答这个问题",
+      assistantText: "旧回答",
+    });
+    await createQueuedRegeneration({
+      generationId: regenerationId,
+      conversationId,
+      assistantMessageId,
+    });
+
+    await expect(
+      database.db.query.messages.findFirst({
+        where: (table, { eq }) => eq(table.id, assistantMessageId),
+      }),
+    ).resolves.toMatchObject({
+      parts: [{ id: "old-text", type: "text", text: "旧回答" }],
+    });
+
+    const job = await enqueue(regenerationId);
+    await job.waitUntilFinished(queueEvents, 5_000);
+
+    expect(capturedRequests[requestOffset]).toEqual({
+      reasoningEffort: "medium",
+      messages: [
+        {
+          role: "user",
+          parts: [{ type: "text", text: "请重新回答这个问题" }],
+        },
+      ],
+    });
+    await expect(
+      database.db.query.messages.findMany({
+        where: (table, { eq }) => eq(table.conversationId, conversationId),
+        orderBy: (table, { asc }) => asc(table.sequence),
+      }),
+    ).resolves.toMatchObject([
+      { id: userMessageId, role: "user", sequence: 0 },
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        sequence: 1,
+        parts: [
+          { id: "reasoning-1", type: "reasoning", text: "先分析" },
+          { id: "text-1", type: "text", text: "你好" },
+        ],
+      },
+    ]);
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, sourceGenerationId),
+      }),
+    ).resolves.toMatchObject({ assistantMessageId: null });
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, regenerationId),
+      }),
+    ).resolves.toMatchObject({
+      status: "completed",
+      assistantMessageId,
+      replacesAssistantMessageId: assistantMessageId,
+    });
+  });
+
+  it("重新生成被停止时丢弃半截新流，并保留原回答", async () => {
+    const conversationId = `worker-regenerate-cancel-conversation-${randomUUID()}`;
+    const userMessageId = `worker-regenerate-cancel-user-${randomUUID()}`;
+    const assistantMessageId = `worker-regenerate-cancel-assistant-${randomUUID()}`;
+    const sourceGenerationId = `worker-regenerate-cancel-source-${randomUUID()}`;
+    const regenerationId = `worker-regenerate-cancel-${randomUUID()}`;
+    await seedCompletedAnswer({
+      conversationId,
+      userMessageId,
+      assistantMessageId,
+      sourceGenerationId,
+      userText: "等待取消",
+      assistantText: "必须保留的旧回答",
+    });
+    await createQueuedRegeneration({
+      generationId: regenerationId,
+      conversationId,
+      assistantMessageId,
+    });
+
+    const job = await enqueue(regenerationId);
+    await waitForGenerationEvent(regenerationId, "reasoning.delta");
+    await requestGenerationCancellationForOwner(
+      { ownerId, generationId: regenerationId, now: new Date() },
+      database.db,
+    );
+    await cancellationPublisher.publish(regenerationId);
+    await expect(job.waitUntilFinished(queueEvents, 5_000)).resolves.toMatchObject({
+      kind: "cancelled",
+    });
+
+    await expect(
+      database.db.query.messages.findMany({
+        where: (table, { eq }) => eq(table.conversationId, conversationId),
+        orderBy: (table, { asc }) => asc(table.sequence),
+      }),
+    ).resolves.toMatchObject([
+      { id: userMessageId, role: "user", sequence: 0 },
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        sequence: 1,
+        parts: [
+          {
+            id: "old-text",
+            type: "text",
+            text: "必须保留的旧回答",
+          },
+        ],
+      },
+    ]);
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, regenerationId),
+      }),
+    ).resolves.toMatchObject({
+      status: "cancelled",
+      assistantMessageId: null,
+      replacesAssistantMessageId: assistantMessageId,
+    });
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, sourceGenerationId),
+      }),
+    ).resolves.toMatchObject({ assistantMessageId });
   });
 
   it("模型流失败时保留已发布 delta，并把 Generation 标记为 failed", async () => {
