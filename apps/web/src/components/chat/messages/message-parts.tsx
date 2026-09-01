@@ -5,6 +5,7 @@ import type {
 import { Brain, Wrench } from "lucide-react";
 
 import { MessageAttachment } from "./message-attachment";
+import { MessageMarkdown } from "./message-markdown";
 
 type MessagePartsDto = UserMessagePartsDto | AssistantMessagePartsDto;
 
@@ -25,12 +26,10 @@ export function MessageParts({
     switch (part.type) {
       case "text":
         return (
-          <p
-            className="whitespace-pre-wrap"
+          <MessageMarkdown
             key={"id" in part ? part.id : `text-${index}`}
-          >
-            {part.text}
-          </p>
+            text={part.text}
+          />
         );
       case "reasoning":
         return (
@@ -46,9 +45,9 @@ export function MessageParts({
               <Brain className="size-4" aria-hidden="true" />
               思考过程
             </summary>
-            <p className="mt-2 whitespace-pre-wrap border-l pl-4 text-sm leading-6">
-              {part.text}
-            </p>
+            <div className="mt-2 border-l pl-4 text-sm leading-6">
+              <MessageMarkdown text={part.text} />
+            </div>
           </details>
         );
       case "attachment":

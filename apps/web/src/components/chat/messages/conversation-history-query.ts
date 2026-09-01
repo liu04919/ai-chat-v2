@@ -97,7 +97,7 @@ export async function refreshConversationHistory(
     queryKey: [...queryKey, "latest"],
     exact: true,
   });
-  const latestPages = await queryClient.fetchQuery({
+  const latestPages = await queryClient.query({
     queryKey: [...queryKey, "latest"],
     gcTime: 0,
     staleTime: 0,

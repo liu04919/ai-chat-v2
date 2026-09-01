@@ -40,6 +40,8 @@ Worker 的 `dev` / `start` 命令在 Node 启动时读取 `.env.local` 并启用
 
 Chat / Image 共用动态高度虚拟列表，首次只读取最新 30 条消息；向上滚动加载更早的消息，插入历史时保持阅读位置。图片加载与思考展开后重新测量高度，在底部时跟随输出，向上阅读时不自动拉回底部。
 
+正文与思考内容使用 `react-markdown` 渲染 CommonMark 与 GFM，支持表格、任务列表、删除线、KaTeX 数学公式及代码语法高亮。代码块展示语言并支持复制；链接在新窗口打开。原始 HTML 与 Markdown 图片不渲染，图片资产仍通过 Attachment 鉴权链路展示。
+
 - `GET /api/conversations/:id`：最新一页，页内按 `sequence` 升序。
 - `GET /api/conversations/:id?before=<nextCursor>`：读取游标之前的一页，`nextCursor: null` 表示没有更早消息。分页使用已有的 `(conversationId, sequence)` 索引，不使用 offset。
 - React Query 保存已加载的历史页；发送、停止和 SSE 终态只同步最新消息，保留旧页。离开期间若新增超过一页，会补齐新旧消息之间的缺口。
