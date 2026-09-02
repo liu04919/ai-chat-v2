@@ -76,6 +76,52 @@ function appendDelta(
   return { ...projection, status: "running", hasStarted: true, parts };
 }
 
+function appendToolEvent(
+  projection: GenerationProjection,
+  event: Extract<
+    GenerationEventDto,
+    { type: "tool.call" | "tool.result" }
+  >,
+): GenerationProjection {
+  if (projection.parts.some((part) => part.id === event.partId)) {
+    return { ...projection, status: "connection-error" };
+  }
+
+  if (
+    event.type === "tool.result" &&
+    !projection.parts.some(
+      (part) =>
+        part.type === "tool-call" && part.toolCallId === event.toolCallId,
+    )
+  ) {
+    return { ...projection, status: "connection-error" };
+  }
+
+  const part: AssistantMessagePartDto =
+    event.type === "tool.call"
+      ? {
+          id: event.partId,
+          type: "tool-call",
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          input: event.input,
+        }
+      : {
+          id: event.partId,
+          type: "tool-result",
+          toolCallId: event.toolCallId,
+          output: event.output,
+          isError: event.isError,
+        };
+
+  return {
+    ...projection,
+    status: "running",
+    hasStarted: true,
+    parts: [...projection.parts, part],
+  };
+}
+
 export function reduceGenerationEvents(
   projection: GenerationProjection,
   events: readonly GenerationEventDto[],
@@ -100,6 +146,9 @@ export function reduceGenerationEvents(
       case "reasoning.delta":
       case "text.delta":
         return appendDelta(current, event);
+      case "tool.call":
+      case "tool.result":
+        return appendToolEvent(current, event);
       case "generation.completed":
         return { ...current, status: "completed" };
       case "generation.failed":

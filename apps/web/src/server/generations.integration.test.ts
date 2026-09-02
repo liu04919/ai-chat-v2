@@ -79,6 +79,10 @@ class FakeGenerationEventWriter {
 const queue = new FakeGenerationQueue();
 const ownerId = `generation-owner-${randomUUID()}`;
 const otherOwnerId = `generation-other-${randomUUID()}`;
+const noTools: CreateGenerationRequest["tools"] = {
+  webSearch: false,
+  mcpToolIds: [],
+};
 
 beforeAll(async () => {
   await migrateDatabase({
@@ -122,6 +126,7 @@ describe("Generation creation service", () => {
         { type: "attachment", attachmentId },
       ],
       reasoningEffort: "medium",
+      tools: noTools,
     } satisfies CreateGenerationRequest;
 
     await database.db.insert(attachments).values({
@@ -186,6 +191,7 @@ describe("Generation creation service", () => {
       userMessageId,
       parts: [{ type: "text", text: "幂等请求" }],
       reasoningEffort: "low",
+      tools: noTools,
     } satisfies CreateGenerationRequest;
     const first = await createGenerationForOwner(ownerId, request, {
       queue,
@@ -263,6 +269,7 @@ describe("Generation creation service", () => {
           userMessageId: `generation-active-second-message-${randomUUID()}`,
           parts: [{ type: "text", text: "第二条" }],
           reasoningEffort: "medium",
+          tools: noTools,
         },
         { queue },
       ),
@@ -326,6 +333,7 @@ describe("Generation creation service", () => {
             { type: "attachment", attachmentId },
           ],
           reasoningEffort: mode === "chat" ? "medium" : null,
+          tools: noTools,
         },
         { queue },
       );
@@ -492,6 +500,7 @@ describe("Generation cancellation service", () => {
         userMessageId: `generation-cancel-message-${randomUUID()}`,
         parts: [{ type: "text", text: "尚未开始就停止" }],
         reasoningEffort: "medium",
+        tools: noTools,
       },
       {
         queue,
@@ -547,6 +556,7 @@ describe("Generation cancellation service", () => {
         userMessageId: `generation-cancel-running-message-${randomUUID()}`,
         parts: [{ type: "text", text: "开始后停止" }],
         reasoningEffort: "high",
+        tools: noTools,
       },
       {
         queue,

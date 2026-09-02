@@ -2,6 +2,7 @@ import type {
   AssistantMessagePartsDto,
   AttachmentMediaType,
   AttachmentStatusDto,
+  GenerationToolSelectionDto,
   ReasoningEffortDto,
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
@@ -51,6 +52,7 @@ export type ClaimedGenerationExecution = {
   ownerId: string;
   mode: "chat" | "image";
   reasoningEffort: ReasoningEffortDto | null;
+  tools: GenerationToolSelectionDto;
   messages: GenerationExecutionMessageRecord[];
   attachments: GenerationExecutionAttachmentRecord[];
 };
@@ -94,6 +96,8 @@ export async function claimGenerationExecution(
         userMessageId: generations.userMessageId,
         conversationId: generations.conversationId,
         reasoningEffort: generations.reasoningEffort,
+        webSearchEnabled: generations.webSearchEnabled,
+        mcpToolIds: generations.mcpToolIds,
       });
 
     if (!claimed) {
@@ -177,6 +181,10 @@ export async function claimGenerationExecution(
         ownerId: conversation.ownerId,
         mode: conversation.mode,
         reasoningEffort: claimed.reasoningEffort,
+        tools: {
+          webSearch: claimed.webSearchEnabled,
+          mcpToolIds: claimed.mcpToolIds,
+        },
         messages: messageRecords,
         attachments: attachmentRecords,
       },

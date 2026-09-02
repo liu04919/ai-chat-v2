@@ -15,6 +15,10 @@ import {
 } from "@ai-chat/db";
 
 import type { ChatModel, ChatModelStreamPart } from "../llm/chat-model";
+import type {
+  GenerationToolResolver,
+  ResolvedGenerationTools,
+} from "../tools/generation-tool-resolver";
 import { buildChatModelRequest } from "./chat-context-builder";
 import {
   coalesceChatModelStream,
@@ -28,6 +32,7 @@ export type ExecuteChatGenerationDependencies = {
   cancellationSubscriber: GenerationCancellationSubscriber;
   eventWriter: GenerationEventWriter;
   objectStorage: Pick<ObjectStorage, "createDownloadUrl">;
+  toolResolver?: GenerationToolResolver;
   coalescing?: DeltaCoalescingOptions;
   createAssistantMessageId?: () => string;
   now?: () => Date;
@@ -47,6 +52,45 @@ type StreamDeltaPart = Extract<
   ChatModelStreamPart,
   { type: "text" | "reasoning" }
 >;
+
+type AssistantToolCallPart = Extract<
+  AssistantMessagePartDto,
+  { type: "tool-call" }
+>;
+type AssistantToolResultPart = Extract<
+  AssistantMessagePartDto,
+  { type: "tool-result" }
+>;
+type JsonValue = AssistantToolCallPart["input"];
+
+function toJsonValue(value: unknown): JsonValue {
+  if (value === undefined) {
+    return null;
+  }
+
+  const serialized = JSON.stringify(value, (_key, nestedValue: unknown) => {
+    if (nestedValue instanceof Error) {
+      return { message: nestedValue.message };
+    }
+
+    return nestedValue;
+  });
+
+  return serialized === undefined
+    ? null
+    : (JSON.parse(serialized) as JsonValue);
+}
+
+function appendAssistantPart(
+  parts: AssistantMessagePartDto[],
+  part: AssistantMessagePartDto,
+): void {
+  if (parts.some((candidate) => candidate.id === part.id)) {
+    throw new Error(`Assistant part ${part.id} 在流中重复出现`);
+  }
+
+  parts.push(part);
+}
 
 function appendAssistantDelta(
   parts: AssistantMessagePartDto[],
@@ -142,6 +186,7 @@ export async function executeChatGeneration(
   const generationId = execution.id;
   const abortController = new AbortController();
   const assistantParts: AssistantMessagePartDto[] = [];
+  let resolvedTools: ResolvedGenerationTools | undefined;
   let unsubscribe: () => Promise<void>;
 
   try {
@@ -174,6 +219,15 @@ export async function executeChatGeneration(
       dependencies.objectStorage,
     );
     abortController.signal.throwIfAborted();
+    if (dependencies.toolResolver) {
+      resolvedTools = await dependencies.toolResolver.resolve(execution.tools);
+      request.tools = resolvedTools.tools;
+    } else if (
+      execution.tools.webSearch ||
+      execution.tools.mcpToolIds.length > 0
+    ) {
+      throw new Error("Generation 选择了 Tool，但 Worker 未配置 Tool Resolver");
+    }
     request.abortSignal = abortController.signal;
     let finished = false;
 
@@ -200,6 +254,46 @@ export async function executeChatGeneration(
             delta: part.delta,
           });
           break;
+        case "tool-call": {
+          const toolName =
+            resolvedTools?.toPublicToolName(part.toolName) ?? part.toolName;
+          const toolCall: AssistantToolCallPart = {
+            id: part.partId,
+            type: "tool-call",
+            toolCallId: part.toolCallId,
+            toolName,
+            input: toJsonValue(part.input),
+          };
+          appendAssistantPart(assistantParts, toolCall);
+          await dependencies.eventWriter.append({
+            type: "tool.call",
+            generationId,
+            partId: toolCall.id,
+            toolCallId: toolCall.toolCallId,
+            toolName: toolCall.toolName,
+            input: toolCall.input,
+          });
+          break;
+        }
+        case "tool-result": {
+          const toolResult: AssistantToolResultPart = {
+            id: part.partId,
+            type: "tool-result",
+            toolCallId: part.toolCallId,
+            output: toJsonValue(part.output),
+            isError: part.isError,
+          };
+          appendAssistantPart(assistantParts, toolResult);
+          await dependencies.eventWriter.append({
+            type: "tool.result",
+            generationId,
+            partId: toolResult.id,
+            toolCallId: toolResult.toolCallId,
+            output: toolResult.output,
+            isError: toolResult.isError,
+          });
+          break;
+        }
         case "finish":
           finished = true;
           break;
@@ -249,6 +343,6 @@ export async function executeChatGeneration(
       dependencies,
     );
   } finally {
-    await unsubscribe();
+    await Promise.all([unsubscribe(), resolvedTools?.close()]);
   }
 }

@@ -1,5 +1,5 @@
 {
-  "id": "85e6e5bf-7477-4dfd-8f19-159b59aedc65",
+  "id": "e63252a4-c153-421a-9f7e-3535c755c7c9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -645,6 +645,20 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": false
+        },
+        "web_search_enabled": {
+          "name": "web_search_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "mcp_tool_ids": {
+          "name": "mcp_tool_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
         },
         "error_code": {
           "name": "error_code",

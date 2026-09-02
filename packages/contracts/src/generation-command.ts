@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { conversationModeSchema } from "./conversation";
 import { generationStatusSchema, reasoningEffortSchema } from "./generation";
+import { generationToolSelectionSchema } from "./generation-tools";
 import { userMessagePartsSchema } from "./message";
 
 export const GENERATION_QUEUE_NAME = "generation";
@@ -29,6 +30,7 @@ export const createGenerationRequestSchema = z
     userMessageId: z.string().min(1),
     parts: userMessagePartsSchema,
     reasoningEffort: reasoningEffortSchema.nullable(),
+    tools: generationToolSelectionSchema,
   })
   .strict()
   .superRefine((request, context) => {
@@ -53,6 +55,18 @@ export const createGenerationRequestSchema = z
         code: "custom",
         path: ["parts"],
         message: "Message 必须包含文本或 Attachment",
+      });
+    }
+
+    const mode = request.target.type === "new" ? request.target.mode : null;
+    if (
+      mode === "image" &&
+      (request.tools.webSearch || request.tools.mcpToolIds.length > 0)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["tools"],
+        message: "图片 Generation 暂不支持 Tool",
       });
     }
   });

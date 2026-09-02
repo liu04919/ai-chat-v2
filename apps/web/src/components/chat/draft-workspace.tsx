@@ -62,6 +62,7 @@ export function DraftWorkspace() {
   async function submitDraft({
     parts,
     reasoningEffort,
+    tools,
   }: ChatComposerSubmission) {
     const conversationId = crypto.randomUUID();
     await createMutation.mutateAsync({
@@ -69,6 +70,7 @@ export function DraftWorkspace() {
       userMessageId: crypto.randomUUID(),
       parts,
       reasoningEffort,
+      tools,
     });
     startNavigation(() => {
       router.replace(`/chat/${conversationId}`);

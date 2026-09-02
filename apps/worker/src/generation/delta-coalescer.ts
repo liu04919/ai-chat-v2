@@ -8,6 +8,10 @@ type DeltaPart = Extract<
   { type: "text" | "reasoning" }
 >;
 
+function isDeltaPart(part: ChatModelStreamPart): part is DeltaPart {
+  return part.type === "text" || part.type === "reasoning";
+}
+
 export type DeltaCoalescingOptions = {
   maxDelayMs?: number;
   maxCharacters?: number;
@@ -109,14 +113,18 @@ export async function* coalesceChatModelStream(
 
       const part = result.value;
 
-      if (part.type === "finish") {
+      if (!isDeltaPart(part)) {
         if (pending) {
           yield pending;
           pending = undefined;
         }
 
         yield part;
-        return;
+        if (part.type === "finish") {
+          return;
+        }
+        next = readNext(iterator);
+        continue;
       }
 
       next = readNext(iterator);

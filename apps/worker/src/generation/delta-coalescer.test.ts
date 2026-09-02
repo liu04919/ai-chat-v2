@@ -119,4 +119,55 @@ describe("Chat delta coalescer", () => {
     });
     await expect(iterator.next()).rejects.toThrow("provider failed");
   });
+
+  it("Tool 事件会先刷新 delta，并保持调用与结果顺序", async () => {
+    async function* source(): AsyncIterable<ChatModelStreamPart> {
+      yield { type: "text", partId: "text-1", delta: "先" };
+      yield { type: "text", partId: "text-1", delta: "查" };
+      yield {
+        type: "tool-call",
+        partId: "tool-call:call-1",
+        toolCallId: "call-1",
+        toolName: "web_search",
+        input: { query: "最新信息" },
+      };
+      yield {
+        type: "tool-result",
+        partId: "tool-result:call-1",
+        toolCallId: "call-1",
+        output: { results: [] },
+        isError: false,
+      };
+      yield { type: "text", partId: "text-2", delta: "结论" };
+      yield { type: "finish", reason: "stop" };
+    }
+
+    await expect(
+      collect(
+        coalesceChatModelStream(source(), {
+          maxDelayMs: 10_000,
+          maxCharacters: 128,
+        }),
+      ),
+    ).resolves.toEqual([
+      { type: "text", partId: "text-1", delta: "先" },
+      { type: "text", partId: "text-1", delta: "查" },
+      {
+        type: "tool-call",
+        partId: "tool-call:call-1",
+        toolCallId: "call-1",
+        toolName: "web_search",
+        input: { query: "最新信息" },
+      },
+      {
+        type: "tool-result",
+        partId: "tool-result:call-1",
+        toolCallId: "call-1",
+        output: { results: [] },
+        isError: false,
+      },
+      { type: "text", partId: "text-2", delta: "结论" },
+      { type: "finish", reason: "stop" },
+    ]);
+  });
 });

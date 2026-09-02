@@ -107,6 +107,7 @@ export function ConversationWorkspace({
   async function submitMessage({
     parts,
     reasoningEffort,
+    tools,
   }: ChatComposerSubmission) {
     cancelMutation.reset();
     await createMutation.mutateAsync({
@@ -114,6 +115,7 @@ export function ConversationWorkspace({
       userMessageId: crypto.randomUUID(),
       parts,
       reasoningEffort,
+      tools,
     });
   }
 

@@ -11,6 +11,7 @@ function execution(): ClaimedGenerationExecution {
     userMessageId: "current",
     mode: "image",
     reasoningEffort: null,
+    tools: { webSearch: false, mcpToolIds: [] },
     messages: [
       {
         id: "first",

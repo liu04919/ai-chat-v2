@@ -21,6 +21,7 @@ describe("Generation command contracts", () => {
         { type: "attachment", attachmentId: "attachment_example" },
       ],
       reasoningEffort: "medium",
+      tools: { webSearch: true, mcpToolIds: ["baidu-maps.map_search"] },
     };
 
     expect(createGenerationRequestSchema.parse(request)).toEqual(request);
@@ -37,6 +38,7 @@ describe("Generation command contracts", () => {
         userMessageId: "message_empty",
         parts: [{ type: "text", text: "   " }],
         reasoningEffort: "low",
+        tools: { webSearch: false, mcpToolIds: [] },
       }),
     ).toThrow();
 
@@ -49,8 +51,25 @@ describe("Generation command contracts", () => {
           { type: "attachment", attachmentId: "attachment_example" },
         ],
         reasoningEffort: "high",
+        tools: { webSearch: false, mcpToolIds: [] },
       }),
     ).toThrow();
+  });
+
+  it("拒绝为 Image Generation 启用 Tool", () => {
+    expect(() =>
+      createGenerationRequestSchema.parse({
+        target: {
+          type: "new",
+          conversationId: "conversation_image",
+          mode: "image",
+        },
+        userMessageId: "message_image",
+        parts: [{ type: "text", text: "画一只猫" }],
+        reasoningEffort: null,
+        tools: { webSearch: true, mcpToolIds: [] },
+      }),
+    ).toThrow("图片 Generation 暂不支持 Tool");
   });
 
   it("响应返回导航与排队所需的稳定 ID", () => {

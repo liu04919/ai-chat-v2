@@ -11,6 +11,7 @@ const execution: ClaimedGenerationExecution = {
   ownerId: "owner_123",
   mode: "chat",
   reasoningEffort: "medium",
+  tools: { webSearch: false, mcpToolIds: [] },
   messages: [
     {
       id: "message_1",

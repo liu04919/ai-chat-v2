@@ -47,6 +47,12 @@ export {
   type ReasoningEffortDto,
 } from "./generation";
 export {
+  MCP_TOOL_ID_SEPARATOR,
+  generationToolSelectionSchema,
+  mcpToolIdSchema,
+  type GenerationToolSelectionDto,
+} from "./generation-tools";
+export {
   cancelGenerationErrorResponseSchema,
   cancelGenerationResponseSchema,
   type CancelGenerationErrorResponse,
@@ -69,6 +75,8 @@ export {
   generationStartedEventSchema,
   reasoningDeltaEventSchema,
   textDeltaEventSchema,
+  toolCallEventSchema,
+  toolResultEventSchema,
   type GenerationEventCursor,
   type GenerationEventDto,
 } from "./generation-event";

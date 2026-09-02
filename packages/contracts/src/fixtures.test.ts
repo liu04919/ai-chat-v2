@@ -94,6 +94,8 @@ describe("contract examples", () => {
     "started",
     "text-delta",
     "reasoning-delta",
+    "tool-call",
+    "tool-result",
     "completed",
     "failed",
     "cancelled",

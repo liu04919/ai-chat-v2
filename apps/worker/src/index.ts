@@ -10,6 +10,8 @@ import { executeGeneration } from "./generation/execute-generation";
 import { createCatApiChatModel } from "./llm/cat-api-chat-model";
 import { createCatApiImageModel } from "./llm/cat-api-image-model";
 import type { ImageModel } from "./llm/image-model";
+import { createConfiguredMcpServerRegistry } from "./mcp";
+import { createGenerationToolResolver } from "./tools";
 
 function requireEnvironment(name: string): string {
   const value = process.env[name];
@@ -38,6 +40,10 @@ const chatModel = createCatApiChatModel({
   apiKey: requireEnvironment("LLM_API_KEY"),
   modelId: requireEnvironment("LLM_MODEL"),
 });
+const toolResolver = createGenerationToolResolver({
+  registry: createConfiguredMcpServerRegistry(process.env),
+  tavilyApiKey: process.env.TAVILY_API_KEY,
+});
 // 图片渠道使用独立凭证；尚未配置时只让图片任务明确失败，不影响 Chat。
 const imageModel: ImageModel = {
   generate(request) {
@@ -57,6 +63,7 @@ const worker = createBullMqGenerationWorker({
       cancellationSubscriber,
       eventWriter,
       objectStorage,
+      toolResolver,
     }),
 });
 

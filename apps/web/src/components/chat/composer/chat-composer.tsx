@@ -2,10 +2,11 @@
 
 import type {
   ConversationModeDto,
+  GenerationToolSelectionDto,
   ReasoningEffortDto,
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
-import { ArrowUp, Brain, Paperclip, Square } from "lucide-react";
+import { ArrowUp, Brain, Globe, Paperclip, Square } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ const reasoningOptions: ReadonlyArray<{
 export type ChatComposerSubmission = {
   parts: UserMessagePartsDto;
   reasoningEffort: ReasoningEffortDto | null;
+  tools: GenerationToolSelectionDto;
 };
 
 export function ChatComposer({
@@ -60,6 +62,7 @@ export function ChatComposer({
   const [input, setInput] = useState("");
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffortDto>("medium");
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachments = useDraftAttachments({
     mode,
@@ -116,6 +119,10 @@ export function ChatComposer({
       await onSubmit({
         parts,
         reasoningEffort: mode === "chat" ? reasoningEffort : null,
+        tools: {
+          webSearch: mode === "chat" && webSearchEnabled,
+          mcpToolIds: [],
+        },
       });
       setInput("");
       attachments.clearSubmitted();
@@ -182,6 +189,28 @@ export function ChatComposer({
           >
             <Paperclip className="size-4" aria-hidden="true" />
           </Button>
+
+          {mode === "chat" ? (
+            <Button
+              aria-label={
+                webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"
+              }
+              aria-pressed={webSearchEnabled}
+              className={
+                webSearchEnabled
+                  ? "h-9 rounded-full bg-primary/12 px-3 text-primary hover:bg-primary/20"
+                  : "h-9 rounded-full px-3 hover:bg-foreground/10 active:bg-foreground/20"
+              }
+              disabled={contentDisabled}
+              onClick={() => setWebSearchEnabled((enabled) => !enabled)}
+              title={webSearchEnabled ? "已开启联网搜索" : "联网搜索"}
+              type="button"
+              variant="ghost"
+            >
+              <Globe className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">联网</span>
+            </Button>
+          ) : null}
 
           <div
             aria-hidden={mode !== "chat"}

@@ -43,6 +43,28 @@ export const generationFailedEventSchema = z
   })
   .strict();
 
+export const toolCallEventSchema = z
+  .object({
+    type: z.literal("tool.call"),
+    ...generationEventBase,
+    partId: z.string().min(1),
+    toolCallId: z.string().min(1),
+    toolName: z.string().min(1),
+    input: z.json(),
+  })
+  .strict();
+
+export const toolResultEventSchema = z
+  .object({
+    type: z.literal("tool.result"),
+    ...generationEventBase,
+    partId: z.string().min(1),
+    toolCallId: z.string().min(1),
+    output: z.json(),
+    isError: z.boolean(),
+  })
+  .strict();
+
 export const generationCancelledEventSchema = z
   .object({
     type: z.literal("generation.cancelled"),
@@ -54,6 +76,8 @@ export const generationEventSchema = z.discriminatedUnion("type", [
   generationStartedEventSchema,
   textDeltaEventSchema,
   reasoningDeltaEventSchema,
+  toolCallEventSchema,
+  toolResultEventSchema,
   generationCompletedEventSchema,
   generationFailedEventSchema,
   generationCancelledEventSchema,

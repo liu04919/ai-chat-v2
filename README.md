@@ -35,6 +35,14 @@ Worker 的 `dev` / `start` 命令在 Node 启动时读取 `.env.local` 并启用
 
 附件读取校验登录身份与归属后签发短期 R2 下载地址，不保存签名 URL。会话详情中的 `activeGeneration` 用于发现正在执行的任务，`latestGeneration` 用于恢复最近一次失败或停止的状态。
 
+## Tool 与联网搜索
+
+Chat 输入框的联网搜索开关只影响本次 Generation，Worker 使用 Tavily 将 `web_search` 作为本地 Tool 注入模型；它不属于 MCP 工具目录，也不会永久绑定 Conversation。MCP 工具同样按次选择，以稳定的 `serverId.toolName` 写入 Generation，执行时再通过远程 MCP Client 的 `tools()` 获取真实可执行工具。
+
+模型的多步 `tool-call → tool-result → 继续生成` 由 Worker 和 AI SDK 完成。调用与结果按原始顺序进入 Redis GenerationEvent，完成或用户取消后持久化为 Assistant Message Parts；后续 Context Builder 会把这些可见工具历史重新交给无状态 Provider。重新生成沿用原 Generation 的 Tool 选择，不依赖第三方保存会话状态。
+
+启用联网搜索前，在 `apps/worker/.env.local` 配置 `TAVILY_API_KEY`。MCP URL、Bearer Token 与第三方 AK 也只存在于 Worker 服务端环境中，不进入浏览器或消息正文。
+
 ## 消息历史与滚动
 
 Chat / Image 共用动态高度虚拟列表，首次只读取最新 30 条消息；向上滚动加载更早的消息，插入历史时保持阅读位置。图片加载与思考展开后重新测量高度，在底部时跟随输出，向上阅读时不自动拉回底部。

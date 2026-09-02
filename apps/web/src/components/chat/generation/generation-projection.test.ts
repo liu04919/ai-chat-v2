@@ -128,4 +128,52 @@ describe("Generation projection", () => {
       { id: "reasoning_1", type: "reasoning", text: "正在分析" },
     ]);
   });
+
+  it("按流顺序投影 Tool Call、Tool Result 与后续文本", () => {
+    const projection = reduceGenerationEvents(
+      createGenerationProjection("conversation_123", generationId),
+      [
+        {
+          type: "tool.call",
+          generationId,
+          partId: "tool-call:call-1",
+          toolCallId: "call-1",
+          toolName: "web_search",
+          input: { query: "最新信息" },
+        },
+        {
+          type: "tool.result",
+          generationId,
+          partId: "tool-result:call-1",
+          toolCallId: "call-1",
+          output: { results: [] },
+          isError: false,
+        },
+        {
+          type: "text.delta",
+          generationId,
+          partId: "text-1",
+          delta: "查询完成",
+        },
+      ],
+    );
+
+    expect(projection.parts).toEqual([
+      {
+        id: "tool-call:call-1",
+        type: "tool-call",
+        toolCallId: "call-1",
+        toolName: "web_search",
+        input: { query: "最新信息" },
+      },
+      {
+        id: "tool-result:call-1",
+        type: "tool-result",
+        toolCallId: "call-1",
+        output: { results: [] },
+        isError: false,
+      },
+      { id: "text-1", type: "text", text: "查询完成" },
+    ]);
+  });
 });

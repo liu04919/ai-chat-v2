@@ -152,6 +152,7 @@ async function createGeneration(
         ? { type: "existing", conversationId }
         : { type: "new", conversationId, mode: "image" },
       reasoningEffort: null,
+      tools: { webSearch: false, mcpToolIds: [] },
       conversationTitle: "图片测试",
       now: new Date(),
     },

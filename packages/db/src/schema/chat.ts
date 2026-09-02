@@ -1,10 +1,12 @@
 import type {
   AssistantMessagePartsDto,
+  GenerationToolSelectionDto,
   ReasoningEffortDto,
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
@@ -100,6 +102,11 @@ export const generations = pgTable(
       .references(() => messages.id, { onDelete: "set null" }),
     status: generationStatus("status").default("queued").notNull(),
     reasoningEffort: reasoningEffort("reasoning_effort").$type<ReasoningEffortDto>(),
+    webSearchEnabled: boolean("web_search_enabled").default(false).notNull(),
+    mcpToolIds: jsonb("mcp_tool_ids")
+      .$type<GenerationToolSelectionDto["mcpToolIds"]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
     errorCode: text("error_code"),
     cancelRequestedAt: timestamp("cancel_requested_at", {
       mode: "date",

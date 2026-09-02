@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { tool } from "ai";
+import { z } from "zod";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ChatModelStreamPart } from "./chat-model";
 import { createCatApiChatModel } from "./cat-api-chat-model";
@@ -95,6 +97,101 @@ function createResponsesStream(): string {
         service_tier: "default",
       },
     }),
+    "data: [DONE]\n\n",
+  ].join("");
+}
+
+function responseCompleted(): string {
+  return sseEvent({
+    type: "response.completed",
+    response: {
+      incomplete_details: null,
+      usage: { input_tokens: 12, output_tokens: 8 },
+      reasoning: null,
+      service_tier: "default",
+    },
+  });
+}
+
+function createToolCallStream(): string {
+  return [
+    sseEvent({
+      type: "response.created",
+      response: {
+        id: "response_tool",
+        created_at: 1_787_900_000,
+        model: "gpt-5.6-sol",
+        service_tier: "default",
+      },
+    }),
+    sseEvent({
+      type: "response.output_item.added",
+      output_index: 0,
+      item: {
+        type: "function_call",
+        id: "function_item",
+        call_id: "call_search",
+        name: "web_search",
+        arguments: "",
+      },
+    }),
+    sseEvent({
+      type: "response.function_call_arguments.delta",
+      item_id: "function_item",
+      output_index: 0,
+      delta: "{\"query\":\"Redis latest\"}",
+    }),
+    sseEvent({
+      type: "response.function_call_arguments.done",
+      item_id: "function_item",
+      output_index: 0,
+      arguments: "{\"query\":\"Redis latest\"}",
+    }),
+    sseEvent({
+      type: "response.output_item.done",
+      output_index: 0,
+      item: {
+        type: "function_call",
+        id: "function_item",
+        call_id: "call_search",
+        name: "web_search",
+        arguments: "{\"query\":\"Redis latest\"}",
+        status: "completed",
+      },
+    }),
+    responseCompleted(),
+    "data: [DONE]\n\n",
+  ].join("");
+}
+
+function createFinalAnswerStream(): string {
+  return [
+    sseEvent({
+      type: "response.created",
+      response: {
+        id: "response_final",
+        created_at: 1_787_900_001,
+        model: "gpt-5.6-sol",
+        service_tier: "default",
+      },
+    }),
+    sseEvent({
+      type: "response.output_item.added",
+      output_index: 0,
+      item: { type: "message", id: "message_final", phase: "final_answer" },
+    }),
+    sseEvent({
+      type: "response.output_text.delta",
+      item_id: "message_final",
+      output_index: 0,
+      delta: "查询完成。",
+    }),
+    sseEvent({
+      type: "response.output_item.done",
+      output_index: 0,
+      item: { type: "message", id: "message_final", phase: "final_answer" },
+    }),
+    responseCompleted(),
     "data: [DONE]\n\n",
   ].join("");
 }
@@ -249,5 +346,155 @@ describe("CatAPI Chat Adapter", () => {
         void part;
       }
     }).rejects.toThrow("provider failed");
+  });
+
+  it("执行 Tool 后继续第二步，并把调用与结果映射到内部流", async () => {
+    const requests: Request[] = [];
+    const execute = vi.fn(async ({ query }: { query: string }) => ({
+      query,
+      results: [{ title: "Redis", url: "https://redis.io/" }],
+    }));
+    const model = createCatApiChatModel({
+      baseUrl: "https://maomiapi.com/v1",
+      apiKey: "test-api-key",
+      modelId: "gpt-5.6-sol",
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        return new Response(
+          requests.length === 1
+            ? createToolCallStream()
+            : createFinalAnswerStream(),
+          {
+            status: 200,
+            headers: { "content-type": "text/event-stream" },
+          },
+        );
+      },
+    });
+    const parts: ChatModelStreamPart[] = [];
+
+    for await (const part of model.stream({
+      messages: [
+        { role: "user", parts: [{ type: "text", text: "查一下 Redis" }] },
+      ],
+      reasoningEffort: "low",
+      tools: {
+        web_search: tool({
+          description: "联网搜索",
+          inputSchema: z.object({ query: z.string() }),
+          execute,
+        }),
+      },
+    })) {
+      parts.push(part);
+    }
+
+    expect(execute).toHaveBeenCalledWith(
+      { query: "Redis latest" },
+      expect.objectContaining({ toolCallId: "call_search" }),
+    );
+    expect(parts).toEqual([
+      {
+        type: "tool-call",
+        partId: "tool-call:call_search",
+        toolCallId: "call_search",
+        toolName: "web_search",
+        input: { query: "Redis latest" },
+      },
+      {
+        type: "tool-result",
+        partId: "tool-result:call_search",
+        toolCallId: "call_search",
+        output: {
+          query: "Redis latest",
+          results: [{ title: "Redis", url: "https://redis.io/" }],
+        },
+        isError: false,
+      },
+      { type: "text", partId: "message_final", delta: "查询完成。" },
+      { type: "finish", reason: "stop" },
+    ]);
+    expect(requests).toHaveLength(2);
+    const secondBody = (await requests[1]?.json()) as {
+      input: Array<Record<string, unknown>>;
+    };
+    expect(secondBody.input).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "function_call",
+          call_id: "call_search",
+          name: "web_search",
+        }),
+        expect.objectContaining({
+          type: "function_call_output",
+          call_id: "call_search",
+        }),
+      ]),
+    );
+  });
+
+  it("下一轮会把已落库的 Tool Call 与 Tool Result 重建进上下文", async () => {
+    let capturedRequest: Request | undefined;
+    const model = createCatApiChatModel({
+      baseUrl: "https://maomiapi.com/v1",
+      apiKey: "test-api-key",
+      modelId: "gpt-5.6-sol",
+      fetch: async (input, init) => {
+        capturedRequest = new Request(input, init);
+        return new Response(createFinalAnswerStream(), {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+    });
+
+    for await (const part of model.stream({
+      messages: [
+        { role: "user", parts: [{ type: "text", text: "查天气" }] },
+        {
+          role: "assistant",
+          parts: [
+            {
+              id: "call-part",
+              type: "tool-call",
+              toolCallId: "call-weather",
+              toolName: "baidu-maps.weather",
+              input: { city: "合肥" },
+            },
+            {
+              id: "result-part",
+              type: "tool-result",
+              toolCallId: "call-weather",
+              output: { temperature: 28 },
+              isError: false,
+            },
+            { id: "answer-part", type: "text", text: "合肥 28 度。" },
+          ],
+        },
+        { role: "user", parts: [{ type: "text", text: "那明天呢？" }] },
+      ],
+      reasoningEffort: "low",
+    })) {
+      void part;
+    }
+
+    const body = (await capturedRequest?.json()) as {
+      input: Array<Record<string, unknown>>;
+    };
+    expect(body.input).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "function_call",
+          call_id: "call-weather",
+          name: "mcp__baidu-maps__weather",
+          arguments: "{\"city\":\"合肥\"}",
+        }),
+        expect.objectContaining({
+          type: "function_call_output",
+          call_id: "call-weather",
+          output: "{\"temperature\":28}",
+        }),
+      ]),
+    );
   });
 });

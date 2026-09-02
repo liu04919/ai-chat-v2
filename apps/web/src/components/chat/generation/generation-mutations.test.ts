@@ -38,6 +38,7 @@ function createRequest(type: "new" | "existing"): CreateGenerationRequest {
     userMessageId: "user_message_123",
     parts: [{ type: "text", text: "你好" }],
     reasoningEffort: "medium",
+    tools: { webSearch: false, mcpToolIds: [] },
   };
 }
 

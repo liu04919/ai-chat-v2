@@ -3,13 +3,19 @@ import {
   type OpenAILanguageModelResponsesOptions,
   type OpenAIProviderSettings,
 } from "@ai-sdk/openai";
-import { streamText, type ModelMessage } from "ai";
+import type { AssistantMessagePartDto } from "@ai-chat/contracts";
+import {
+  isStepCount,
+  streamText,
+  type ModelMessage,
+} from "ai";
 
 import type {
   ChatModel,
   ChatModelMessage,
   ChatModelStreamPart,
 } from "./chat-model";
+import { toRuntimeHistoryToolName } from "../tools/tool-names";
 
 export type CatApiChatModelConfig = {
   baseUrl: string;
@@ -26,10 +32,38 @@ function assistantHistoryLabel(text: string): string {
   return `[上一轮助手输出]\n${text}`;
 }
 
-function toAssistantModelMessage(
+type AssistantContentPart = Extract<
+  Extract<ModelMessage, { role: "assistant" }>["content"],
+  readonly unknown[]
+>[number];
+
+function toToolResultOutput(
+  output: Extract<
+    AssistantMessagePartDto,
+    { type: "tool-result" }
+  >["output"],
+  isError: boolean,
+) {
+  return isError
+    ? ({ type: "error-json", value: output } as const)
+    : ({ type: "json", value: output } as const);
+}
+
+function toAssistantModelMessages(
   message: Extract<ChatModelMessage, { role: "assistant" }>,
-): ModelMessage {
-  const content: Array<{ type: "text"; text: string }> = [];
+): ModelMessage[] {
+  const messages: ModelMessage[] = [];
+  let content: AssistantContentPart[] = [];
+  const toolNames = new Map<string, string>();
+
+  function flushAssistant(): void {
+    if (content.length === 0) {
+      return;
+    }
+
+    messages.push({ role: "assistant", content });
+    content = [];
+  }
 
   for (const part of message.parts) {
     switch (part.type) {
@@ -42,34 +76,68 @@ function toAssistantModelMessage(
       case "attachment":
         throw new Error("Chat Model 暂不支持 Assistant Attachment 历史");
       case "tool-call":
-      case "tool-result":
-        throw new Error("CatAPI Tool 历史适配尚未实现");
+        toolNames.set(
+          part.toolCallId,
+          toRuntimeHistoryToolName(part.toolName),
+        );
+        content.push({
+          type: "tool-call",
+          toolCallId: part.toolCallId,
+          toolName: toRuntimeHistoryToolName(part.toolName),
+          input: part.input,
+        });
+        break;
+      case "tool-result": {
+        const toolName = toolNames.get(part.toolCallId);
+        if (!toolName) {
+          throw new Error(
+            `Assistant Tool Result ${part.toolCallId} 缺少对应的 Tool Call`,
+          );
+        }
+
+        flushAssistant();
+        messages.push({
+          role: "tool",
+          content: [
+            {
+              type: "tool-result",
+              toolCallId: part.toolCallId,
+              toolName,
+              output: toToolResultOutput(part.output, part.isError),
+            },
+          ],
+        });
+        break;
+      }
     }
   }
 
-  return { role: "assistant", content };
+  flushAssistant();
+  return messages;
 }
 
-function toModelMessage(message: ChatModelMessage): ModelMessage {
+function toModelMessages(message: ChatModelMessage): ModelMessage[] {
   if (message.role === "assistant") {
-    return toAssistantModelMessage(message);
+    return toAssistantModelMessages(message);
   }
 
-  return {
-    role: "user",
-    content: message.parts.map((part) => {
-      if (part.type === "text") {
-        return part;
-      }
+  return [
+    {
+      role: "user",
+      content: message.parts.map((part) => {
+        if (part.type === "text") {
+          return part;
+        }
 
-      return {
-        type: "file" as const,
-        data: new URL(part.url),
-        mediaType: part.mediaType,
-        ...(part.filename ? { filename: part.filename } : {}),
-      };
-    }),
-  };
+        return {
+          type: "file" as const,
+          data: new URL(part.url),
+          mediaType: part.mediaType,
+          ...(part.filename ? { filename: part.filename } : {}),
+        };
+      }),
+    },
+  ];
 }
 
 function toError(error: unknown, fallbackMessage: string): Error {
@@ -93,8 +161,11 @@ export function createCatApiChatModel(
       const result = streamText({
         model,
         maxRetries: 0,
-        messages: request.messages.map(toModelMessage),
+        messages: request.messages.flatMap(toModelMessages),
         abortSignal: request.abortSignal,
+        ...(request.tools
+          ? { tools: request.tools, stopWhen: isStepCount(8) }
+          : {}),
         providerOptions: {
           openai: {
             forceReasoning: true,
@@ -115,6 +186,40 @@ export function createCatApiChatModel(
             break;
           case "reasoning-delta":
             yield { type: "reasoning", partId: part.id, delta: part.text };
+            break;
+          case "tool-call":
+            yield {
+              type: "tool-call",
+              partId: `tool-call:${part.toolCallId}`,
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              input: part.input,
+            };
+            break;
+          case "tool-result":
+            if (!part.preliminary) {
+              yield {
+                type: "tool-result",
+                partId: `tool-result:${part.toolCallId}`,
+                toolCallId: part.toolCallId,
+                output: part.output,
+                isError: false,
+              };
+            }
+            break;
+          case "tool-error":
+            yield {
+              type: "tool-result",
+              partId: `tool-result:${part.toolCallId}`,
+              toolCallId: part.toolCallId,
+              output: {
+                message:
+                  part.error instanceof Error
+                    ? part.error.message
+                    : "Tool 执行失败",
+              },
+              isError: true,
+            };
             break;
           case "finish":
             yield { type: "finish", reason: part.finishReason };

@@ -15,5 +15,9 @@
       "attachmentId": "attachment_example"
     }
   ],
-  "reasoningEffort": "medium"
+  "reasoningEffort": "medium",
+  "tools": {
+    "webSearch": true,
+    "mcpToolIds": ["baidu-maps.map_search"]
+  }
 }

@@ -28,6 +28,8 @@ import {
 } from "@ai-chat/event-store";
 import { Job, Queue, QueueEvents } from "bullmq";
 import IORedis from "ioredis";
+import { tool } from "ai";
+import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -108,7 +110,31 @@ const fakeChatModel: ChatModel = {
     capturedRequests.push({
       messages: request.messages,
       reasoningEffort: request.reasoningEffort,
+      ...(request.tools ? { tools: request.tools } : {}),
     });
+
+    if (latestUserText(request).includes("工具调用")) {
+      if (!request.tools?.web_search) {
+        throw new Error("测试 Generation 没有收到 web_search Tool");
+      }
+      yield {
+        type: "tool-call",
+        partId: "tool-call:search-1",
+        toolCallId: "search-1",
+        toolName: "web_search",
+        input: { query: "Redis latest" },
+      };
+      yield {
+        type: "tool-result",
+        partId: "tool-result:search-1",
+        toolCallId: "search-1",
+        output: { results: [{ title: "Redis", url: "https://redis.io/" }] },
+        isError: false,
+      };
+      yield { type: "text", partId: "tool-answer", delta: "查询完成" };
+      yield { type: "finish", reason: "stop" };
+      return;
+    }
 
     if (latestUserText(request).includes("触发失败")) {
       yield { type: "text", partId: "failed-text", delta: "部分" };
@@ -184,6 +210,23 @@ const worker = createBullMqGenerationWorker({
           throw new Error("Chat 不能删除图片");
         },
       },
+      toolResolver: {
+        async resolve(selection) {
+          return {
+            tools: selection.webSearch
+              ? {
+                  web_search: tool({
+                    description: "测试联网搜索",
+                    inputSchema: z.object({ query: z.string() }),
+                    execute: async ({ query }) => ({ query, results: [] }),
+                  }),
+                }
+              : undefined,
+            toPublicToolName: (runtimeName) => runtimeName,
+            close: async () => {},
+          };
+        },
+      },
       coalescing: { maxDelayMs: 1000, maxCharacters: 128 },
       createAssistantMessageId: () => `assistant-${randomUUID()}`,
     }),
@@ -194,6 +237,7 @@ async function createQueuedGeneration(input: {
   conversationId: string;
   userMessageId: string;
   parts: CreateGenerationRequest["parts"];
+  tools?: CreateGenerationRequest["tools"];
 }) {
   const result = await createGenerationCommandRecord(
     {
@@ -207,6 +251,7 @@ async function createQueuedGeneration(input: {
       userMessageId: input.userMessageId,
       parts: input.parts,
       reasoningEffort: "medium",
+      tools: input.tools ?? { webSearch: false, mcpToolIds: [] },
       conversationTitle: "Worker Integration",
       now: new Date(),
     },
@@ -233,6 +278,7 @@ async function createExistingQueuedGeneration(input: {
       userMessageId: input.userMessageId,
       parts: input.parts,
       reasoningEffort: "medium",
+      tools: { webSearch: false, mcpToolIds: [] },
       conversationTitle: "不会用于已有 Conversation",
       now: new Date(),
     },
@@ -466,6 +512,84 @@ describe("Chat Generation Worker 主链", () => {
         where: (table, { eq }) => eq(table.conversationId, conversationId),
       }),
     ).toHaveLength(2);
+  });
+
+  it("把 Tool 事件写入 Redis，并按原顺序持久化到 Assistant Message", async () => {
+    const generationId = `worker-tool-generation-${randomUUID()}`;
+    const conversationId = `worker-tool-conversation-${randomUUID()}`;
+    await createQueuedGeneration({
+      generationId,
+      conversationId,
+      userMessageId: `worker-tool-message-${randomUUID()}`,
+      parts: [{ type: "text", text: "执行一次工具调用" }],
+      tools: { webSearch: true, mcpToolIds: [] },
+    });
+
+    const job = await enqueue(generationId);
+    await job.waitUntilFinished(queueEvents, 5_000);
+
+    expect(Object.keys(capturedRequests.at(-1)?.tools ?? {})).toEqual([
+      "web_search",
+    ]);
+    expect(
+      (await eventReader.read({ generationId })).map((entry) => entry.event),
+    ).toEqual([
+      { type: "generation.started", generationId },
+      {
+        type: "tool.call",
+        generationId,
+        partId: "tool-call:search-1",
+        toolCallId: "search-1",
+        toolName: "web_search",
+        input: { query: "Redis latest" },
+      },
+      {
+        type: "tool.result",
+        generationId,
+        partId: "tool-result:search-1",
+        toolCallId: "search-1",
+        output: {
+          results: [{ title: "Redis", url: "https://redis.io/" }],
+        },
+        isError: false,
+      },
+      {
+        type: "text.delta",
+        generationId,
+        partId: "tool-answer",
+        delta: "查询完成",
+      },
+      { type: "generation.completed", generationId },
+    ]);
+    await expect(
+      database.db.query.messages.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.conversationId, conversationId),
+            eq(table.role, "assistant"),
+          ),
+      }),
+    ).resolves.toMatchObject({
+      parts: [
+        {
+          id: "tool-call:search-1",
+          type: "tool-call",
+          toolCallId: "search-1",
+          toolName: "web_search",
+          input: { query: "Redis latest" },
+        },
+        {
+          id: "tool-result:search-1",
+          type: "tool-result",
+          toolCallId: "search-1",
+          output: {
+            results: [{ title: "Redis", url: "https://redis.io/" }],
+          },
+          isError: false,
+        },
+        { id: "tool-answer", type: "text", text: "查询完成" },
+      ],
+    });
   });
 
   it("下一轮从 PostgreSQL 重建可见 reasoning 与 text", async () => {

@@ -1,5 +1,6 @@
 import type {
   GenerationStatusDto,
+  GenerationToolSelectionDto,
   ReasoningEffortDto,
   RegenerateGenerationRequest,
 } from "@ai-chat/contracts";
@@ -16,6 +17,7 @@ export type RegenerationCommandRecord = {
   userMessageId: string;
   status: GenerationStatusDto;
   reasoningEffort: ReasoningEffortDto;
+  tools: GenerationToolSelectionDto;
   createdAt: Date;
 };
 
@@ -106,6 +108,8 @@ export async function createRegenerationCommandRecord(
       .select({
         userMessageId: generations.userMessageId,
         reasoningEffort: generations.reasoningEffort,
+        webSearchEnabled: generations.webSearchEnabled,
+        mcpToolIds: generations.mcpToolIds,
       })
       .from(generations)
       .where(eq(generations.assistantMessageId, assistantMessage.id))
@@ -133,6 +137,8 @@ export async function createRegenerationCommandRecord(
         userMessageId: sourceGeneration.userMessageId,
         status: "queued",
         reasoningEffort: sourceGeneration.reasoningEffort,
+        webSearchEnabled: sourceGeneration.webSearchEnabled,
+        mcpToolIds: sourceGeneration.mcpToolIds,
         createdAt: input.now,
       })
       .returning({
@@ -141,12 +147,16 @@ export async function createRegenerationCommandRecord(
         userMessageId: generations.userMessageId,
         status: generations.status,
         reasoningEffort: generations.reasoningEffort,
+        webSearchEnabled: generations.webSearchEnabled,
+        mcpToolIds: generations.mcpToolIds,
         createdAt: generations.createdAt,
       });
 
     if (!generation || !generation.reasoningEffort) {
       throw new Error("创建 Regeneration 后数据库没有返回记录");
     }
+
+    const { webSearchEnabled, mcpToolIds, ...generationRecord } = generation;
 
     await transaction
       .update(conversations)
@@ -156,8 +166,12 @@ export async function createRegenerationCommandRecord(
     return {
       kind: "created",
       generation: {
-        ...generation,
+        ...generationRecord,
         reasoningEffort: generation.reasoningEffort,
+        tools: {
+          webSearch: webSearchEnabled,
+          mcpToolIds,
+        },
       },
     };
   });

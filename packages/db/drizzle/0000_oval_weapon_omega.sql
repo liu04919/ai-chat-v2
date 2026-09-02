@@ -83,6 +83,8 @@ CREATE TABLE "generations" (
 	"assistant_message_id" text,
 	"status" "generation_status" DEFAULT 'queued' NOT NULL,
 	"reasoning_effort" "reasoning_effort",
+	"web_search_enabled" boolean DEFAULT false NOT NULL,
+	"mcp_tool_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"error_code" text,
 	"cancel_requested_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

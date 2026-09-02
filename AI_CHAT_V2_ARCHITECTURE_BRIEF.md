@@ -158,11 +158,14 @@ Browser、Web/API 与 Worker 之间的可序列化契约集中在 `packages/cont
 generation.started
 text.delta       # 携带 partId
 reasoning.delta  # 携带 partId；上游实际提供时才有
+tool.call         # 携带 partId、toolCallId、toolName 与 input
+tool.result       # 携带 partId、toolCallId、toolName、output 与 isError
 generation.completed
 generation.failed
+generation.cancelled
 ```
 
-取消链路实现时再增加 `generation.cancelled`；Tool 和来源能力接入时再增加 `tool.called`、`tool.completed`、`source.added`。不得提前实现没有调用方的未来事件。
+Tool 事件只表达已经实际发生的模型调用与执行结果，顺序与 Assistant Message Parts 一致。来源引用尚无真实调用方，当前不增加 `source.added`。
 
 Redis Stream 和 SSE 传输同一个 GenerationEvent，不再定义第二套 SSE 业务协议。Redis Stream ID 默认直接作为 SSE `id` 和恢复 cursor；只有出现明确需求并经开发者确认后才能增加映射层。
 
@@ -194,7 +197,7 @@ POST 不运行模型，不把生成生命周期绑在 HTTP 请求上。
 
 ### 重新生成命令
 
-重新生成只作用于 Chat 会话最末尾的 Assistant Message。客户端只提交 `conversationId` 和 `assistantMessageId`；服务端沿用原回答关联的 User Message、Attachment 与 reasoning effort，不新增 User Message。
+重新生成只作用于 Chat 会话最末尾的 Assistant Message。客户端只提交 `conversationId` 和 `assistantMessageId`；服务端沿用原回答关联的 User Message、Attachment、reasoning effort 与 Tool 选择，不新增 User Message。
 
 服务端接受命令时在同一事务中删除旧 Assistant Message，并创建复用原 User Message 与 reasoning effort 的 queued Generation。此后它与普通 Generation 共用完全相同的 Worker 与持久化路径：成功保存完整回答，用户取消保存已有 partial，没有可见输出或失败时不创建 Assistant Message。浏览器点击后乐观移除旧回答，请求未成立才恢复缓存。第一版不做回答版本树，不支持 Image 会话重新生成。
 
@@ -286,11 +289,13 @@ LLM Tools 必须能由 Worker 独立执行。当前不支持浏览器执行 Tool
 
 Tool Registry 负责本地 Tool、联网搜索与 Model Context Protocol（MCP）工具的统一暴露；协议编排优先使用 AI SDK 已有能力，不自研通用 Tool Calling engine。
 
+Generation 持久化本次 Tool 选择：`webSearch` 表示是否注入本地 `web_search`，`mcpToolIds` 保存选中的稳定 MCP 工具 ID。Worker 根据选择解析可执行 ToolSet；启用了 Tavily 或 MCP 工具却缺少相应服务端配置时必须明确失败，不能静默忽略用户选择。
+
 网站只连接独立部署的远程 Streamable HTTP MCP Server，不在 Web/Worker 中通过 `command`、`npx` 或 stdio 为用户启动本地子进程。MCP Server 保留来源命名空间，工具目录使用稳定的 `serverId.toolName` 标识；连接 URL、Bearer Token 与第三方 AK 只存在于服务端配置，不进入浏览器、Message 或 Generation 数据。
 
-首批 Server 是自建 `fortune-mcp-server` 与百度地图官方远程 MCP。Server 的 tools/list 结果可以短期缓存，但每次实际调用仍按来源路由回原 Server。用户勾选的 MCP Tool 只属于本次 Chat Generation，不永久绑定 Conversation；未勾选的工具不得注入该次模型请求。
+首批 Server 是自建 `fortune-mcp-server` 与百度地图官方远程 MCP。工具发现和执行统一来自 MCP Client 的 `tools()`；目录结果可以短期缓存，但每次实际调用仍按来源路由回原 Server，且 Client 必须存活到该次模型流结束。用户勾选的 MCP Tool 只属于本次 Chat Generation，不永久绑定 Conversation；未勾选的工具不得注入该次模型请求。
 
-联网搜索在输入框中保留独立开关，不作为 MCP 工具目录中的一个 Server 展示；Worker 内部仍可把它作为本次 Generation 的 Tool 注入模型。
+联网搜索在输入框中保留独立开关，不作为 MCP 工具目录中的一个 Server 展示；当前使用 Tavily Search API 实现本地 `web_search` Tool。请求只返回回答所需的精简来源字段，不持久化 Tavily 原始响应。
 
 ### Retrieval 与知识入库
 

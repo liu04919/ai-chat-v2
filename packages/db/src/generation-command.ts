@@ -1,5 +1,6 @@
 import type {
   CreateGenerationRequest,
+  GenerationToolSelectionDto,
   GenerationStatusDto,
   ReasoningEffortDto,
   UserMessagePartsDto,
@@ -30,6 +31,7 @@ export type GenerationCommandRecord = {
   userMessageId: string;
   status: GenerationStatusDto;
   reasoningEffort: ReasoningEffortDto | null;
+  tools: GenerationToolSelectionDto;
   createdAt: Date;
 };
 
@@ -60,6 +62,8 @@ type ExistingCommandRow = {
   generationId: string | null;
   generationStatus: GenerationStatusDto | null;
   reasoningEffort: ReasoningEffortDto | null;
+  webSearchEnabled: boolean | null;
+  mcpToolIds: string[] | null;
   generationCreatedAt: Date | null;
 };
 
@@ -97,6 +101,8 @@ async function findExistingCommand(
       generationId: generations.id,
       generationStatus: generations.status,
       reasoningEffort: generations.reasoningEffort,
+      webSearchEnabled: generations.webSearchEnabled,
+      mcpToolIds: generations.mcpToolIds,
       generationCreatedAt: generations.createdAt,
     })
     .from(messages)
@@ -128,6 +134,13 @@ function resolveExistingCommand(
     existing.ownerId !== input.ownerId ||
     !targetMatches ||
     !messagePartsEqual(existing.parts, input.parts) ||
+    existing.reasoningEffort !== input.reasoningEffort ||
+    existing.webSearchEnabled !== input.tools.webSearch ||
+    !existing.mcpToolIds ||
+    existing.mcpToolIds.length !== input.tools.mcpToolIds.length ||
+    existing.mcpToolIds.some(
+      (toolId, index) => toolId !== input.tools.mcpToolIds[index],
+    ) ||
     !existing.generationId ||
     !existing.generationStatus ||
     !existing.generationCreatedAt
@@ -143,6 +156,10 @@ function resolveExistingCommand(
       userMessageId: input.userMessageId,
       status: existing.generationStatus,
       reasoningEffort: existing.reasoningEffort,
+      tools: {
+        webSearch: existing.webSearchEnabled,
+        mcpToolIds: existing.mcpToolIds,
+      },
       createdAt: existing.generationCreatedAt,
     },
   };
@@ -219,7 +236,10 @@ export async function createGenerationCommandRecord(
 
       if (
         (conversation.mode === "chat" && input.reasoningEffort === null) ||
-        (conversation.mode === "image" && input.reasoningEffort !== null)
+        (conversation.mode === "image" &&
+          (input.reasoningEffort !== null ||
+            input.tools.webSearch ||
+            input.tools.mcpToolIds.length > 0))
       ) {
         return { kind: "invalid_request" };
       }
@@ -336,6 +356,8 @@ export async function createGenerationCommandRecord(
           userMessageId: input.userMessageId,
           status: "queued",
           reasoningEffort: input.reasoningEffort,
+          webSearchEnabled: input.tools.webSearch,
+          mcpToolIds: input.tools.mcpToolIds,
           createdAt: input.now,
         })
         .returning({
@@ -344,6 +366,8 @@ export async function createGenerationCommandRecord(
           userMessageId: generations.userMessageId,
           status: generations.status,
           reasoningEffort: generations.reasoningEffort,
+          webSearchEnabled: generations.webSearchEnabled,
+          mcpToolIds: generations.mcpToolIds,
           createdAt: generations.createdAt,
         });
 
@@ -351,12 +375,24 @@ export async function createGenerationCommandRecord(
         throw new Error("创建 Generation 后数据库没有返回记录");
       }
 
+      const { webSearchEnabled, mcpToolIds, ...generationRecord } =
+        generation;
+
       await transaction
         .update(conversations)
         .set({ updatedAt: input.now })
         .where(eq(conversations.id, conversation.id));
 
-      return { kind: "created", generation };
+      return {
+        kind: "created",
+        generation: {
+          ...generationRecord,
+          tools: {
+            webSearch: webSearchEnabled,
+            mcpToolIds,
+          },
+        },
+      };
     });
   } catch (error) {
     if (isPostgresConstraintError(error, "messages_pkey")) {
