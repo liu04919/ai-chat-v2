@@ -98,10 +98,6 @@ export const generations = pgTable(
     assistantMessageId: text("assistant_message_id")
       .unique()
       .references(() => messages.id, { onDelete: "set null" }),
-    replacesAssistantMessageId: text("replaces_assistant_message_id").references(
-      () => messages.id,
-      { onDelete: "set null" },
-    ),
     status: generationStatus("status").default("queued").notNull(),
     reasoningEffort: reasoningEffort("reasoning_effort").$type<ReasoningEffortDto>(),
     errorCode: text("error_code"),

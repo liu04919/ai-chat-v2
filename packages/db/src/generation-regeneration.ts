@@ -119,13 +119,18 @@ export async function createRegenerationCommandRecord(
       return { kind: "regeneration_not_allowed" };
     }
 
+    // 重新生成没有回答版本切换：命令一旦成立，旧回答立即退出历史。
+    // 后续 Worker 与普通 Generation 共用同一套完成、取消和失败语义。
+    await transaction
+      .delete(messages)
+      .where(eq(messages.id, assistantMessage.id));
+
     const [generation] = await transaction
       .insert(generations)
       .values({
         id: input.generationId,
         conversationId: conversation.id,
         userMessageId: sourceGeneration.userMessageId,
-        replacesAssistantMessageId: assistantMessage.id,
         status: "queued",
         reasoningEffort: sourceGeneration.reasoningEffort,
         createdAt: input.now,

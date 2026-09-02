@@ -29,7 +29,6 @@ describe("Conversation response schemas", () => {
         id: "generation_example",
         status: "running",
         cancelRequestedAt: null,
-        replacesAssistantMessageId: null,
       },
       messages: [
         {
@@ -102,7 +101,6 @@ describe("Conversation response schemas", () => {
             id: "g1",
             status,
             cancelRequestedAt: null,
-            replacesAssistantMessageId: null,
           },
         }),
       ).toThrow();

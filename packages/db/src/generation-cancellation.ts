@@ -160,7 +160,6 @@ export async function cancelGenerationExecution(
         conversationId: generations.conversationId,
         status: generations.status,
         cancelRequestedAt: generations.cancelRequestedAt,
-        replacesAssistantMessageId: generations.replacesAssistantMessageId,
       })
       .from(generations)
       .where(eq(generations.id, input.generationId))
@@ -176,7 +175,6 @@ export async function cancelGenerationExecution(
     }
 
     const shouldPersistPartial =
-      !generation.replacesAssistantMessageId &&
       input.assistantMessageId !== null &&
       assistantParts.length > 0;
 

@@ -9,7 +9,6 @@ const queued = {
   id: "g1",
   status: "queued" as const,
   cancelRequestedAt: null,
-  replacesAssistantMessageId: null,
 };
 const projection = createGenerationProjection("c1", "g1");
 const getImageGenerationStatus = (

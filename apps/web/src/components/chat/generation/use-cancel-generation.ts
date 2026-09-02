@@ -54,8 +54,6 @@ export function cancelGenerationMutationOptions(queryClient: QueryClient) {
                   id,
                   status,
                   cancelRequestedAt,
-                  replacesAssistantMessageId:
-                    current.activeGeneration.replacesAssistantMessageId,
                 }
               : null;
 

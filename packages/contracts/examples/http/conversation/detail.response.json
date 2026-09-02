@@ -10,8 +10,7 @@
   "activeGeneration": {
     "id": "generation_example",
     "status": "running",
-    "cancelRequestedAt": null,
-    "replacesAssistantMessageId": null
+    "cancelRequestedAt": null
   },
   "latestGeneration": {
     "id": "generation_example",

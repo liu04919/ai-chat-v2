@@ -112,17 +112,14 @@ async function recordCancellation(
   dependencies: ExecuteChatGenerationDependencies,
 ): Promise<Extract<ExecuteChatGenerationResult, { kind: "cancelled" }>> {
   const generationId = execution.id;
-  const visibleParts = execution.replacesAssistantMessageId
-    ? []
-    : assistantParts;
   const assistantMessageId =
-    visibleParts.length > 0
+    assistantParts.length > 0
       ? (dependencies.createAssistantMessageId ?? randomUUID)()
       : null;
   const cancelled = await cancelGenerationExecution({
     generationId,
     assistantMessageId,
-    assistantParts: visibleParts,
+    assistantParts,
     now: (dependencies.now ?? (() => new Date()))(),
   });
 

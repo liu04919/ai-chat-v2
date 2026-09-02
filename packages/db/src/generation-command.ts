@@ -103,10 +103,7 @@ async function findExistingCommand(
     .innerJoin(conversations, eq(conversations.id, messages.conversationId))
     .leftJoin(
       generations,
-      and(
-        eq(generations.userMessageId, messages.id),
-        isNull(generations.replacesAssistantMessageId),
-      ),
+      eq(generations.userMessageId, messages.id),
     )
     .where(and(eq(messages.id, userMessageId), eq(messages.role, "user")))
     .orderBy(asc(generations.createdAt))

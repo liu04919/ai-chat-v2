@@ -64,7 +64,6 @@ function createDetail(running = false): ConversationDetailResponse {
           id: generationId,
           status: "running",
           cancelRequestedAt: null,
-          replacesAssistantMessageId: null,
         }
       : null,
     messages: [
@@ -204,7 +203,6 @@ describe("创建 Generation mutation", () => {
       id: generationId,
       status: "queued",
       cancelRequestedAt: null,
-      replacesAssistantMessageId: null,
     });
     expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true);
     expect(mutation.getCurrentResult().isPending).toBe(false);
@@ -308,12 +306,28 @@ describe("重新生成 mutation", () => {
     setDetail(detail);
   });
 
-  it("命令确认后标记被替换的回答，同时保留旧消息等待终态", async () => {
+  it("点击后立即乐观移除旧回答，命令确认后进入普通 active Generation", async () => {
     useGenerationProjectionStore
       .getState()
       .start(conversationId, "stale_generation");
-    const fetchMock = vi.fn().mockResolvedValue(
-      Response.json({
+    const deferred = Promise.withResolvers<Response>();
+    const fetchMock = vi.fn().mockReturnValue(deferred.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const mutation = new MutationObserver(
+      queryClient,
+      regenerateGenerationMutationOptions(queryClient),
+    );
+
+    const regenerating = mutation.mutate({ conversationId, assistantMessageId });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    expect(getDetail()?.messages).toHaveLength(1);
+    expect(getDetail()?.messages.at(-1)?.role).toBe("user");
+    expect(
+      useGenerationProjectionStore.getState().projections[conversationId],
+    ).toBeUndefined();
+
+    deferred.resolve(Response.json({
         conversationId,
         generation: {
           id: generationId,
@@ -322,34 +336,42 @@ describe("重新生成 mutation", () => {
           reasoningEffort: "medium",
           createdAt: now,
         },
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    const mutation = new MutationObserver(
-      queryClient,
-      regenerateGenerationMutationOptions(queryClient),
-    );
-
-    await mutation.mutate({ conversationId, assistantMessageId });
+      }));
+    await regenerating;
 
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toEqual({
       conversationId,
       assistantMessageId,
     });
-    expect(getDetail()?.messages.at(-1)).toMatchObject({
-      id: assistantMessageId,
-      parts: [{ id: "old-text", type: "text", text: "旧回答" }],
-    });
+    expect(getDetail()?.messages).toHaveLength(1);
     expect(getDetail()?.activeGeneration).toEqual({
       id: generationId,
       status: "queued",
       cancelRequestedAt: null,
-      replacesAssistantMessageId: assistantMessageId,
     });
-    expect(
-      useGenerationProjectionStore.getState().projections[conversationId],
-    ).toBeUndefined();
+  });
+
+  it("重新生成请求未成立时恢复乐观移除的旧回答", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({ code: "QUEUE_UNAVAILABLE" }, { status: 503 }),
+      ),
+    );
+    const mutation = new MutationObserver(
+      queryClient,
+      regenerateGenerationMutationOptions(queryClient),
+    );
+
+    await expect(
+      mutation.mutate({ conversationId, assistantMessageId }),
+    ).rejects.toThrow("生成服务暂时不可用，请重试");
+
+    expect(getDetail()?.messages.at(-1)).toMatchObject({
+      id: assistantMessageId,
+      parts: [{ id: "old-text", type: "text", text: "旧回答" }],
+    });
   });
 
   it("只允许当前详情中位于末尾的 Assistant Message", async () => {
@@ -412,7 +434,6 @@ describe("停止 Generation mutation", () => {
       id: generationId,
       status: "running",
       cancelRequestedAt: now,
-      replacesAssistantMessageId: null,
     });
     expect(
       useGenerationProjectionStore.getState().projections[conversationId],

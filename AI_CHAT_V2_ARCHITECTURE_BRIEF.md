@@ -196,7 +196,7 @@ POST 不运行模型，不把生成生命周期绑在 HTTP 请求上。
 
 重新生成只作用于 Chat 会话最末尾的 Assistant Message。客户端只提交 `conversationId` 和 `assistantMessageId`；服务端沿用原回答关联的 User Message、Attachment 与 reasoning effort，不新增 User Message。
 
-Worker 构建上下文时截止到被替换回答之前。生成期间 PostgreSQL 继续保留旧回答，浏览器仅在展示层用新流临时占据原位置；成功后事务内更新同一条 Assistant Message 的 parts，保持原 Message ID 与 sequence。失败或取消不持久化新流的半截内容，旧回答恢复显示。第一版不做回答版本树，不支持 Image 会话重新生成。
+服务端接受命令时在同一事务中删除旧 Assistant Message，并创建复用原 User Message 与 reasoning effort 的 queued Generation。此后它与普通 Generation 共用完全相同的 Worker 与持久化路径：成功保存完整回答，用户取消保存已有 partial，没有可见输出或失败时不创建 Assistant Message。浏览器点击后乐观移除旧回答，请求未成立才恢复缓存。第一版不做回答版本树，不支持 Image 会话重新生成。
 
 ### 事件订阅与恢复
 
@@ -215,7 +215,7 @@ Reader 先用非阻塞批量读取追到当前最新 cursor，再从同一 curso
 首次消费从 stream beginning 开始；自动重连从 `Last-Event-ID` 之后继续。页面刷新时：
 
 1. 浏览器获取 Chat Detail
-2. 服务端从 PostgreSQL 返回持久化 Message 与 `activeGeneration: { id, status, cancelRequestedAt, replacesAssistantMessageId } | null`
+2. 服务端从 PostgreSQL 返回持久化 Message 与 `activeGeneration: { id, status, cancelRequestedAt } | null`
 3. 存在 Active Generation 时，浏览器使用该 ID 重新建立 EventSource
 
 浏览器不得根据 Redis、本地缓存、旧连接或 UI 残留状态猜测 Active Generation。首次消费和恢复使用同一 endpoint 与同一事件协议，不增加 Snapshot Stream 或 recovery 专用协议。
@@ -349,10 +349,7 @@ Context Builder 在每次 Generation 中统一组合 Summary、近期 Messages�
 
 ### Regenerate
 
-Regenerate 只针对最后一条 Assistant Message，并创建新的 Generation。运行时可以隐藏旧回答，但不能提前删除：
-
-- 新回答成功：在 PostgreSQL transaction 中删除旧 Assistant Message 并写入新回答
-- 新回答失败或取消：保留旧回答
+Regenerate 只针对最后一条 Assistant Message，并创建新的 Generation。命令成立时旧回答立即删除；新 Generation 与普通 Generation 使用相同的完成、取消和失败保存规则，不保留或恢复旧回答。
 
 当前不支持任意历史 User Message 编辑、Conversation Branch、回答版本树或多个 selected/superseded 回答。
 

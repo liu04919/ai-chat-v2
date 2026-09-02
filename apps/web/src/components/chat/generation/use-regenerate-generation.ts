@@ -51,6 +51,23 @@ export function regenerateGenerationMutationOptions(queryClient: QueryClient) {
       }
 
       useGenerationProjectionStore.getState().clear(request.conversationId);
+      queryClient.setQueryData<ConversationHistoryData>(
+        queryKey,
+        (current) =>
+          current
+            ? {
+                ...current,
+                pages: current.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.filter(
+                    (message) => message.id !== request.assistantMessageId,
+                  ),
+                })),
+              }
+            : current,
+      );
+
+      return history;
     },
     onSuccess: (response, request) => {
       const { id, status } = response.generation;
@@ -62,7 +79,6 @@ export function regenerateGenerationMutationOptions(queryClient: QueryClient) {
                 id,
                 status,
                 cancelRequestedAt: null,
-                replacesAssistantMessageId: request.assistantMessageId,
               }
             : null,
         latestGeneration: { id, status },
@@ -70,7 +86,13 @@ export function regenerateGenerationMutationOptions(queryClient: QueryClient) {
       invalidateConversationHistory(queryClient, request.conversationId);
       void queryClient.invalidateQueries({ queryKey: conversationListQueryKey });
     },
-    onError: (_error, request) => {
+    onError: (_error, request, previousHistory) => {
+      if (previousHistory) {
+        queryClient.setQueryData(
+          conversationDetailQueryKey(request.conversationId),
+          previousHistory,
+        );
+      }
       invalidateConversationHistory(queryClient, request.conversationId);
     },
   });

@@ -6,7 +6,6 @@ import { buildImageModelRequest } from "./image-context-builder";
 function execution(): ClaimedGenerationExecution {
   return {
     id: "generation",
-    replacesAssistantMessageId: null,
     conversationId: "conversation",
     ownerId: "owner",
     userMessageId: "current",

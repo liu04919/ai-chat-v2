@@ -514,7 +514,7 @@ describe("Chat Generation Worker 主链", () => {
     });
   });
 
-  it("重新生成只携带目标回答之前的上下文，并原位替换同一条 Assistant Message", async () => {
+  it("重新生成先删除旧回答，再沿用普通 Generation 路径保存新回答", async () => {
     const conversationId = `worker-regenerate-conversation-${randomUUID()}`;
     const userMessageId = `worker-regenerate-user-${randomUUID()}`;
     const assistantMessageId = `worker-regenerate-assistant-${randomUUID()}`;
@@ -539,9 +539,7 @@ describe("Chat Generation Worker 主链", () => {
       database.db.query.messages.findFirst({
         where: (table, { eq }) => eq(table.id, assistantMessageId),
       }),
-    ).resolves.toMatchObject({
-      parts: [{ id: "old-text", type: "text", text: "旧回答" }],
-    });
+    ).resolves.toBeUndefined();
 
     const job = await enqueue(regenerationId);
     await job.waitUntilFinished(queueEvents, 5_000);
@@ -555,15 +553,13 @@ describe("Chat Generation Worker 主链", () => {
         },
       ],
     });
-    await expect(
-      database.db.query.messages.findMany({
-        where: (table, { eq }) => eq(table.conversationId, conversationId),
-        orderBy: (table, { asc }) => asc(table.sequence),
-      }),
-    ).resolves.toMatchObject([
+    const persistedMessages = await database.db.query.messages.findMany({
+      where: (table, { eq }) => eq(table.conversationId, conversationId),
+      orderBy: (table, { asc }) => asc(table.sequence),
+    });
+    expect(persistedMessages).toMatchObject([
       { id: userMessageId, role: "user", sequence: 0 },
       {
-        id: assistantMessageId,
         role: "assistant",
         sequence: 1,
         parts: [
@@ -572,6 +568,7 @@ describe("Chat Generation Worker 主链", () => {
         ],
       },
     ]);
+    expect(persistedMessages[1]?.id).not.toBe(assistantMessageId);
     await expect(
       database.db.query.generations.findFirst({
         where: (table, { eq }) => eq(table.id, sourceGenerationId),
@@ -583,12 +580,11 @@ describe("Chat Generation Worker 主链", () => {
       }),
     ).resolves.toMatchObject({
       status: "completed",
-      assistantMessageId,
-      replacesAssistantMessageId: assistantMessageId,
+      assistantMessageId: persistedMessages[1]?.id,
     });
   });
 
-  it("重新生成被停止时丢弃半截新流，并保留原回答", async () => {
+  it("重新生成被停止时与普通生成一样保存半截新流", async () => {
     const conversationId = `worker-regenerate-cancel-conversation-${randomUUID()}`;
     const userMessageId = `worker-regenerate-cancel-user-${randomUUID()}`;
     const assistantMessageId = `worker-regenerate-cancel-assistant-${randomUUID()}`;
@@ -627,14 +623,13 @@ describe("Chat Generation Worker 主链", () => {
     ).resolves.toMatchObject([
       { id: userMessageId, role: "user", sequence: 0 },
       {
-        id: assistantMessageId,
         role: "assistant",
         sequence: 1,
         parts: [
           {
-            id: "old-text",
-            type: "text",
-            text: "必须保留的旧回答",
+            id: "cancel-reasoning",
+            type: "reasoning",
+            text: "分析到一半",
           },
         ],
       },
@@ -645,14 +640,56 @@ describe("Chat Generation Worker 主链", () => {
       }),
     ).resolves.toMatchObject({
       status: "cancelled",
-      assistantMessageId: null,
-      replacesAssistantMessageId: assistantMessageId,
+      assistantMessageId: expect.any(String),
     });
     await expect(
       database.db.query.generations.findFirst({
         where: (table, { eq }) => eq(table.id, sourceGenerationId),
       }),
-    ).resolves.toMatchObject({ assistantMessageId });
+    ).resolves.toMatchObject({ assistantMessageId: null });
+  });
+
+  it("重新生成失败时不恢复已经删除的旧回答", async () => {
+    const conversationId = `worker-regenerate-fail-conversation-${randomUUID()}`;
+    const userMessageId = `worker-regenerate-fail-user-${randomUUID()}`;
+    const assistantMessageId = `worker-regenerate-fail-assistant-${randomUUID()}`;
+    const sourceGenerationId = `worker-regenerate-fail-source-${randomUUID()}`;
+    const regenerationId = `worker-regenerate-fail-${randomUUID()}`;
+    await seedCompletedAnswer({
+      conversationId,
+      userMessageId,
+      assistantMessageId,
+      sourceGenerationId,
+      userText: "触发失败",
+      assistantText: "不会恢复的旧回答",
+    });
+    await createQueuedRegeneration({
+      generationId: regenerationId,
+      conversationId,
+      assistantMessageId,
+    });
+
+    const job = await enqueue(regenerationId);
+    await expect(job.waitUntilFinished(queueEvents, 5_000)).rejects.toThrow(
+      "Fake LLM failure",
+    );
+
+    await expect(
+      database.db.query.messages.findMany({
+        where: (table, { eq }) => eq(table.conversationId, conversationId),
+      }),
+    ).resolves.toMatchObject([
+      { id: userMessageId, role: "user", sequence: 0 },
+    ]);
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, regenerationId),
+      }),
+    ).resolves.toMatchObject({
+      status: "failed",
+      assistantMessageId: null,
+      errorCode: "CHAT_GENERATION_FAILED",
+    });
   });
 
   it("模型流失败时保留已发布 delta，并把 Generation 标记为 failed", async () => {

@@ -44,7 +44,6 @@ describe("Generation projection store", () => {
     ).toEqual({
       conversationId,
       generationId,
-      replacesAssistantMessageId: null,
       status: "running",
       hasStarted: true,
       parts: [{ id: "text_1", type: "text", text: "你好" }],

@@ -101,8 +101,6 @@ export function ConversationWorkspace({
   useGenerationEventStream({
     conversationId,
     generationId: activeGenerationId,
-    replacesAssistantMessageId:
-      detail.activeGeneration?.replacesAssistantMessageId ?? null,
     onTerminal: handleTerminal,
   });
 
@@ -145,13 +143,7 @@ export function ConversationWorkspace({
     conversation.mode === "image" ? ImageIcon : MessageSquareText;
   const isGenerating =
     detail.activeGeneration !== null || regenerateMutation.isPending;
-  const replacedAssistantMessageId =
-    detail.activeGeneration?.replacesAssistantMessageId ?? null;
-  const messages = replacedAssistantMessageId
-    ? history.messages.filter(
-        (message) => message.id !== replacedAssistantMessageId,
-      )
-    : history.messages;
+  const messages = history.messages;
   const latestAssistantMessageId = history.messages.findLast(
     (message) => message.role === "assistant",
   )?.id;

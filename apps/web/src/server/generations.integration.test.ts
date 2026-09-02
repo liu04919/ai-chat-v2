@@ -410,10 +410,19 @@ describe("Generation regeneration service", () => {
       }),
     ).resolves.toMatchObject({
       userMessageId,
-      replacesAssistantMessageId: assistantMessageId,
       reasoningEffort: "high",
       status: "queued",
     });
+    await expect(
+      database.db.query.messages.findFirst({
+        where: (table, { eq }) => eq(table.id, assistantMessageId),
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      database.db.query.generations.findFirst({
+        where: (table, { eq }) => eq(table.id, sourceGenerationId),
+      }),
+    ).resolves.toMatchObject({ assistantMessageId: null });
   });
 
   it("拒绝重新生成非末尾回答，并且不创建新 Generation", async () => {

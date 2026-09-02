@@ -81,7 +81,6 @@ CREATE TABLE "generations" (
 	"conversation_id" text NOT NULL,
 	"user_message_id" text NOT NULL,
 	"assistant_message_id" text,
-	"replaces_assistant_message_id" text,
 	"status" "generation_status" DEFAULT 'queued' NOT NULL,
 	"reasoning_effort" "reasoning_effort",
 	"error_code" text,
@@ -109,7 +108,6 @@ ALTER TABLE "conversations" ADD CONSTRAINT "conversations_owner_id_user_id_fk" F
 ALTER TABLE "generations" ADD CONSTRAINT "generations_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "generations" ADD CONSTRAINT "generations_user_message_id_messages_id_fk" FOREIGN KEY ("user_message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "generations" ADD CONSTRAINT "generations_assistant_message_id_messages_id_fk" FOREIGN KEY ("assistant_message_id") REFERENCES "public"."messages"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "generations" ADD CONSTRAINT "generations_replaces_assistant_message_id_messages_id_fk" FOREIGN KEY ("replaces_assistant_message_id") REFERENCES "public"."messages"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "messages" ADD CONSTRAINT "messages_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "account_issuer_account_id_unique" ON "account" USING btree ("issuer","account_id");--> statement-breakpoint
 CREATE INDEX "account_user_id_idx" ON "account" USING btree ("user_id");--> statement-breakpoint

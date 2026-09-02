@@ -15,7 +15,6 @@ type GenerationProjectionState = {
   start(
     conversationId: string,
     generationId: string,
-    replacesAssistantMessageId?: string | null,
   ): void;
   apply(conversationId: string, events: readonly GenerationEventDto[]): void;
   setReconnecting(conversationId: string): void;
@@ -29,12 +28,11 @@ export const useGenerationProjectionStore =
     immer((set) => ({
       projections: {},
 
-      start(conversationId, generationId, replacesAssistantMessageId = null) {
+      start(conversationId, generationId) {
         set((state) => {
           state.projections[conversationId] = createGenerationProjection(
             conversationId,
             generationId,
-            replacesAssistantMessageId,
           );
         });
       },

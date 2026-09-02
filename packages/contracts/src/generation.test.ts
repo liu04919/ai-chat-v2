@@ -19,7 +19,6 @@ describe("chatRuntimeStateSchema", () => {
           id: "gen_123",
           status: "running",
           cancelRequestedAt: null,
-          replacesAssistantMessageId: null,
         },
       }),
     ).toEqual({
@@ -27,7 +26,6 @@ describe("chatRuntimeStateSchema", () => {
         id: "gen_123",
         status: "running",
         cancelRequestedAt: null,
-        replacesAssistantMessageId: null,
       },
     });
 
@@ -37,7 +35,6 @@ describe("chatRuntimeStateSchema", () => {
           id: "gen_123",
           status: "completed",
           cancelRequestedAt: null,
-          replacesAssistantMessageId: null,
         },
       }),
     ).toThrow();
