@@ -117,6 +117,9 @@ export function VirtualMessageList({
     followOnAppend: true,
     scrollEndThreshold: 96,
     directDomUpdates: true,
+    // ref 挂载时会同步测量；React 19 不允许此时由 Virtualizer 调用 flushSync。
+    // DOM 位置与容器尺寸已经由 directDomUpdates 同步维护，React 更新可以异步提交。
+    useFlushSync: false,
     scrollToFn: (offset, options, instance) => {
       // 先扩展滚动空间，避免图片长高时浏览器把补偿位置截断到旧的底部。
       if (contentRef.current) {

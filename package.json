@@ -15,9 +15,10 @@
     }
   },
   "scripts": {
+    "dev": "pnpm infra:up && pnpm db:migrate && pnpm --parallel --filter @ai-chat/web --filter @ai-chat/worker run dev",
     "dev:web": "pnpm --filter @ai-chat/web dev",
     "dev:worker": "pnpm --filter @ai-chat/worker dev",
-    "infra:up": "docker compose up -d postgres redis",
+    "infra:up": "docker compose up -d --wait postgres redis",
     "infra:down": "docker compose down",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",

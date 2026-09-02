@@ -22,11 +22,10 @@ packages/event-store Web/Worker 共享的 Redis GenerationEvent 日志边界
 
 ```bash
 pnpm install
-pnpm db:up
-pnpm db:migrate
-pnpm dev:web
-pnpm dev:worker
+pnpm dev
 ```
+
+`pnpm dev` 会等待 Docker PostgreSQL/Redis 健康、执行数据库迁移，再并行启动 Web 与 Worker。需要单独调试时仍可使用 `pnpm dev:web` 或 `pnpm dev:worker`。
 
 Web 与 Worker 的环境变量分别参考各自的 `.env.example`。真实密钥写入对应的 `.env.local`，这些文件不会进入 Git。
 

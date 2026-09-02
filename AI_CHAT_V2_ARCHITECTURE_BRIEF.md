@@ -286,6 +286,12 @@ LLM Tools 必须能由 Worker 独立执行。当前不支持浏览器执行 Tool
 
 Tool Registry 负责本地 Tool、联网搜索与 Model Context Protocol（MCP）工具的统一暴露；协议编排优先使用 AI SDK 已有能力，不自研通用 Tool Calling engine。
 
+网站只连接独立部署的远程 Streamable HTTP MCP Server，不在 Web/Worker 中通过 `command`、`npx` 或 stdio 为用户启动本地子进程。MCP Server 保留来源命名空间，工具目录使用稳定的 `serverId.toolName` 标识；连接 URL、Bearer Token 与第三方 AK 只存在于服务端配置，不进入浏览器、Message 或 Generation 数据。
+
+首批 Server 是自建 `fortune-mcp-server` 与百度地图官方远程 MCP。Server 的 tools/list 结果可以短期缓存，但每次实际调用仍按来源路由回原 Server。用户勾选的 MCP Tool 只属于本次 Chat Generation，不永久绑定 Conversation；未勾选的工具不得注入该次模型请求。
+
+联网搜索在输入框中保留独立开关，不作为 MCP 工具目录中的一个 Server 展示；Worker 内部仍可把它作为本次 Generation 的 Tool 注入模型。
+
 ### Retrieval 与知识入库
 
 Chat 上层只依赖 Retrieval abstraction。Pinecone 是可替换的基础设施 Adapter，不得把其类型、filter DSL 或 SDK 对象泄漏到 Chat、Generation 和 Tool 主链。
