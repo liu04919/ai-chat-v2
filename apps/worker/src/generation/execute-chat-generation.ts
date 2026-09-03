@@ -271,7 +271,6 @@ export async function executeChatGeneration(
             partId: toolCall.id,
             toolCallId: toolCall.toolCallId,
             toolName: toolCall.toolName,
-            input: toolCall.input,
           });
           break;
         }
@@ -289,7 +288,6 @@ export async function executeChatGeneration(
             generationId,
             partId: toolResult.id,
             toolCallId: toolResult.toolCallId,
-            output: toolResult.output,
             isError: toolResult.isError,
           });
           break;

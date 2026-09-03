@@ -3,6 +3,7 @@ import {
   createRedisGenerationCancellationSubscriber,
   createRedisGenerationEventWriter,
 } from "@ai-chat/event-store";
+import { createConfiguredMcpServerRegistry } from "@ai-chat/mcp";
 import { createR2ObjectStorage } from "@ai-chat/storage";
 
 import { createBullMqGenerationWorker } from "./generation/bullmq-generation-worker";
@@ -10,7 +11,6 @@ import { executeGeneration } from "./generation/execute-generation";
 import { createCatApiChatModel } from "./llm/cat-api-chat-model";
 import { createCatApiImageModel } from "./llm/cat-api-image-model";
 import type { ImageModel } from "./llm/image-model";
-import { createConfiguredMcpServerRegistry } from "./mcp";
 import { createGenerationToolResolver } from "./tools";
 
 function requireEnvironment(name: string): string {

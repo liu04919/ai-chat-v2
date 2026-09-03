@@ -21,6 +21,7 @@ import {
   generationJobPayloadSchema,
 } from "./generation-command";
 import { generationEventSchema } from "./generation-event";
+import { mcpToolCatalogResponseSchema } from "./generation-tools";
 
 function readExample(name: string): unknown {
   const url = new URL(`../examples/${name}`, import.meta.url);
@@ -88,6 +89,12 @@ describe("contract examples", () => {
 
     expect(generationErrorResponseSchema.parse(error)).toEqual(error);
     expect(generationJobPayloadSchema.parse(job)).toEqual(job);
+  });
+
+  it("MCP Tool catalog response 与 Schema 保持一致", () => {
+    const response = readExample("http/tool/catalog.response.json");
+
+    expect(mcpToolCatalogResponseSchema.parse(response)).toEqual(response);
   });
 
   it.each([

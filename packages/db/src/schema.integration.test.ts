@@ -12,6 +12,7 @@ import {
   generations,
   messages,
   user,
+  userToolPreferences,
 } from "./schema/index";
 import { loadIntegrationTestEnvironment } from "./test-environment";
 
@@ -148,5 +149,30 @@ describe("PostgreSQL 业务不变量", () => {
         sizeBytes: 2048,
       }),
     ).rejects.toThrow();
+  });
+
+  it("用户工具偏好按用户唯一保存，并随用户删除", async () => {
+    await database.db.insert(userToolPreferences).values({
+      userId: ownerId,
+      mcpToolIds: ["fortune.draw_tarot_reading"],
+    });
+
+    await database.db
+      .insert(userToolPreferences)
+      .values({
+        userId: ownerId,
+        mcpToolIds: ["baidu-maps.map_weather"],
+      })
+      .onConflictDoUpdate({
+        target: userToolPreferences.userId,
+        set: { mcpToolIds: ["baidu-maps.map_weather"] },
+      });
+
+    const preferences =
+      await database.db.query.userToolPreferences.findFirst({
+        where: eq(userToolPreferences.userId, ownerId),
+      });
+
+    expect(preferences?.mcpToolIds).toEqual(["baidu-maps.map_weather"]);
   });
 });

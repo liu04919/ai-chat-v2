@@ -1,8 +1,8 @@
+import { createMcpServerRegistry } from "@ai-chat/mcp";
 import { tool } from "ai";
 import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
-import { createMcpServerRegistry } from "../mcp";
 import { createGenerationToolResolver } from "./generation-tool-resolver";
 
 const registry = createMcpServerRegistry([

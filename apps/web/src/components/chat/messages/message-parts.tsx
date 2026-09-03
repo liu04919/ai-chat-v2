@@ -1,5 +1,5 @@
 import type {
-  AssistantMessagePartsDto,
+  AssistantMessageViewPartsDto,
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
 import { Brain, Wrench } from "lucide-react";
@@ -7,7 +7,7 @@ import { Brain, Wrench } from "lucide-react";
 import { MessageAttachment } from "./message-attachment";
 import { MessageMarkdown } from "./message-markdown";
 
-type MessagePartsDto = UserMessagePartsDto | AssistantMessagePartsDto;
+type MessagePartsDto = UserMessagePartsDto | AssistantMessageViewPartsDto;
 
 export function MessageParts({
   isStreaming = false,

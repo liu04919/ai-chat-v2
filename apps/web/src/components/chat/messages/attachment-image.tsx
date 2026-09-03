@@ -2,10 +2,16 @@
 
 import { Expand, X } from "lucide-react";
 import Image from "next/image";
-import { Dialog } from "radix-ui";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { ImagePlaceholder } from "./image-placeholder";
 
 export function AttachmentImage({
@@ -41,7 +47,7 @@ export function AttachmentImage({
     );
   }
   return (
-    <Dialog.Root>
+    <Dialog>
       <div
         className="relative max-w-full overflow-hidden rounded-2xl border bg-muted/40"
         style={{
@@ -57,7 +63,7 @@ export function AttachmentImage({
             <ImagePlaceholder label="正在加载图片…" />
           </div>
         ) : null}
-        <Dialog.Trigger asChild>
+        <DialogTrigger asChild>
           <button
             type="button"
             aria-label={`查看大图：${name}`}
@@ -89,32 +95,31 @@ export function AttachmentImage({
               </span>
             ) : null}
           </button>
-        </Dialog.Trigger>
+        </DialogTrigger>
       </div>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm" />
-        <Dialog.Content
-          aria-describedby={undefined}
-          className="fixed left-1/2 top-1/2 z-50 h-[calc(100vh-6rem)] w-[calc(100vw-6rem)] -translate-x-1/2 -translate-y-1/2 outline-none"
+      <DialogContent
+        aria-describedby={undefined}
+        className="block h-[calc(100vh-6rem)] w-[calc(100vw-6rem)] max-w-none border-0 bg-transparent p-0 shadow-none outline-none sm:max-w-none"
+        overlayClassName="bg-black/75 backdrop-blur-sm"
+        showCloseButton={false}
+      >
+        <DialogTitle className="sr-only">{name}</DialogTitle>
+        <Image
+          src={url}
+          alt={name}
+          fill
+          sizes="100vw"
+          className="object-contain"
+          unoptimized
+          referrerPolicy="no-referrer"
+        />
+        <DialogClose
+          className="absolute right-0 top-0 rounded-full bg-black/65 p-3 text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-white"
+          aria-label="关闭大图"
         >
-          <Dialog.Title className="sr-only">{name}</Dialog.Title>
-          <Image
-            src={url}
-            alt={name}
-            fill
-            sizes="100vw"
-            className="object-contain"
-            unoptimized
-            referrerPolicy="no-referrer"
-          />
-          <Dialog.Close
-            className="absolute right-0 top-0 rounded-full bg-black/65 p-3 text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-white"
-            aria-label="关闭大图"
-          >
-            <X className="size-5" aria-hidden="true" />
-          </Dialog.Close>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+          <X className="size-5" aria-hidden="true" />
+        </DialogClose>
+      </DialogContent>
+    </Dialog>
   );
 }

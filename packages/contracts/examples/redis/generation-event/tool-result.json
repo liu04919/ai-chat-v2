@@ -3,8 +3,5 @@
   "generationId": "generation_example",
   "partId": "tool-result:call_example",
   "toolCallId": "call_example",
-  "output": {
-    "results": []
-  },
   "isError": false
 }

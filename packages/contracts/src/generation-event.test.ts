@@ -20,6 +20,20 @@ describe("generationEventSchema", () => {
       partId: "reasoning_123",
       delta: "先分析问题",
     },
+    {
+      type: "tool.call",
+      generationId: "generation_123",
+      partId: "tool-call_123",
+      toolCallId: "call_123",
+      toolName: "web_search",
+    },
+    {
+      type: "tool.result",
+      generationId: "generation_123",
+      partId: "tool-result_123",
+      toolCallId: "call_123",
+      isError: false,
+    },
     { type: "generation.completed", generationId: "generation_123" },
     { type: "generation.failed", generationId: "generation_123" },
     { type: "generation.cancelled", generationId: "generation_123" },
@@ -47,6 +61,26 @@ describe("generationEventSchema", () => {
         type: "generation.completed",
         generationId: "generation_123",
         assistantMessageId: "message_123",
+      }),
+    ).toThrow();
+    expect(() =>
+      generationEventSchema.parse({
+        type: "tool.call",
+        generationId: "generation_123",
+        partId: "tool-call_123",
+        toolCallId: "call_123",
+        toolName: "web_search",
+        input: { query: "不应发送到浏览器" },
+      }),
+    ).toThrow();
+    expect(() =>
+      generationEventSchema.parse({
+        type: "tool.result",
+        generationId: "generation_123",
+        partId: "tool-result_123",
+        toolCallId: "call_123",
+        output: { secret: "不应发送到浏览器" },
+        isError: false,
       }),
     ).toThrow();
   });

@@ -1,10 +1,10 @@
 import type { GenerationToolSelectionDto } from "@ai-chat/contracts";
-import type { ToolSet } from "ai";
-
 import {
   createRemoteMcpClient,
   type McpServerRegistry,
-} from "../mcp/index";
+} from "@ai-chat/mcp";
+import type { ToolSet } from "ai";
+
 import {
   createMcpToolId,
   parseMcpToolId,

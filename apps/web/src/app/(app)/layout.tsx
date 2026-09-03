@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ConversationSidebar } from "@/components/chat/sidebar/conversation-sidebar";
+import { McpToolPreferencesProvider } from "@/components/tools/mcp-tool-preferences-provider";
 import { getCurrentSession } from "@/lib/session";
 import { listConversationsForOwner } from "@/server/conversations";
+import { getMcpToolPreferencesForUser } from "@ai-chat/db";
 
 export default async function AppLayout({
   children,
@@ -14,12 +16,16 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  const conversations = await listConversationsForOwner(session.user.id);
+  const [conversations, toolPreferences] = await Promise.all([
+    listConversationsForOwner(session.user.id),
+    getMcpToolPreferencesForUser(session.user.id),
+  ]);
   const displayName = session.user.name || session.user.email;
   const avatarText = displayName.trim().charAt(0).toUpperCase() || "U";
 
   return (
-    <div className="flex h-svh min-h-0 overflow-hidden bg-background">
+    <McpToolPreferencesProvider initialPreferences={toolPreferences}>
+      <div className="flex h-svh min-h-0 overflow-hidden bg-background">
       <aside className="flex w-72 shrink-0 flex-col border-r bg-muted/45">
         <ConversationSidebar initialConversations={conversations} />
 
@@ -46,6 +52,7 @@ export default async function AppLayout({
       <div className="flex min-w-0 flex-1 flex-col">
         <main className="min-h-0 flex-1">{children}</main>
       </div>
-    </div>
+      </div>
+    </McpToolPreferencesProvider>
   );
 }

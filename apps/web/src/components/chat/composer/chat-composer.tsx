@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useMcpToolPreferences } from "@/components/tools/mcp-tool-preferences-provider";
 
 import { DraftAttachmentList } from "./draft-attachment-list";
 import { handleComposerKeyDown } from "./composer-keyboard";
@@ -63,6 +64,7 @@ export function ChatComposer({
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffortDto>("medium");
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const { mcpToolIds } = useMcpToolPreferences();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachments = useDraftAttachments({
     mode,
@@ -121,7 +123,7 @@ export function ChatComposer({
         reasoningEffort: mode === "chat" ? reasoningEffort : null,
         tools: {
           webSearch: mode === "chat" && webSearchEnabled,
-          mcpToolIds: [],
+          mcpToolIds: mode === "chat" ? [...mcpToolIds] : [],
         },
       });
       setInput("");
@@ -191,25 +193,27 @@ export function ChatComposer({
           </Button>
 
           {mode === "chat" ? (
-            <Button
-              aria-label={
-                webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"
-              }
-              aria-pressed={webSearchEnabled}
-              className={
-                webSearchEnabled
-                  ? "h-9 rounded-full bg-primary/12 px-3 text-primary hover:bg-primary/20"
-                  : "h-9 rounded-full px-3 hover:bg-foreground/10 active:bg-foreground/20"
-              }
-              disabled={contentDisabled}
-              onClick={() => setWebSearchEnabled((enabled) => !enabled)}
-              title={webSearchEnabled ? "已开启联网搜索" : "联网搜索"}
-              type="button"
-              variant="ghost"
-            >
-              <Globe className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">联网</span>
-            </Button>
+            <>
+              <Button
+                aria-label={
+                  webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"
+                }
+                aria-pressed={webSearchEnabled}
+                className={
+                  webSearchEnabled
+                    ? "h-9 gap-2 rounded-full bg-primary/12 px-4 text-primary hover:bg-primary/20"
+                    : "h-9 gap-2 rounded-full px-4 hover:bg-foreground/10 active:bg-foreground/20"
+                }
+                disabled={contentDisabled}
+                onClick={() => setWebSearchEnabled((enabled) => !enabled)}
+                title={webSearchEnabled ? "已开启联网搜索" : "联网搜索"}
+                type="button"
+                variant="ghost"
+              >
+                <Globe className="size-4" aria-hidden="true" />
+                <span>联网搜索</span>
+              </Button>
+            </>
           ) : null}
 
           <div

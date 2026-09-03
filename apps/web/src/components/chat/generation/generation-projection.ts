@@ -1,5 +1,5 @@
 import type {
-  AssistantMessagePartDto,
+  AssistantMessageViewPartDto,
   GenerationEventDto,
 } from "@ai-chat/contracts";
 
@@ -17,7 +17,7 @@ export type GenerationProjection = {
   generationId: string;
   status: GenerationProjectionStatus;
   hasStarted: boolean;
-  parts: AssistantMessagePartDto[];
+  parts: AssistantMessageViewPartDto[];
 };
 
 export function createGenerationProjection(
@@ -97,20 +97,18 @@ function appendToolEvent(
     return { ...projection, status: "connection-error" };
   }
 
-  const part: AssistantMessagePartDto =
+  const part: AssistantMessageViewPartDto =
     event.type === "tool.call"
       ? {
           id: event.partId,
           type: "tool-call",
           toolCallId: event.toolCallId,
           toolName: event.toolName,
-          input: event.input,
         }
       : {
           id: event.partId,
           type: "tool-result",
           toolCallId: event.toolCallId,
-          output: event.output,
           isError: event.isError,
         };
 

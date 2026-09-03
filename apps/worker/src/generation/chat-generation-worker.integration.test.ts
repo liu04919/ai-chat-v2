@@ -541,16 +541,12 @@ describe("Chat Generation Worker 主链", () => {
         partId: "tool-call:search-1",
         toolCallId: "search-1",
         toolName: "web_search",
-        input: { query: "Redis latest" },
       },
       {
         type: "tool.result",
         generationId,
         partId: "tool-result:search-1",
         toolCallId: "search-1",
-        output: {
-          results: [{ title: "Redis", url: "https://redis.io/" }],
-        },
         isError: false,
       },
       {

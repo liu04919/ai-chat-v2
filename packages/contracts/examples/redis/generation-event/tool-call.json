@@ -3,8 +3,5 @@
   "generationId": "generation_example",
   "partId": "tool-call:call_example",
   "toolCallId": "call_example",
-  "toolName": "web_search",
-  "input": {
-    "query": "Redis Streams latest version"
-  }
+  "toolName": "web_search"
 }

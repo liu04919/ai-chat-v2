@@ -139,14 +139,12 @@ describe("Generation projection", () => {
           partId: "tool-call:call-1",
           toolCallId: "call-1",
           toolName: "web_search",
-          input: { query: "最新信息" },
         },
         {
           type: "tool.result",
           generationId,
           partId: "tool-result:call-1",
           toolCallId: "call-1",
-          output: { results: [] },
           isError: false,
         },
         {
@@ -164,13 +162,11 @@ describe("Generation projection", () => {
         type: "tool-call",
         toolCallId: "call-1",
         toolName: "web_search",
-        input: { query: "最新信息" },
       },
       {
         id: "tool-result:call-1",
         type: "tool-result",
         toolCallId: "call-1",
-        output: { results: [] },
         isError: false,
       },
       { id: "text-1", type: "text", text: "查询完成" },

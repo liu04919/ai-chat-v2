@@ -15,3 +15,4 @@ export {
   messageRole,
   messages,
 } from "./chat";
+export { userToolPreferences } from "./tool-preference";

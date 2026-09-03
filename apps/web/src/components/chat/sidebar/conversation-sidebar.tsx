@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   Plus,
   Sparkles,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -127,6 +128,19 @@ export function ConversationSidebar({
         >
           <Plus className="size-4" aria-hidden="true" />
           新对话
+        </Link>
+
+        <Link
+          aria-current={pathname === "/tools" ? "page" : undefined}
+          className={
+            pathname === "/tools"
+              ? "mt-2 flex h-10 items-center gap-2.5 rounded-xl bg-background px-3 text-sm font-medium shadow-sm ring-1 ring-border"
+              : "mt-2 flex h-10 items-center gap-2.5 rounded-xl px-3 text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          }
+          href="/tools"
+        >
+          <Wrench className="size-4" aria-hidden="true" />
+          MCP 工具
         </Link>
       </div>
 

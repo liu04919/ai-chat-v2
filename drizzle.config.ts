@@ -19,6 +19,7 @@ export default defineConfig({
     "./packages/db/src/schema/auth.ts",
     "./packages/db/src/schema/attachment.ts",
     "./packages/db/src/schema/chat.ts",
+    "./packages/db/src/schema/tool-preference.ts",
   ],
   out: "./packages/db/drizzle",
   dbCredentials: {

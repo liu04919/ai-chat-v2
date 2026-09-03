@@ -52,4 +52,8 @@ export {
 } from "./generation-reader";
 export { migrateDatabase } from "./migration";
 export { completeImageGenerationExecution } from "./image-generation-execution";
+export {
+  getMcpToolPreferencesForUser,
+  saveMcpToolPreferencesForUser,
+} from "./tool-preferences";
 export * from "./schema/index";

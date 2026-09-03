@@ -44,6 +44,9 @@ importers:
       '@ai-chat/event-store':
         specifier: workspace:*
         version: link:../../packages/event-store
+      '@ai-chat/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@ai-chat/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -150,12 +153,12 @@ importers:
       '@ai-chat/event-store':
         specifier: workspace:*
         version: link:../../packages/event-store
+      '@ai-chat/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@ai-chat/storage':
         specifier: workspace:*
         version: link:../../packages/storage
-      '@ai-sdk/mcp':
-        specifier: 2.0.39
-        version: 2.0.39(zod@4.4.3)
       '@ai-sdk/openai':
         specifier: ^4.0.50
         version: 4.0.50(zod@4.4.3)
@@ -200,6 +203,12 @@ importers:
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0
+
+  packages/mcp:
+    dependencies:
+      '@ai-sdk/mcp':
+        specifier: 2.0.39
+        version: 2.0.39(zod@4.4.3)
 
   packages/storage:
     dependencies:

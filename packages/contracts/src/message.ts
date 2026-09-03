@@ -97,6 +97,46 @@ export const assistantMessagePartsSchema = z
     }
   });
 
+export const assistantToolCallViewPartSchema = z
+  .object({
+    ...assistantPartBase,
+    type: z.literal("tool-call"),
+    toolCallId: z.string().min(1),
+    toolName: z.string().min(1),
+  })
+  .strict();
+
+export const assistantToolResultViewPartSchema = z
+  .object({
+    ...assistantPartBase,
+    type: z.literal("tool-result"),
+    toolCallId: z.string().min(1),
+    isError: z.boolean(),
+  })
+  .strict();
+
+export const assistantMessageViewPartSchema = z.discriminatedUnion("type", [
+  assistantReasoningMessagePartSchema,
+  assistantTextMessagePartSchema,
+  assistantAttachmentMessagePartSchema,
+  assistantToolCallViewPartSchema,
+  assistantToolResultViewPartSchema,
+]);
+
+export const assistantMessageViewPartsSchema = z
+  .array(assistantMessageViewPartSchema)
+  .min(1)
+  .superRefine((parts, context) => {
+    const partIds = parts.map((part) => part.id);
+
+    if (new Set(partIds).size !== partIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Assistant Message View 的 part id 不能重复",
+      });
+    }
+  });
+
 export const messageRoleSchema = z.enum(["user", "assistant"]);
 
 export const userMessageSchema = z
@@ -111,7 +151,7 @@ export const assistantMessageSchema = z
   .object({
     ...messageBase,
     role: z.literal("assistant"),
-    parts: assistantMessagePartsSchema,
+    parts: assistantMessageViewPartsSchema,
   })
   .strict();
 
@@ -127,6 +167,12 @@ export type AssistantMessagePartDto = z.infer<
 >;
 export type AssistantMessagePartsDto = z.infer<
   typeof assistantMessagePartsSchema
+>;
+export type AssistantMessageViewPartDto = z.infer<
+  typeof assistantMessageViewPartSchema
+>;
+export type AssistantMessageViewPartsDto = z.infer<
+  typeof assistantMessageViewPartsSchema
 >;
 export type MessageRoleDto = z.infer<typeof messageRoleSchema>;
 export type UserMessageDto = z.infer<typeof userMessageSchema>;

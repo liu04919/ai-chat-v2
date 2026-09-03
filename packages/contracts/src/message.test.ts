@@ -91,4 +91,44 @@ describe("Message contract", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("Assistant Message View 不暴露 Tool 输入和结果", () => {
+    const assistantMessage = {
+      id: "message-assistant-tool",
+      role: "assistant",
+      parts: [
+        {
+          id: "tool-call-1",
+          type: "tool-call",
+          toolCallId: "call-1",
+          toolName: "web_search",
+        },
+        {
+          id: "tool-result-1",
+          type: "tool-result",
+          toolCallId: "call-1",
+          isError: false,
+        },
+      ],
+      sequence: 1,
+      createdAt: "2026-08-28T00:00:01.000Z",
+    };
+
+    expect(messageSchema.parse(assistantMessage)).toEqual(assistantMessage);
+    expect(
+      messageSchema.safeParse({
+        ...assistantMessage,
+        parts: [
+          {
+            ...assistantMessage.parts[0],
+            input: { query: "不应暴露" },
+          },
+          {
+            ...assistantMessage.parts[1],
+            output: { secret: "不应暴露" },
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
 });

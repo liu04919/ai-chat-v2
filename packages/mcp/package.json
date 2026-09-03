@@ -1,0 +1,15 @@
+{
+  "name": "@ai-chat/mcp",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "2.0.39"
+  }
+}

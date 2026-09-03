@@ -1,0 +1,28 @@
+{
+  "servers": [
+    {
+      "id": "fortune",
+      "title": "传统文化与塔罗",
+      "description": "提供八字排盘、每日黄历和塔罗抽牌。",
+      "source": "owned",
+      "status": "available",
+      "tools": [
+        {
+          "id": "fortune.draw_tarot_reading",
+          "name": "draw_tarot_reading",
+          "title": "塔罗抽牌",
+          "description": "根据问题进行塔罗抽牌。"
+        }
+      ]
+    },
+    {
+      "id": "baidu-maps",
+      "title": "百度地图",
+      "description": "提供地点搜索、路线规划、天气和地理编码等地图能力。",
+      "source": "third-party",
+      "status": "unavailable",
+      "tools": [],
+      "message": "暂时无法读取工具列表"
+    }
+  ]
+}

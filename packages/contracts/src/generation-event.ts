@@ -50,7 +50,6 @@ export const toolCallEventSchema = z
     partId: z.string().min(1),
     toolCallId: z.string().min(1),
     toolName: z.string().min(1),
-    input: z.json(),
   })
   .strict();
 
@@ -60,7 +59,6 @@ export const toolResultEventSchema = z
     ...generationEventBase,
     partId: z.string().min(1),
     toolCallId: z.string().min(1),
-    output: z.json(),
     isError: z.boolean(),
   })
   .strict();

@@ -101,7 +101,7 @@ export async function createRemoteMcpClient(
         ? { headers: { ...server.connection.headers } }
         : {}),
     },
-    clientName: "ai-chat-worker",
+    clientName: "ai-chat-server",
     version: "0.1.0",
     initializationOptions: { timeout: MCP_REQUEST_TIMEOUT_MS },
     maxRetries: 0,

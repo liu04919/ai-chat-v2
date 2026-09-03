@@ -14,6 +14,7 @@ packages/core       不依赖框架的领域规则
 packages/db         Drizzle schema、PostgreSQL client 与 migrations
 packages/storage    Web/Worker 共享的薄 R2 对象存储边界
 packages/event-store Web/Worker 共享的 Redis GenerationEvent 日志边界
+packages/mcp        Web/Worker 共享的服务端 MCP Registry、Client 与工具目录
 ```
 
 ## 本地运行
@@ -37,11 +38,11 @@ Worker 的 `dev` / `start` 命令在 Node 启动时读取 `.env.local` 并启用
 
 ## Tool 与联网搜索
 
-Chat 输入框的联网搜索开关只影响本次 Generation，Worker 使用 Tavily 将 `web_search` 作为本地 Tool 注入模型；它不属于 MCP 工具目录，也不会永久绑定 Conversation。MCP 工具同样按次选择，以稳定的 `serverId.toolName` 写入 Generation，执行时再通过远程 MCP Client 的 `tools()` 获取真实可执行工具。
+Chat 输入框的联网搜索开关只影响本次 Generation，Worker 使用 Tavily 将 `web_search` 作为本地 Tool 注入模型；它不属于 MCP 工具目录，也不会永久绑定 Conversation。Sidebar 的 MCP 入口打开独立工具页，按“个人工具 / 公开工具”和 Server 展示能力，允许逐 Tool 启用，Server 级按钮只是全选/清空快捷操作。启用配置属于当前用户；发送时以稳定的 `serverId.toolName` 快照到 Generation，执行时再通过远程 MCP Client 的 `tools()` 获取真实可执行工具。
 
-模型的多步 `tool-call → tool-result → 继续生成` 由 Worker 和 AI SDK 完成。调用与结果按原始顺序进入 Redis GenerationEvent，完成或用户取消后持久化为 Assistant Message Parts；后续 Context Builder 会把这些可见工具历史重新交给无状态 Provider。重新生成沿用原 Generation 的 Tool 选择，不依赖第三方保存会话状态。
+模型的多步 `tool-call → tool-result → 继续生成` 由 Worker 和 AI SDK 完成。完整 Tool 输入与结果只在 Worker 内部流转并持久化为服务端 Assistant Message Parts，供后续 Context Builder 重建无状态 Provider 上下文；Redis GenerationEvent、SSE 与会话详情只向浏览器投影 Tool 名称、调用完成或失败等展示状态，不传原始 `input/output`。重新生成沿用原 Generation 的 Tool 选择，不依赖第三方保存会话状态。
 
-启用联网搜索前，在 `apps/worker/.env.local` 配置 `TAVILY_API_KEY`。MCP URL、Bearer Token 与第三方 AK 也只存在于 Worker 服务端环境中，不进入浏览器或消息正文。
+启用联网搜索前，在 `apps/worker/.env.local` 配置 `TAVILY_API_KEY`。MCP URL、Bearer Token 与第三方 AK 同时配置在 Web 和 Worker 的服务端本地环境中：Web 只用于发现目录，Worker 才执行 Tool；这些连接信息不会进入目录响应、浏览器或消息正文。单个 Server 发现失败只会在工具页标记该 Server 暂不可用。
 
 ## 消息历史与滚动
 
