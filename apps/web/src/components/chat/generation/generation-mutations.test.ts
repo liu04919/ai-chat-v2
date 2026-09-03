@@ -25,6 +25,7 @@ const conversation = {
   id: conversationId,
   mode: "chat" as const,
   title: "测试对话",
+  pinnedAt: null,
   createdAt: now,
   updatedAt: now,
 };

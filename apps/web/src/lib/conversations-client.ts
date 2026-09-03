@@ -1,6 +1,8 @@
 import {
   conversationDetailResponseSchema,
   conversationListResponseSchema,
+  conversationSummarySchema,
+  deleteConversationResponseSchema,
   type ConversationDetailResponse,
   type ConversationSummaryDto,
 } from "@ai-chat/contracts";
@@ -44,6 +46,83 @@ export async function fetchConversation(
   }
 
   return conversationDetailResponseSchema.parse(await response.json());
+}
+
+export async function setConversationPinned(
+  conversationId: string,
+  pinned: boolean,
+): Promise<ConversationSummaryDto> {
+  const response = await fetch(
+    `/api/conversations/${encodeURIComponent(conversationId)}/pin`,
+    { method: pinned ? "PUT" : "DELETE" },
+  );
+
+  if (!response.ok) {
+    throw new Error(pinned ? "无法置顶对话" : "无法取消置顶");
+  }
+
+  return conversationSummarySchema.parse(await response.json());
+}
+
+export async function deleteConversation(
+  conversationId: string,
+): Promise<void> {
+  const response = await fetch(
+    `/api/conversations/${encodeURIComponent(conversationId)}`,
+    { method: "DELETE" },
+  );
+
+  if (!response.ok) {
+    throw new Error("无法删除对话");
+  }
+
+  deleteConversationResponseSchema.parse(await response.json());
+}
+
+function compareConversations(
+  left: ClientConversationSummary,
+  right: ClientConversationSummary,
+): number {
+  if (left.pinnedAt || right.pinnedAt) {
+    if (!left.pinnedAt) return 1;
+    if (!right.pinnedAt) return -1;
+    const pinnedDifference =
+      new Date(right.pinnedAt).getTime() - new Date(left.pinnedAt).getTime();
+    if (pinnedDifference !== 0) return pinnedDifference;
+  }
+
+  const updatedDifference =
+    new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+  return updatedDifference !== 0
+    ? updatedDifference
+    : right.id.localeCompare(left.id);
+}
+
+export function replaceConversation(
+  current: ClientConversationListResponse | undefined,
+  conversation: ConversationSummaryDto,
+): ClientConversationListResponse {
+  return {
+    conversations: (current?.conversations.map((candidate) =>
+      candidate.id === conversation.id
+        ? { ...conversation, isPending: candidate.isPending }
+        : candidate,
+    ) ?? []).toSorted(compareConversations),
+  };
+}
+
+export function updateConversationPinned(
+  current: ClientConversationListResponse | undefined,
+  conversationId: string,
+  pinnedAt: string | null,
+): ClientConversationListResponse {
+  return {
+    conversations: (current?.conversations.map((conversation) =>
+      conversation.id === conversationId
+        ? { ...conversation, pinnedAt }
+        : conversation,
+    ) ?? []).toSorted(compareConversations),
+  };
 }
 
 export function prependConversation(

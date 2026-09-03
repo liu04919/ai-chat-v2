@@ -1,6 +1,14 @@
-import { conversationDetailResponseSchema, conversationPageQuerySchema } from "@ai-chat/contracts";
+import {
+  conversationDetailResponseSchema,
+  conversationPageQuerySchema,
+  deleteConversationResponseSchema,
+} from "@ai-chat/contracts";
 
 import { getCurrentSession } from "@/lib/session";
+import {
+  ConversationMutationError,
+  deleteConversationForOwner,
+} from "@/server/conversation-mutations";
 import { getConversationForOwner } from "@/server/conversations";
 
 export async function GET(
@@ -31,4 +39,34 @@ export async function GET(
   }
 
   return Response.json(conversationDetailResponseSchema.parse(conversation));
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ conversationId: string }> },
+) {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    return Response.json({ code: "UNAUTHORIZED" }, { status: 401 });
+  }
+
+  const { conversationId } = await params;
+
+  try {
+    const response = await deleteConversationForOwner(
+      session.user.id,
+      conversationId,
+    );
+    return Response.json(deleteConversationResponseSchema.parse(response));
+  } catch (error) {
+    if (error instanceof ConversationMutationError) {
+      return Response.json(
+        { code: "CONVERSATION_NOT_FOUND" },
+        { status: error.status },
+      );
+    }
+
+    throw error;
+  }
 }

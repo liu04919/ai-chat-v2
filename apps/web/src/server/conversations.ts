@@ -10,13 +10,14 @@ import {
   type ConversationRecord,
 } from "@ai-chat/db";
 
-function toConversationSummary(
+export function toConversationSummary(
   conversation: ConversationRecord,
 ): ConversationSummaryDto {
   return {
     id: conversation.id,
     mode: conversation.mode,
     title: conversation.title,
+    pinnedAt: conversation.pinnedAt?.toISOString() ?? null,
     createdAt: conversation.createdAt.toISOString(),
     updatedAt: conversation.updatedAt.toISOString(),
   };

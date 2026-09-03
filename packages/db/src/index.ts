@@ -19,6 +19,11 @@ export type {
   ConversationRecord,
 } from "./conversation-reader";
 export {
+  deleteConversationRecordForOwner,
+  setConversationPinnedForOwner,
+  type DeletedConversationRecord,
+} from "./conversation-mutations";
+export {
   cancelGenerationExecution,
   isGenerationCancellationRequested,
   requestGenerationCancellationForOwner,

@@ -11,6 +11,7 @@ function conversation(
     id,
     mode: "chat",
     title: id,
+    pinnedAt: null,
     createdAt: updatedAt.toISOString(),
     updatedAt: updatedAt.toISOString(),
   };
@@ -48,5 +49,20 @@ describe("Conversation date groups", () => {
     );
 
     expect(groups.map((group) => group.label)).toEqual(["更久"]);
+  });
+
+  it("置顶 Conversation 独立成组，不再出现在日期分组", () => {
+    const now = new Date(2026, 7, 26, 12);
+    const pinned = {
+      ...conversation("pinned", new Date(2026, 7, 1, 12)),
+      pinnedAt: new Date(2026, 7, 26, 11).toISOString(),
+    };
+    const groups = groupConversationsByRecency(
+      [pinned, conversation("today", new Date(2026, 7, 26, 1))],
+      now,
+    );
+
+    expect(groups.map((group) => group.label)).toEqual(["置顶", "今天"]);
+    expect(groups[0]?.conversations).toEqual([pinned]);
   });
 });

@@ -29,6 +29,7 @@ export {
   conversationMessageCursorSchema,
   conversationPageQuerySchema,
   conversationDetailResponseSchema,
+  deleteConversationResponseSchema,
   conversationListResponseSchema,
   conversationModeSchema,
   conversationSummarySchema,
@@ -36,6 +37,7 @@ export {
   type ConversationListResponse,
   type ConversationModeDto,
   type ConversationSummaryDto,
+  type DeleteConversationResponse,
 } from "./conversation";
 export {
   activeGenerationSchema,

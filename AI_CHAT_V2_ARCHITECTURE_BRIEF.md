@@ -370,7 +370,11 @@ Worker 收到请求后用 `AbortSignal` 停止模型流，把内存中按原顺�
 
 ### Delete Conversation
 
-删除后停止该 Conversation 的新命令，并使正在执行的 Generation 结束。具体软删或硬删策略随数据库模型讨论，但不能留下仍可继续写入的孤立 Worker。
+删除采用 Owner 鉴权后的硬删除：PostgreSQL 在同一事务中删除 Conversation、级联 Message/Generation，并删除消息引用的 Attachment 记录。事务同时返回正在运行的 Generation 与 R2 object key；提交后通知 Worker 中止模型流，并尽力清理对应 R2 对象。即使外部通知或对象清理失败，已删除的 Conversation 也不能被 Worker 重新写回。
+
+### Pin Conversation
+
+Conversation 使用可空 `pinnedAt` 表达置顶状态和置顶先后顺序。置顶只改变 Sidebar 组织方式，不修改表示会话活跃度的 `updatedAt`；取消置顶后重新按 `updatedAt` 进入今天、昨天或更久分组。
 
 ### Share
 

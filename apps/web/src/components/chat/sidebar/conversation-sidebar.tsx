@@ -1,20 +1,22 @@
 "use client";
 
-import {
-  type ConversationSummaryDto,
-} from "@ai-chat/contracts";
+import type { ConversationSummaryDto } from "@ai-chat/contracts";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronRight,
+  Ellipsis,
   ImageIcon,
   MessageSquareText,
+  Pin,
+  PinOff,
   Plus,
   Sparkles,
+  Trash2,
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
 import {
   conversationListQueryKey,
@@ -27,18 +29,120 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import {
   groupConversationsByRecency,
   type ConversationGroup,
 } from "./conversation-groups";
+import {
+  useDeleteConversation,
+  usePinConversation,
+} from "./use-conversation-actions";
+
+function ConversationItem({
+  conversation,
+  isActive,
+  isBusy,
+  onDelete,
+  onPin,
+}: Readonly<{
+  conversation: ClientConversationSummary;
+  isActive: boolean;
+  isBusy: boolean;
+  onDelete: () => void;
+  onPin: () => void;
+}>) {
+  const Icon = conversation.mode === "image" ? ImageIcon : MessageSquareText;
+  const className = isActive
+    ? "flex min-w-0 flex-1 items-center gap-2.5 rounded-xl bg-background px-3 py-2.5 pr-10 text-sm font-medium shadow-sm ring-1 ring-border"
+    : "flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-3 py-2.5 pr-10 text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
+  const content = (
+    <>
+      <Icon className="size-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
+      {conversation.pinnedAt ? (
+        <Pin className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      ) : null}
+    </>
+  );
+
+  if (conversation.isPending) {
+    return (
+      <div
+        aria-disabled="true"
+        className={className}
+        title="正在创建对话"
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="group relative flex min-w-0">
+      <Link
+        aria-current={isActive ? "page" : undefined}
+        className={className}
+        href={`/chat/${conversation.id}`}
+        title={conversation.title}
+      >
+        {content}
+      </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-label={`打开「${conversation.title}」的更多操作`}
+            className="absolute right-1 top-1/2 size-8 -translate-y-1/2 p-0 text-muted-foreground opacity-0 shadow-none group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:bg-muted data-[state=open]:opacity-100"
+            disabled={isBusy}
+            variant="ghost"
+          >
+            <Ellipsis className="size-4" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={onPin}>
+            {conversation.pinnedAt ? <PinOff /> : <Pin />}
+            {conversation.pinnedAt ? "取消置顶" : "置顶"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={onDelete} variant="destructive">
+            <Trash2 />
+            删除
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
 
 function ConversationGroupSection({
   group,
   pathname,
+  busyConversationId,
+  onDelete,
+  onPin,
 }: Readonly<{
   group: ConversationGroup<ClientConversationSummary>;
   pathname: string;
+  busyConversationId: string | null;
+  onDelete: (conversation: ClientConversationSummary) => void;
+  onPin: (conversation: ClientConversationSummary) => void;
 }>) {
   return (
     <Collapsible defaultOpen>
@@ -52,38 +156,15 @@ function ConversationGroupSection({
       <CollapsibleContent className="space-y-1 pt-1">
         {group.conversations.map((conversation) => {
           const isActive = pathname === `/chat/${conversation.id}`;
-          const Icon =
-            conversation.mode === "image" ? ImageIcon : MessageSquareText;
-
-          const className = isActive
-            ? "flex min-w-0 items-center gap-2.5 rounded-xl bg-background px-3 py-2.5 text-sm font-medium shadow-sm ring-1 ring-border"
-            : "flex min-w-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
-          const content = (
-            <>
-              <Icon className="size-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">{conversation.title}</span>
-            </>
-          );
-
-          return conversation.isPending ? (
-            <div
-              aria-disabled="true"
-              className={className}
+          return (
+            <ConversationItem
+              conversation={conversation}
+              isActive={isActive}
+              isBusy={busyConversationId === conversation.id}
               key={conversation.id}
-              title="正在创建对话"
-            >
-              {content}
-            </div>
-          ) : (
-            <Link
-              aria-current={isActive ? "page" : undefined}
-              className={className}
-              href={`/chat/${conversation.id}`}
-              key={conversation.id}
-              title={conversation.title}
-            >
-              {content}
-            </Link>
+              onDelete={() => onDelete(conversation)}
+              onPin={() => onPin(conversation)}
+            />
           );
         })}
       </CollapsibleContent>
@@ -95,6 +176,11 @@ export function ConversationSidebar({
   initialConversations,
 }: Readonly<{ initialConversations: ConversationSummaryDto[] }>) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [deleteTarget, setDeleteTarget] =
+    useState<ClientConversationSummary | null>(null);
+  const pinMutation = usePinConversation();
+  const deleteMutation = useDeleteConversation();
   const { data, isError } = useQuery({
     queryKey: conversationListQueryKey,
     queryFn: fetchConversations,
@@ -105,6 +191,27 @@ export function ConversationSidebar({
     () => groupConversationsByRecency(data.conversations),
     [data.conversations],
   );
+  const busyConversationId = pinMutation.isPending
+    ? pinMutation.variables.conversationId
+    : deleteMutation.isPending
+      ? deleteMutation.variables
+      : null;
+
+  function confirmDelete() {
+    if (!deleteTarget) {
+      return;
+    }
+
+    const conversationId = deleteTarget.id;
+    deleteMutation.mutate(conversationId, {
+      onSuccess: () => {
+        setDeleteTarget(null);
+        if (pathname === `/chat/${conversationId}`) {
+          router.replace("/chat");
+        }
+      },
+    });
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -155,6 +262,12 @@ export function ConversationSidebar({
             </p>
           ) : null}
 
+          {pinMutation.isError || deleteMutation.isError ? (
+            <p className="px-3 py-2 text-sm text-destructive" role="alert">
+              操作失败，请重试
+            </p>
+          ) : null}
+
           {!isError && data.conversations.length === 0 ? (
             <p className="px-3 py-2 text-sm text-muted-foreground">暂无对话</p>
           ) : null}
@@ -164,10 +277,52 @@ export function ConversationSidebar({
               group={group}
               key={group.id}
               pathname={pathname ?? ""}
+              busyConversationId={busyConversationId}
+              onDelete={setDeleteTarget}
+              onPin={(conversation) =>
+                pinMutation.mutate({
+                  conversationId: conversation.id,
+                  pinned: !conversation.pinnedAt,
+                })
+              }
             />
           ))}
         </div>
       </section>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <DialogContent showCloseButton={!deleteMutation.isPending}>
+          <DialogHeader>
+            <DialogTitle>删除这个对话？</DialogTitle>
+            <DialogDescription>
+              “{deleteTarget?.title}”及其中的全部消息和附件将被永久删除。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              disabled={deleteMutation.isPending}
+              onClick={() => setDeleteTarget(null)}
+              variant="outline"
+            >
+              取消
+            </Button>
+            <Button
+              disabled={deleteMutation.isPending}
+              onClick={confirmDelete}
+              variant="destructive"
+            >
+              {deleteMutation.isPending ? "正在删除…" : "删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

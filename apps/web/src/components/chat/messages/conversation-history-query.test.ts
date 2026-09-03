@@ -9,7 +9,7 @@ const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, 
 const key = conversationDetailQueryKey("c1");
 function page(start: number, end: number): ConversationDetailResponse {
   return {
-    conversation: { id: "c1", mode: "chat", title: "测试", createdAt: now, updatedAt: now },
+    conversation: { id: "c1", mode: "chat", title: "测试", pinnedAt: null, createdAt: now, updatedAt: now },
     activeGeneration: null, latestGeneration: null,
     messages: Array.from({ length: end - start + 1 }, (_, index): MessageDto => ({
       id: `m${start + index}`, sequence: start + index, role: "user",

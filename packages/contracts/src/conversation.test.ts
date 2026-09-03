@@ -9,6 +9,7 @@ const conversation = {
   id: "conversation_example",
   mode: "chat",
   title: "ReadableStream 如何工作",
+  pinnedAt: null,
   createdAt: "2026-08-26T10:00:00.000Z",
   updatedAt: "2026-08-26T10:05:00.000Z",
 };

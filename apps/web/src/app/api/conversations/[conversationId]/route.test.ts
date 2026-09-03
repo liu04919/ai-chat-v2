@@ -1,18 +1,59 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCurrentSession } from "@/lib/session";
+import {
+  ConversationMutationError,
+  deleteConversationForOwner,
+} from "@/server/conversation-mutations";
 import { getConversationForOwner } from "@/server/conversations";
-import { GET } from "./route";
+import { DELETE, GET } from "./route";
 
 vi.mock("@/lib/session", () => ({ getCurrentSession: vi.fn() }));
 vi.mock("@/server/conversations", () => ({ getConversationForOwner: vi.fn() }));
+vi.mock("@/server/conversation-mutations", () => ({
+  ConversationMutationError: class ConversationMutationError extends Error {
+    constructor(readonly status: 404) {
+      super("CONVERSATION_NOT_FOUND");
+    }
+  },
+  deleteConversationForOwner: vi.fn(),
+}));
 const context = { params: Promise.resolve({ conversationId: "c1" }) };
 const getSession = vi.mocked(getCurrentSession);
 const getConversation = vi.mocked(getConversationForOwner);
+const deleteConversation = vi.mocked(deleteConversationForOwner);
 
 beforeEach(() => {
   vi.clearAllMocks();
   getSession.mockResolvedValue({ user: { id: "owner" } } as Awaited<ReturnType<typeof getCurrentSession>>);
   getConversation.mockResolvedValue(null);
+  deleteConversation.mockResolvedValue({ conversationId: "c1" });
+});
+
+describe("删除会话 API", () => {
+  it("未登录不执行删除", async () => {
+    getSession.mockResolvedValue(null);
+
+    expect((await DELETE(new Request("http://localhost"), context)).status).toBe(401);
+    expect(deleteConversation).not.toHaveBeenCalled();
+  });
+
+  it("按当前用户删除并返回 Conversation ID", async () => {
+    const response = await DELETE(new Request("http://localhost"), context);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ conversationId: "c1" });
+    expect(deleteConversation).toHaveBeenCalledWith("owner", "c1");
+  });
+
+  it("不存在或不属于当前用户时返回 404", async () => {
+    deleteConversation.mockRejectedValue(new ConversationMutationError(404));
+
+    const response = await DELETE(new Request("http://localhost"), context);
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      code: "CONVERSATION_NOT_FOUND",
+    });
+  });
 });
 
 describe("会话游标分页 API", () => {

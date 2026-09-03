@@ -8,7 +8,7 @@ import {
   assistantMessagePartsSchema,
   userMessagePartsSchema,
 } from "@ai-chat/contracts";
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 
 import { getDatabase } from "./client";
 import { conversations, generations, messages } from "./schema/index";
@@ -21,6 +21,7 @@ export type ConversationRecord = {
   id: string;
   mode: "chat" | "image";
   title: string;
+  pinnedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -61,12 +62,17 @@ export async function listConversationRecordsForOwner(
       id: conversations.id,
       mode: conversations.mode,
       title: conversations.title,
+      pinnedAt: conversations.pinnedAt,
       createdAt: conversations.createdAt,
       updatedAt: conversations.updatedAt,
     })
     .from(conversations)
     .where(eq(conversations.ownerId, ownerId))
-    .orderBy(desc(conversations.updatedAt), desc(conversations.id));
+    .orderBy(
+      sql`${conversations.pinnedAt} desc nulls last`,
+      desc(conversations.updatedAt),
+      desc(conversations.id),
+    );
 }
 
 export async function getConversationRecordForOwner(
@@ -79,6 +85,7 @@ export async function getConversationRecordForOwner(
       id: conversations.id,
       mode: conversations.mode,
       title: conversations.title,
+      pinnedAt: conversations.pinnedAt,
       createdAt: conversations.createdAt,
       updatedAt: conversations.updatedAt,
       generationId: generations.id,
@@ -162,6 +169,7 @@ export async function getConversationRecordForOwner(
       id: row.id,
       mode: row.mode,
       title: row.title,
+      pinnedAt: row.pinnedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     },

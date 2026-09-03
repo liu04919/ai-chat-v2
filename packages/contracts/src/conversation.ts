@@ -25,6 +25,7 @@ export const conversationSummarySchema = z
     id: z.string().min(1),
     mode: conversationModeSchema,
     title: z.string().min(1),
+    pinnedAt: z.iso.datetime().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -34,6 +35,10 @@ export const conversationListResponseSchema = z
   .object({
     conversations: z.array(conversationSummarySchema),
   })
+  .strict();
+
+export const deleteConversationResponseSchema = z
+  .object({ conversationId: z.string().min(1) })
   .strict();
 
 export const conversationDetailResponseSchema = z
@@ -53,6 +58,9 @@ export const conversationDetailResponseSchema = z
   .strict();
 
 export type ConversationSummaryDto = z.infer<typeof conversationSummarySchema>;
+export type DeleteConversationResponse = z.infer<
+  typeof deleteConversationResponseSchema
+>;
 export type ConversationListResponse = z.infer<
   typeof conversationListResponseSchema
 >;

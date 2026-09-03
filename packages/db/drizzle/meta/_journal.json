@@ -15,6 +15,13 @@
       "when": 1788407646924,
       "tag": "0001_breezy_tenebrous",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788436373246,
+      "tag": "0002_mighty_vision",
+      "breakpoints": true
     }
   ]
 }

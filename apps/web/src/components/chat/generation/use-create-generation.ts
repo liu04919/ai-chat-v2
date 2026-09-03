@@ -65,6 +65,7 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
               id: target.conversationId,
               mode: target.mode,
               title: createConversationTitle(parts),
+              pinnedAt: null,
               createdAt: now,
               updatedAt: now,
               isPending: true,

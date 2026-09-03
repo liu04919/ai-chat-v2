@@ -56,6 +56,7 @@ export const conversations = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     mode: conversationMode("mode").notNull(),
     title: text("title").notNull(),
+    pinnedAt: timestamp("pinned_at", { mode: "date", withTimezone: true }),
     ...timestampColumns(),
   },
   (table) => [index("conversations_owner_id_idx").on(table.ownerId)],
