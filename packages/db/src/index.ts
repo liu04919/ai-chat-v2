@@ -19,6 +19,17 @@ export type {
   ConversationRecord,
 } from "./conversation-reader";
 export {
+  createConversationShareRecordForOwner,
+  deleteConversationShareRecordForOwner,
+  getConversationShareAttachmentRecord,
+  getConversationShareRecordByToken,
+  getConversationShareRecordForOwner,
+  type ConversationShareAttachmentRecord,
+  type ConversationShareRecord,
+  type ConversationShareStatusRecordResult,
+  type CreateConversationShareResult,
+} from "./conversation-shares";
+export {
   deleteConversationRecordForOwner,
   setConversationPinnedForOwner,
   type DeletedConversationRecord,

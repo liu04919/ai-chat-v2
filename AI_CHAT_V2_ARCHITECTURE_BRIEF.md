@@ -370,7 +370,7 @@ Worker 收到请求后用 `AbortSignal` 停止模型流，把内存中按原顺�
 
 ### Delete Conversation
 
-删除采用 Owner 鉴权后的硬删除：PostgreSQL 在同一事务中删除 Conversation、级联 Message/Generation，并删除消息引用的 Attachment 记录。事务同时返回正在运行的 Generation 与 R2 object key；提交后通知 Worker 中止模型流，并尽力清理对应 R2 对象。即使外部通知或对象清理失败，已删除的 Conversation 也不能被 Worker 重新写回。
+删除采用 Owner 鉴权后的硬删除：PostgreSQL 在同一事务中删除 Conversation、级联 Message/Generation/ConversationShare，并删除当前消息或分享快照引用的 Attachment 记录。事务同时返回正在运行的 Generation 与 R2 object key；提交后通知 Worker 中止模型流，并尽力清理对应 R2 对象。即使外部通知或对象清理失败，已删除的 Conversation 也不能被 Worker 重新写回。
 
 ### Pin Conversation
 
@@ -378,11 +378,14 @@ Conversation 使用可空 `pinnedAt` 表达置顶状态和置顶先后顺序。�
 
 ### Share
 
-分享使用独立、不可变的 durable snapshot：
+分享使用独立的 `conversation_shares` durable snapshot 表，每个 Conversation 最多一个有效分享。创建时在锁定 Conversation 的事务内复制标题、所有已持久化的浏览器可见 Message DTO 与附件元数据；Tool input/output 不进入公开快照。已有分享再次创建只返回原快照，后续消息、重新生成和重命名不会改变它。
 
-- 只复制 terminal 状态下的 Completed Messages
-- 有 Active Generation 时不允许创建分享
+- 有 Active Generation 时不允许创建分享，Redis/SSE 中尚未持久化的 projection 永不进入快照
+- 管理 API 必须校验 Session 与 owner；公共页面只凭高熵随机 token 读取
+- `/share/:token` 使用动态 Server Component，并对 metadata 与页面正文的同请求查询去重
 - 公共页面不依赖 Redis、BullMQ、SSE 或当前 Generation Projection
+- R2 继续保持私有；公开附件路由只有在 token 有效且 attachment ID 属于该快照时才代理对象内容
+- 停止分享直接删除记录；旧页面与附件请求随即 404，重新分享会生成新的 token 和快照
 
 ### 多 Tab
 

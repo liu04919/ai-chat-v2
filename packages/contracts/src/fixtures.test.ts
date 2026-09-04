@@ -13,6 +13,10 @@ import {
   conversationDetailResponseSchema,
   conversationListResponseSchema,
 } from "./conversation";
+import {
+  conversationShareSchema,
+  conversationShareStatusResponseSchema,
+} from "./conversation-share";
 import { cancelGenerationResponseSchema } from "./generation-cancellation";
 import {
   createGenerationRequestSchema,
@@ -89,6 +93,14 @@ describe("contract examples", () => {
 
     expect(generationErrorResponseSchema.parse(error)).toEqual(error);
     expect(generationJobPayloadSchema.parse(job)).toEqual(job);
+  });
+
+  it("conversation share response 与 Schema 保持一致", () => {
+    const status = readExample("http/conversation-share/status.response.json");
+    const created = readExample("http/conversation-share/create.response.json");
+
+    expect(conversationShareStatusResponseSchema.parse(status)).toEqual(status);
+    expect(conversationShareSchema.parse(created)).toEqual(created);
   });
 
   it("MCP Tool catalog response 与 Schema 保持一致", () => {

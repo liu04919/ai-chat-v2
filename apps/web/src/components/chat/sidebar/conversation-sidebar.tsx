@@ -10,6 +10,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  Share2,
   Sparkles,
   Trash2,
   Wrench,
@@ -54,6 +55,7 @@ import {
   useDeleteConversation,
   usePinConversation,
 } from "./use-conversation-actions";
+import { ShareConversationDialog } from "./share-conversation-dialog";
 
 function ConversationItem({
   conversation,
@@ -61,12 +63,14 @@ function ConversationItem({
   isBusy,
   onDelete,
   onPin,
+  onShare,
 }: Readonly<{
   conversation: ClientConversationSummary;
   isActive: boolean;
   isBusy: boolean;
   onDelete: () => void;
   onPin: () => void;
+  onShare: () => void;
 }>) {
   const Icon = conversation.mode === "image" ? ImageIcon : MessageSquareText;
   const className = isActive
@@ -104,11 +108,11 @@ function ConversationItem({
       >
         {content}
       </Link>
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             aria-label={`打开「${conversation.title}」的更多操作`}
-            className="absolute right-1 top-1/2 size-8 -translate-y-1/2 p-0 text-muted-foreground opacity-0 shadow-none group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:bg-muted data-[state=open]:opacity-100"
+            className="absolute right-1 top-1/2 size-8 -translate-y-1/2 p-0 text-muted-foreground opacity-0 shadow-none hover:bg-foreground/10 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:bg-foreground/10 data-[state=open]:opacity-100"
             disabled={isBusy}
             variant="ghost"
           >
@@ -116,6 +120,10 @@ function ConversationItem({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={onShare}>
+            <Share2 />
+            分享
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={onPin}>
             {conversation.pinnedAt ? <PinOff /> : <Pin />}
             {conversation.pinnedAt ? "取消置顶" : "置顶"}
@@ -137,12 +145,14 @@ function ConversationGroupSection({
   busyConversationId,
   onDelete,
   onPin,
+  onShare,
 }: Readonly<{
   group: ConversationGroup<ClientConversationSummary>;
   pathname: string;
   busyConversationId: string | null;
   onDelete: (conversation: ClientConversationSummary) => void;
   onPin: (conversation: ClientConversationSummary) => void;
+  onShare: (conversation: ClientConversationSummary) => void;
 }>) {
   return (
     <Collapsible defaultOpen>
@@ -164,6 +174,7 @@ function ConversationGroupSection({
               key={conversation.id}
               onDelete={() => onDelete(conversation)}
               onPin={() => onPin(conversation)}
+              onShare={() => onShare(conversation)}
             />
           );
         })}
@@ -178,6 +189,8 @@ export function ConversationSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] =
+    useState<ClientConversationSummary | null>(null);
+  const [shareTarget, setShareTarget] =
     useState<ClientConversationSummary | null>(null);
   const pinMutation = usePinConversation();
   const deleteMutation = useDeleteConversation();
@@ -279,6 +292,7 @@ export function ConversationSidebar({
               pathname={pathname ?? ""}
               busyConversationId={busyConversationId}
               onDelete={setDeleteTarget}
+              onShare={setShareTarget}
               onPin={(conversation) =>
                 pinMutation.mutate({
                   conversationId: conversation.id,
@@ -323,6 +337,14 @@ export function ConversationSidebar({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ShareConversationDialog
+        conversation={shareTarget}
+        open={shareTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setShareTarget(null);
+        }}
+      />
     </div>
   );
 }

@@ -40,6 +40,21 @@ export {
   type DeleteConversationResponse,
 } from "./conversation";
 export {
+  conversationShareAttachmentSchema,
+  conversationShareErrorCodeSchema,
+  conversationShareSchema,
+  conversationShareSnapshotSchema,
+  conversationShareStatusResponseSchema,
+  conversationShareTokenSchema,
+  deleteConversationShareResponseSchema,
+  type ConversationShareAttachmentDto,
+  type ConversationShareDto,
+  type ConversationShareErrorCode,
+  type ConversationShareSnapshotDto,
+  type ConversationShareStatusResponse,
+  type DeleteConversationShareResponse,
+} from "./conversation-share";
+export {
   activeGenerationSchema,
   chatRuntimeStateSchema,
   generationStatusSchema,

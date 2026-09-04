@@ -14,6 +14,7 @@ import { migrateDatabase } from "./migration";
 import {
   attachments,
   conversations,
+  conversationShares,
   generations,
   messages,
   user,
@@ -205,6 +206,69 @@ describe("Conversation mutations", () => {
         where: eq(generations.id, generationId),
       }),
     ).resolves.toBeUndefined();
+    await expect(
+      database.db.query.attachments.findFirst({
+        where: eq(attachments.id, attachmentId),
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("删除会话也会清理只被不可变分享快照引用的附件", async () => {
+    const conversationId = randomUUID();
+    const attachmentId = randomUUID();
+    const objectKey = `attachments/${attachmentId}`;
+    const now = new Date();
+    await database.db.insert(conversations).values({
+      id: conversationId,
+      ownerId,
+      mode: "image",
+      title: "已有分享的会话",
+    });
+    await database.db.insert(attachments).values({
+      id: attachmentId,
+      ownerId,
+      objectKey,
+      originalName: "old-result.png",
+      mediaType: "image/png",
+      sizeBytes: 128,
+      status: "ready",
+      readyAt: now,
+      linkedAt: now,
+    });
+    await database.db.insert(conversationShares).values({
+      id: randomUUID(),
+      conversationId,
+      token: randomUUID(),
+      title: "旧快照",
+      snapshot: {
+        version: 1,
+        messages: [
+          {
+            id: randomUUID(),
+            role: "user",
+            sequence: 0,
+            parts: [{ type: "text", text: "生成旧图片" }],
+            createdAt: now.toISOString(),
+          },
+        ],
+        attachments: [
+          {
+            id: attachmentId,
+            originalName: "old-result.png",
+            mediaType: "image/png",
+            sizeBytes: 128,
+          },
+        ],
+      },
+    });
+
+    await expect(
+      deleteConversationRecordForOwner(ownerId, conversationId, database.db),
+    ).resolves.toEqual({
+      conversationId,
+      activeGenerations: [],
+      attachmentObjectKeys: [objectKey],
+    });
     await expect(
       database.db.query.attachments.findFirst({
         where: eq(attachments.id, attachmentId),

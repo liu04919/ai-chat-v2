@@ -15,4 +15,5 @@ export {
   messageRole,
   messages,
 } from "./chat";
+export { conversationShares } from "./conversation-share";
 export { userToolPreferences } from "./tool-preference";

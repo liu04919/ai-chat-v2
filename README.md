@@ -59,6 +59,13 @@ Chat / Image 共用动态高度虚拟列表，首次只读取最新 30 条消息
 
 Sidebar 支持按用户置顶和删除会话。置顶会话独立成组，并按最近置顶时间排列；置顶操作不会改变会话的消息活跃时间。删除会话会级联清理 PostgreSQL 中的消息与 Generation，通知仍在运行的 Worker 停止，并清理消息引用的 R2 附件对象。
 
+会话菜单支持创建和停止公开分享。创建时把当前已持久化的可见消息、附件元数据与标题写入独立的 `conversation_shares` 不可变快照；已有分享再次创建会返回原链接，不会随之后的聊天或重命名变化。存在 Active Generation 时拒绝创建。`/share/:token` 由 Server Component 直接查询并渲染，不依赖 Redis、BullMQ、SSE 或登录态；分享附件仍保存在私有 R2，由公开附件路由在校验 token 与快照引用后代理读取。停止分享会删除快照，使页面和附件入口失效。
+
+- `GET /api/conversations/:id/share`：读取当前用户的分享状态。
+- `POST /api/conversations/:id/share`：创建一次不可变分享快照。
+- `DELETE /api/conversations/:id/share`：停止分享。
+- `GET /share/:token`：服务端渲染的公开只读页面。
+
 ## 验证
 
 ```bash

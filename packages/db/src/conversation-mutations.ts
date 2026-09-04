@@ -1,9 +1,11 @@
+import { conversationShareSnapshotSchema } from "@ai-chat/contracts";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { getDatabase } from "./client";
 import {
   attachments,
   conversations,
+  conversationShares,
   generations,
   messages,
 } from "./schema/index";
@@ -89,13 +91,24 @@ export async function deleteConversationRecordForOwner(
       .select({ parts: messages.parts })
       .from(messages)
       .where(eq(messages.conversationId, conversationId));
+    const shareRows = await transaction
+      .select({ snapshot: conversationShares.snapshot })
+      .from(conversationShares)
+      .where(eq(conversationShares.conversationId, conversationId));
     const attachmentIds = [
       ...new Set(
-        messageRows.flatMap(({ parts }) =>
-          parts.flatMap((part) =>
-            part.type === "attachment" ? [part.attachmentId] : [],
+        [
+          ...messageRows.flatMap(({ parts }) =>
+            parts.flatMap((part) =>
+              part.type === "attachment" ? [part.attachmentId] : [],
+            ),
           ),
-        ),
+          ...shareRows.flatMap(({ snapshot }) =>
+            conversationShareSnapshotSchema
+              .parse(snapshot)
+              .attachments.map((attachment) => attachment.id),
+          ),
+        ],
       ),
     ];
     const deletedAttachments =
