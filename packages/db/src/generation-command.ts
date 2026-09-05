@@ -100,7 +100,7 @@ function messagePartsEqual(
 
 async function findExistingCommand(
   userMessageId: string,
-  database: Database,
+  database: Pick<Database, "select">,
 ): Promise<ExistingCommandRow | null> {
   const [row] = await database
     .select({
@@ -179,6 +179,10 @@ function isPostgresConstraintError(
   error: unknown,
   constraintName: string,
 ): boolean {
+  // DrizzleQueryError 将 postgres-js 的错误保存在 cause 中。
+  if (error instanceof Error && error.cause) {
+    return isPostgresConstraintError(error.cause, constraintName);
+  }
   return (
     typeof error === "object" &&
     error !== null &&
@@ -242,6 +246,14 @@ export async function createGenerationCommandRecord(
         }
 
         conversation = existingConversation;
+      }
+
+      // 等待会话锁时，相同请求可能已经提交，必须先检查幂等再检查活跃任务。
+      const concurrentExisting = await findExistingCommand(input.userMessageId, transaction);
+      if (concurrentExisting) {
+        const result = resolveExistingCommand(concurrentExisting, input);
+        if (result.kind === "message_id_conflict") throw new GenerationCommandRejected(result);
+        return result;
       }
 
       if (
@@ -408,7 +420,10 @@ export async function createGenerationCommandRecord(
     if (error instanceof GenerationCommandRejected) {
       return error.result;
     }
-    if (isPostgresConstraintError(error, "messages_pkey")) {
+    if (
+      isPostgresConstraintError(error, "messages_pkey") ||
+      isPostgresConstraintError(error, "conversations_pkey")
+    ) {
       const concurrentExisting = await findExistingCommand(
         input.userMessageId,
         database,

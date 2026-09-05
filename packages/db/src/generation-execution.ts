@@ -13,6 +13,7 @@ import {
 import { and, asc, eq, inArray, isNull, max } from "drizzle-orm";
 
 import { getDatabase } from "./client";
+import { lockGenerationConversation } from "./generation-conversation-lock";
 import {
   attachments,
   conversations,
@@ -77,6 +78,9 @@ export async function claimGenerationExecution(
   assertNonEmpty(generationId, "generationId");
 
   return database.transaction(async (transaction) => {
+    if (!await lockGenerationConversation(transaction, generationId)) {
+      return { kind: "not_queued" };
+    }
     const [claimed] = await transaction
       .update(generations)
       .set({
@@ -217,6 +221,7 @@ export async function completeGenerationExecution(
   }
 
   return database.transaction(async (transaction) => {
+    if (!await lockGenerationConversation(transaction, input.generationId)) return null;
     const [generation] = await transaction
       .select({
         conversationId: generations.conversationId,

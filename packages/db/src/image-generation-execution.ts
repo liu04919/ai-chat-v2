@@ -2,6 +2,7 @@ import { createAttachmentUploadRequestSchema } from "@ai-chat/contracts";
 import { eq, max } from "drizzle-orm";
 
 import { getDatabase } from "./client";
+import { lockGenerationConversation } from "./generation-conversation-lock";
 import {
   attachments,
   conversations,
@@ -45,6 +46,7 @@ export async function completeImageGenerationExecution(
   }
 
   return database.transaction(async (transaction) => {
+    if (!await lockGenerationConversation(transaction, input.generationId)) return false;
     const [generation] = await transaction
       .select({
         conversationId: generations.conversationId,

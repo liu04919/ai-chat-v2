@@ -6,6 +6,7 @@ import { assistantMessagePartsSchema } from "@ai-chat/contracts";
 import { and, eq, max } from "drizzle-orm";
 
 import { getDatabase } from "./client";
+import { lockGenerationConversation } from "./generation-conversation-lock";
 import { conversations, generations, messages } from "./schema/index";
 
 type Database = ReturnType<typeof getDatabase>;
@@ -38,6 +39,9 @@ export async function requestGenerationCancellationForOwner(
   assertNonEmpty(input.generationId, "generationId");
 
   return database.transaction(async (transaction) => {
+    if (!await lockGenerationConversation(transaction, input.generationId)) {
+      return { kind: "not_found" };
+    }
     const [generation] = await transaction
       .select({
         id: generations.id,
@@ -155,6 +159,7 @@ export async function cancelGenerationExecution(
   }
 
   return database.transaction(async (transaction) => {
+    if (!await lockGenerationConversation(transaction, input.generationId)) return false;
     const [generation] = await transaction
       .select({
         conversationId: generations.conversationId,
