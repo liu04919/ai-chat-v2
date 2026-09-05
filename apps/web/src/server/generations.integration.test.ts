@@ -318,13 +318,17 @@ describe("Generation creation service", () => {
       },
     ]);
 
-    const createWithAttachment = (attachmentId: string, mode: "chat" | "image") =>
-      createGenerationForOwner(
+    const attemptedConversationIds: string[] = [];
+    const initialJobs = queue.jobs.size;
+    const createWithAttachment = (attachmentId: string, mode: "chat" | "image") => {
+      const conversationId = `generation-validation-conversation-${randomUUID()}`;
+      attemptedConversationIds.push(conversationId);
+      return createGenerationForOwner(
         ownerId,
         {
           target: {
             type: "new",
-            conversationId: `generation-validation-conversation-${randomUUID()}`,
+            conversationId,
             mode,
           },
           userMessageId: `generation-validation-message-${randomUUID()}`,
@@ -337,6 +341,7 @@ describe("Generation creation service", () => {
         },
         { queue },
       );
+    };
 
     await expect(createWithAttachment(pendingAttachmentId, "chat")).rejects.toMatchObject({
       response: { code: "ATTACHMENT_NOT_READY", attachmentId: pendingAttachmentId },
@@ -347,6 +352,18 @@ describe("Generation creation service", () => {
     await expect(createWithAttachment(pdfAttachmentId, "image")).rejects.toMatchObject({
       response: { code: "ATTACHMENT_MODE_MISMATCH", attachmentId: pdfAttachmentId },
     });
+    const missingAttachmentId = `missing-${randomUUID()}`;
+    await expect(createWithAttachment(missingAttachmentId, "chat")).rejects.toMatchObject({
+      response: { code: "ATTACHMENT_NOT_FOUND", attachmentId: missingAttachmentId },
+    });
+    for (const conversationId of attemptedConversationIds) {
+      expect(await database.client`SELECT id FROM conversations WHERE id = ${conversationId}`).toHaveLength(0);
+      expect(await database.client`SELECT id FROM messages WHERE conversation_id = ${conversationId}`).toHaveLength(0);
+      expect(await database.client`SELECT id FROM generations WHERE conversation_id = ${conversationId}`).toHaveLength(0);
+    }
+    expect(queue.jobs.size).toBe(initialJobs);
+    const [attachment] = await database.client`SELECT linked_at FROM attachments WHERE id = ${pdfAttachmentId}`;
+    expect(attachment!.linked_at).toBeNull();
   });
 });
 

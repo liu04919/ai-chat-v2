@@ -54,6 +54,16 @@ export type CreateGenerationCommandRecordInput = CreateGenerationRequest & {
   now: Date;
 };
 
+// 事务回调正常 return 会提交。校验失败先抛出以回滚，再在事务外恢复业务返回值。
+class GenerationCommandRejected extends Error {
+  constructor(readonly result: Exclude<
+    CreateGenerationCommandRecordResult,
+    { kind: "created" | "idempotent" }
+  >) {
+    super(result.kind);
+  }
+}
+
 type ExistingCommandRow = {
   ownerId: string;
   conversationId: string;
@@ -228,7 +238,7 @@ export async function createGenerationCommandRecord(
           .limit(1);
 
         if (!existingConversation) {
-          return { kind: "conversation_not_found" };
+          throw new GenerationCommandRejected({ kind: "conversation_not_found" });
         }
 
         conversation = existingConversation;
@@ -241,7 +251,7 @@ export async function createGenerationCommandRecord(
             input.tools.webSearch ||
             input.tools.mcpToolIds.length > 0))
       ) {
-        return { kind: "invalid_request" };
+        throw new GenerationCommandRejected({ kind: "invalid_request" });
       }
 
       const textParts = input.parts.filter((part) => part.type === "text");
@@ -255,7 +265,7 @@ export async function createGenerationCommandRecord(
           textParts[0]?.text.trim().length === 0 ||
           attachmentIds.length > 1)
       ) {
-        return { kind: "invalid_request" };
+        throw new GenerationCommandRejected({ kind: "invalid_request" });
       }
 
       const [activeGeneration] = await transaction
@@ -270,10 +280,10 @@ export async function createGenerationCommandRecord(
         .limit(1);
 
       if (activeGeneration) {
-        return {
+        throw new GenerationCommandRejected({
           kind: "active_generation",
           activeGenerationId: activeGeneration.id,
-        };
+        });
       }
 
       if (attachmentIds.length > 0) {
@@ -300,22 +310,22 @@ export async function createGenerationCommandRecord(
           const attachment = attachmentsById.get(attachmentId);
 
           if (!attachment) {
-            return { kind: "attachment_not_found", attachmentId };
+            throw new GenerationCommandRejected({ kind: "attachment_not_found", attachmentId });
           }
 
           if (attachment.status !== "ready") {
-            return { kind: "attachment_not_ready", attachmentId };
+            throw new GenerationCommandRejected({ kind: "attachment_not_ready", attachmentId });
           }
 
           if (attachment.linkedAt) {
-            return { kind: "attachment_in_use", attachmentId };
+            throw new GenerationCommandRejected({ kind: "attachment_in_use", attachmentId });
           }
 
           if (
             conversation.mode === "image" &&
             !attachment.mediaType.startsWith("image/")
           ) {
-            return { kind: "attachment_mode_mismatch", attachmentId };
+            throw new GenerationCommandRejected({ kind: "attachment_mode_mismatch", attachmentId });
           }
         }
       }
@@ -395,6 +405,9 @@ export async function createGenerationCommandRecord(
       };
     });
   } catch (error) {
+    if (error instanceof GenerationCommandRejected) {
+      return error.result;
+    }
     if (isPostgresConstraintError(error, "messages_pkey")) {
       const concurrentExisting = await findExistingCommand(
         input.userMessageId,

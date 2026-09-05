@@ -66,10 +66,20 @@ export function mergeConversationHead(
 ): ConversationHistoryData {
   const latest = latestPages[0]!;
   if (!current) return initialConversationHistory(latest);
+  if (latest.messages.length === 0 && latest.nextCursor === null) {
+    return initialConversationHistory(latest);
+  }
   const head = current.pages[0]!;
-  // 新页可能和旧页重叠。只扩展最新页，保留其他页及它们固定的 before 游标。
+  // 服务端覆盖区间是权威快照：不能保留区间内已删除的旧回答。
+  // 区间之前的消息仍保留，避免只刷新最新页时丢失已加载的历史。
+  const oldest = latestPages.at(-1)!;
+  const coveredFrom = oldest.nextCursor === null
+    ? -Infinity
+    : oldest.messages[0]!.sequence;
   const boundary = head.messages[0]?.sequence ?? Infinity;
-  const messages = new Map(head.messages.map((message) => [message.id, message]));
+  const messages = new Map(head.messages
+    .filter((message) => message.sequence < coveredFrom)
+    .map((message) => [message.id, message]));
   for (const page of latestPages.toReversed()) {
     for (const message of page.messages) {
       if (message.sequence >= boundary || head.messages.length === 0) {

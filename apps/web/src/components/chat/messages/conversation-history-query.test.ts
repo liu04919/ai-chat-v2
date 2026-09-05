@@ -21,6 +21,39 @@ function page(start: number, end: number): ConversationDetailResponse {
 afterEach(() => { client.clear(); vi.unstubAllGlobals(); });
 
 describe("会话消息分页缓存", () => {
+  it.each([false, true])("重新生成同步移除旧回答，是否已有新回答：%s", (completed) => {
+    const older = page(0, 29);
+    const current = { pages: [page(30, 59), older], pageParams: [null, 30] };
+    const latest = page(30, completed ? 59 : 58);
+    if (completed) latest.messages[29] = { ...latest.messages[29]!, id: "new-answer" };
+    const merged = mergeConversationHead(current, [latest]);
+    const ids = historyMessages(merged).map((message) => message.id);
+    expect(ids).not.toContain("m59");
+    expect(ids.includes("new-answer")).toBe(completed);
+    expect(new Set(historyMessages(merged).map((message) => message.sequence)).size).toBe(ids.length);
+    expect(merged.pages[1]).toBe(older);
+    expect(merged.pageParams).toEqual(current.pageParams);
+    expect(current.pages[0]!.messages.at(-1)!.id).toBe("m59");
+  });
+
+  it("多页补齐时也移除覆盖区间内的旧回答", () => {
+    const current = initialConversationHistory(page(0, 29));
+    const overlap = page(5, 34);
+    overlap.messages = overlap.messages.map((message) => message.sequence === 29
+      ? { ...message, id: "replacement" } : message);
+    const merged = mergeConversationHead(current, [page(35, 64), overlap]);
+    expect(historyMessages(merged)).toHaveLength(65);
+    expect(historyMessages(merged).map((message) => message.id)).not.toContain("m29");
+    expect(historyMessages(merged)[29]!.id).toBe("replacement");
+  });
+
+  it("服务端返回空历史时清空旧缓存", () => {
+    const empty = { ...page(0, 0), messages: [] };
+    const merged = mergeConversationHead(initialConversationHistory(page(0, 29)), [empty]);
+    expect(historyMessages(merged)).toEqual([]);
+    expect(merged.pages[0]!.nextCursor).toBeNull();
+  });
+
   it("按最新页到最早页加载，渲染时按时间升序", async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(page(0, 29)));
     vi.stubGlobal("fetch", fetchMock);
