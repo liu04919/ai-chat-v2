@@ -29,6 +29,13 @@
       "when": 1788446460663,
       "tag": "0003_rapid_weapon_omega",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788615575010,
+      "tag": "0004_skinny_zodiak",
+      "breakpoints": true
     }
   ]
 }

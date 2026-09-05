@@ -73,3 +73,4 @@ export {
   saveMcpToolPreferencesForUser,
 } from "./tool-preferences";
 export * from "./schema/index";
+export { createKnowledgeRepository, validateKnowledgeVector, type KnowledgeHit } from "./knowledge";

@@ -17,3 +17,4 @@ export {
 } from "./chat";
 export { conversationShares } from "./conversation-share";
 export { userToolPreferences } from "./tool-preference";
+export * from "./knowledge";

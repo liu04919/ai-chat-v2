@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "knowledge": "tsx --env-file-if-exists=.env.local --use-env-proxy src/knowledge/cli.ts",
     "dev": "tsx watch --env-file-if-exists=.env.local --use-env-proxy src/index.ts",
     "start": "tsx --env-file-if-exists=.env.local --use-env-proxy src/index.ts",
     "typecheck": "tsc --noEmit"
@@ -18,6 +19,7 @@
     "ai": "^7.0.83",
     "bullmq": "^6.3.1",
     "ioredis": "^6.0.0",
+    "pdf-parse": "2.4.5",
     "zod": "4.4.3"
   }
 }

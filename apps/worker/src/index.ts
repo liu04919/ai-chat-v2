@@ -1,4 +1,7 @@
-import { closeApplicationDatabase } from "@ai-chat/db";
+import {
+  closeApplicationDatabase,
+  createKnowledgeRepository,
+} from "@ai-chat/db";
 import {
   createRedisGenerationCancellationSubscriber,
   createRedisGenerationEventWriter,
@@ -12,6 +15,9 @@ import { createCatApiChatModel } from "./llm/cat-api-chat-model";
 import { createCatApiImageModel } from "./llm/cat-api-image-model";
 import type { ImageModel } from "./llm/image-model";
 import { createGenerationToolResolver } from "./tools";
+import { createKnowledgeWorker } from "./knowledge/queue";
+import { createKnowledgeEmbedder } from "./knowledge/embedding";
+import { ingestKnowledge } from "./knowledge/ingest";
 
 function requireEnvironment(name: string): string {
   const value = process.env[name];
@@ -68,11 +74,19 @@ const worker = createBullMqGenerationWorker({
 });
 
 let shutdownPromise: Promise<void> | undefined;
+const knowledgeWorker = createKnowledgeWorker(redisUrl, (documentId) =>
+  ingestKnowledge(documentId, {
+    repository: createKnowledgeRepository(),
+    storage: objectStorage,
+    createEmbedder: createKnowledgeEmbedder,
+  }),
+);
 
 function shutdown(signal: NodeJS.Signals): Promise<void> {
   shutdownPromise ??= (async () => {
     console.info(`收到 ${signal}，正在停止 Generation Worker`);
     await worker.close();
+    await knowledgeWorker.close();
     await cancellationSubscriber.close();
     await eventWriter.close();
     await closeApplicationDatabase();
@@ -93,4 +107,6 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 }
 
 await worker.waitUntilReady();
+await knowledgeWorker.waitUntilReady();
+console.info("Knowledge Worker 已开始消费文档入库任务（concurrency=1）");
 console.info("@ai-chat/worker 已开始消费 Generation job（concurrency=1）");

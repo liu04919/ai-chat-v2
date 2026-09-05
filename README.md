@@ -52,7 +52,31 @@ pnpm db:migrate
 
 两条检索将使用同一套 chunk：`pgvector` 负责语义检索，`pg_textsearch + zhparser` 负责中文 BM25，再通过 RRF 融合和 Rerank 精排。BM25 的 `<@>` 返回负分，升序排列；向量采用余弦距离。数据库过滤条件仍需包含用户和知识库归属，扩展不会替应用完成鉴权。
 
-当前只完成数据库底座，尚未实现知识库表、文件解析、Embedding 入库任务、检索服务和聊天入口。底座测试使用人工构造的三维向量验证 SQL，不代表真实 Embedding 效果或 RAG 跑分。
+已完成知识库、文档、chunk 三层数据结构，以及独立 BullMQ 入库任务和混合检索入口。知识库不依赖会话，原文件使用独立的 R2 对象。两条检索使用同一套 chunk，当前以 RRF 合并结果；Rerank、知识库页面、聊天选择入口和上下文注入留到后续。
+
+### 本地验证知识库
+
+先配置 `apps/worker/.env.local` 的 `DASHSCOPE_API_KEY`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`，维度固定为 1024。执行 `pnpm db:migrate`，并运行 `pnpm dev:worker`。下面的 `ownerId` 使用现有用户 ID；这是受信任的本地开发工具，不是接受客户端 ownerId 的公开接口。
+
+```powershell
+pnpm --filter @ai-chat/worker knowledge create <ownerId> "学习资料"
+pnpm --filter @ai-chat/worker knowledge upload <ownerId> <baseId> "D:\资料\数据库.md"
+pnpm --filter @ai-chat/worker knowledge status <ownerId> <baseId>
+pnpm --filter @ai-chat/worker knowledge search <ownerId> <baseId> "数据库如何进行向量检索？"
+pnpm --filter @ai-chat/worker knowledge delete <ownerId> <baseId> <documentId>
+```
+
+入库流程：读取 R2 → 解析 → 切块 → 分批 Embedding → 事务发布全部 chunk 与 ready 状态。重复 job 不重复入库；失败文档不会参与检索。删除文档先删除数据库记录及 chunk，再删除 R2 原文件；对象删除失败时数据库不会回滚，当前没有补偿任务。进程硬退出可能留下 processing 状态，本轮没有自动恢复；开发阶段可删除后重新上传。
+
+当前基线参数：
+
+- UTF-8 TXT/Markdown、文本型 PDF，文件不超过 10 MB，PDF 不超过 200 页；不做 OCR。
+- 每块约 800 个 UTF-16 码元、重叠约 100，不跨 PDF 页，最多 1000 块；保留页码和提取文本内的位置。它不是 token 切块，也没有标题/表格结构解析。
+- Embedding 每批 10 条，每批 60 秒超时，不自动重试。使用百炼 OpenAI 兼容接口，未启用 DashScope 原生接口的 query/document 区分。
+- 按账户、知识库、ready 状态和 Embedding 模型过滤，语义与 BM25 各取 20 条，RRF（常数 60）取前 6 条。RRF 分数不是置信度；无答案拒答策略尚未接入。
+- 当前先过滤再精确计算向量距离，作为小规模召回基线；虽然建有 HNSW 索引，该查询不以 ANN 加速。后续用评测结果决定是否切换，并检查过滤后的召回量。BM25 使用共享索引的语料统计，不是每个知识库独立计算 IDF。
+
+测试覆盖数据库/队列、账户隔离、失败与重复任务、原子发布、删除、解析和分批请求。测试使用可控向量验证流程，不能当成检索效果跑分；效果评测需要另外准备标注问题与相关 chunk。
 
 ```bash
 pnpm exec vitest run packages/db/src/rag-extensions.integration.test.ts

@@ -157,3 +157,4 @@ export {
   type UserMessagePartDto,
   type UserMessagePartsDto,
 } from "./message";
+export * from "./knowledge";
