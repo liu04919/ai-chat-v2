@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -11,6 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { navigateAfterAuthentication } from "@/lib/auth-navigation";
 
 const emailSchema = z.email("请输入有效的邮箱地址");
 const passwordSchema = z
@@ -51,7 +51,6 @@ function getAuthErrorMessage(error: { code?: string }) {
 }
 
 export function AuthForm({ mode }: Readonly<{ mode: AuthMode }>) {
-  const router = useRouter();
   const isRegister = mode === "register";
   const form = useForm<AuthFormValues>({
     resolver: zodResolver(authFormSchema),
@@ -84,8 +83,7 @@ export function AuthForm({ mode }: Readonly<{ mode: AuthMode }>) {
         return;
       }
 
-      router.replace("/chat");
-      router.refresh();
+      navigateAfterAuthentication("/chat");
     } catch {
       form.setError("root", { message: "暂时无法连接认证服务，请稍后重试" });
     }

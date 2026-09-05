@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ChatModelStreamPart } from "./chat-model";
+import type { ChatModelMessage, ChatModelStreamPart } from "./chat-model";
 import { createCatApiChatModel } from "./cat-api-chat-model";
 
 function sseEvent(value: unknown): string {
@@ -197,6 +197,96 @@ function createFinalAnswerStream(): string {
 }
 
 describe("CatAPI Chat Adapter", () => {
+  it.each([1, 2])("为 %i 个无结果调用补齐历史，保留文字和已有结果，不重新执行工具", async (count) => {
+    const history: Extract<ChatModelMessage, { role: "assistant" }> = {
+      role: "assistant",
+      parts: [
+        { id: "partial", type: "text", text: "已经生成的部分回答" },
+        { id: "reasoning", type: "reasoning", text: "正在查询" },
+        { id: "done-call", type: "tool-call", toolCallId: "done", toolName: "web_search", input: {} },
+        ...Array.from({ length: count }, (_, index) => ({
+          id: `pending-${index}`, type: "tool-call" as const,
+          toolCallId: `pending-${index}`, toolName: "web_search", input: { query: "test" },
+        })),
+        { id: "done-result", type: "tool-result", toolCallId: "done", output: { answer: "real result" }, isError: false },
+      ],
+    };
+    const original = structuredClone(history);
+    const requests: Request[] = [];
+    const execute = vi.fn();
+    const model = createCatApiChatModel({
+      baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model",
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        return new Response(createFinalAnswerStream(), { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    const parts: ChatModelStreamPart[] = [];
+    for await (const part of model.stream({
+      messages: [
+        { role: "user", parts: [{ type: "text", text: "查询" }] }, history,
+        { role: "user", parts: [{ type: "text", text: "继续" }] },
+      ],
+      reasoningEffort: "low",
+      tools: { web_search: tool({ inputSchema: z.object({}), execute }) },
+    })) parts.push(part);
+
+    expect(requests).toHaveLength(1);
+    const body = await requests[0]!.json() as {
+      input: Array<{ type: string; call_id: string; output: string }>;
+    };
+    const outputs = body.input.filter((item: { type: string }) => item.type === "function_call_output");
+    expect(outputs).toHaveLength(count + 1);
+    expect(outputs.find((item) => item.call_id === "done")?.output).toBe(JSON.stringify({ answer: "real result" }));
+    for (let index = 0; index < count; index++) {
+      expect(JSON.parse(outputs.find((item) => item.call_id === `pending-${index}`)!.output))
+        .toMatchObject({ code: "TOOL_RESULT_UNAVAILABLE" });
+    }
+    expect(JSON.stringify(body.input)).toContain("已经生成的部分回答");
+    expect(JSON.stringify(body.input)).toContain("正在查询");
+    expect(parts).toContainEqual({ type: "text", partId: "message_final", delta: "查询完成。" });
+    expect(execute).not.toHaveBeenCalled();
+    expect(history).toEqual(original);
+  });
+
+  it("工具执行中停止，只有 Tool Call 的历史也能继续下一轮", async () => {
+    const controller = new AbortController();
+    const model = createCatApiChatModel({
+      baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model",
+      fetch: async () => new Response(createToolCallStream(), { headers: { "content-type": "text/event-stream" } }),
+    });
+    const history: Extract<ChatModelMessage, { role: "assistant" }> = { role: "assistant", parts: [] };
+    try {
+      for await (const part of model.stream({
+        messages: [{ role: "user", parts: [{ type: "text", text: "查询" }] }],
+        reasoningEffort: "low", abortSignal: controller.signal,
+        tools: { web_search: tool({
+          inputSchema: z.object({ query: z.string() }),
+          execute: async () => new Promise((_resolve, reject) => {
+            if (controller.signal.aborted) reject(controller.signal.reason);
+            else controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true });
+          }),
+        }) },
+      })) {
+        if (part.type === "tool-call") {
+          history.parts.push({ id: part.partId, type: "tool-call", toolCallId: part.toolCallId, toolName: part.toolName, input: z.json().parse(part.input) });
+          controller.abort(new Error("用户停止"));
+        }
+      }
+    } catch (error) {
+      expect((error as Error).message).toContain("用户停止");
+    }
+    expect(history.parts).toHaveLength(1);
+    const fetch = vi.fn(async () => new Response(createFinalAnswerStream(), { headers: { "content-type": "text/event-stream" } }));
+    const next = createCatApiChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model", fetch });
+    const parts: ChatModelStreamPart[] = [];
+    for await (const part of next.stream({
+      messages: [history, { role: "user", parts: [{ type: "text", text: "继续" }] }], reasoningEffort: "low",
+    })) parts.push(part);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(parts).toContainEqual({ type: "text", partId: "message_final", delta: "查询完成。" });
+  });
+
   it("使用 Responses API，并把 SDK stream part 映射为内部协议", async () => {
     let capturedRequest: Request | undefined;
     const model = createCatApiChatModel({

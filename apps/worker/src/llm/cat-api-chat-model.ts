@@ -55,6 +55,7 @@ function toAssistantModelMessages(
   const messages: ModelMessage[] = [];
   let content: AssistantContentPart[] = [];
   const toolNames = new Map<string, string>();
+  const pendingToolCalls = new Map<string, string>();
 
   function flushAssistant(): void {
     if (content.length === 0) {
@@ -80,6 +81,7 @@ function toAssistantModelMessages(
           part.toolCallId,
           toRuntimeHistoryToolName(part.toolName),
         );
+        pendingToolCalls.set(part.toolCallId, toRuntimeHistoryToolName(part.toolName));
         content.push({
           type: "tool-call",
           toolCallId: part.toolCallId,
@@ -96,6 +98,7 @@ function toAssistantModelMessages(
         }
 
         flushAssistant();
+        pendingToolCalls.delete(part.toolCallId);
         messages.push({
           role: "tool",
           content: [
@@ -113,6 +116,25 @@ function toAssistantModelMessages(
   }
 
   flushAssistant();
+  // 停止生成可能只保存了调用。仅修复发送给模型的历史，不改落库内容，
+  // 也不推断工具是否已产生副作用，更不能自动重试这个调用。
+  if (pendingToolCalls.size > 0) {
+    messages.push({
+      role: "tool",
+      content: [...pendingToolCalls].map(([toolCallId, toolName]) => ({
+        type: "tool-result" as const,
+        toolCallId,
+        toolName,
+        output: {
+          type: "error-json" as const,
+          value: {
+            code: "TOOL_RESULT_UNAVAILABLE",
+            message: "上一轮工具调用未记录到结果（生成可能已被停止）。执行结果未知，请勿假定调用成功。",
+          },
+        },
+      })),
+    });
+  }
   return messages;
 }
 

@@ -1,13 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { navigateAfterAuthentication } from "@/lib/auth-navigation";
 
 export function SignOutButton() {
-  const router = useRouter();
   const [error, setError] = useState<string>();
   const [isPending, startTransition] = useTransition();
 
@@ -22,8 +21,7 @@ export function SignOutButton() {
           return;
         }
 
-        router.replace("/login");
-        router.refresh();
+        navigateAfterAuthentication("/login");
       } catch {
         setError("退出失败，请重试");
       }
