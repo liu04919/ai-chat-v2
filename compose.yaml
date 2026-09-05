@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:18.4-alpine
+    image: ai-chat-postgres:18.4-rag
+    build: ./docker/postgres
+    command: ["postgres", "-c", "shared_preload_libraries=pg_textsearch"]
     restart: unless-stopped
     environment:
       POSTGRES_DB: ai_chat

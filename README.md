@@ -36,6 +36,30 @@ Worker 的 `dev` / `start` 命令在 Node 启动时读取 `.env.local` 并启用
 
 附件读取校验登录身份与归属后签发短期 R2 下载地址，不保存签名 URL。会话详情中的 `activeGeneration` 用于发现正在执行的任务，`latestGeneration` 用于恢复最近一次失败或停止的状态。
 
+## RAG 数据库底座
+
+PostgreSQL 使用 `docker/postgres/Dockerfile` 构建的 `ai-chat-postgres:18.4-rag` 镜像，仍基于原来的 PostgreSQL 18.4 Alpine，保留 `postgres-data` 卷和 5433 端口。扩展源码固定为具体提交：pgvector 0.8.6、pg_textsearch 1.4.0、zhparser 2.4（依赖 SCWS 1.2.3）。最终镜像不包含构建阶段安装的编译工具。
+
+首次使用或修改 Dockerfile 后：
+
+```bash
+docker compose build postgres
+docker compose up -d --wait postgres redis
+pnpm db:migrate
+```
+
+`pg_textsearch` 通过 Compose 的 `shared_preload_libraries` 启动加载；`db:migrate` 在业务迁移前为当前数据库启用三个扩展，并建立 `public.rag_chinese` 中文分词配置。已有数据卷也走这个步骤，不依赖仅在空数据目录执行的 Docker init 脚本；不需要删卷或清库。
+
+两条检索将使用同一套 chunk：`pgvector` 负责语义检索，`pg_textsearch + zhparser` 负责中文 BM25，再通过 RRF 融合和 Rerank 精排。BM25 的 `<@>` 返回负分，升序排列；向量采用余弦距离。数据库过滤条件仍需包含用户和知识库归属，扩展不会替应用完成鉴权。
+
+当前只完成数据库底座，尚未实现知识库表、文件解析、Embedding 入库任务、检索服务和聊天入口。底座测试使用人工构造的三维向量验证 SQL，不代表真实 Embedding 效果或 RAG 跑分。
+
+```bash
+pnpm exec vitest run packages/db/src/rag-extensions.integration.test.ts
+```
+
+实现参考：[pg_textsearch](https://github.com/timescale/pg_textsearch/tree/v1.4.0)、[pgvector](https://github.com/pgvector/pgvector/tree/v0.8.6)、[zhparser](https://github.com/amutu/zhparser/tree/2e995c4df672563992b4d7a147b8fa2d0d4cda6c)。
+
 ## Tool 与联网搜索
 
 Chat 输入框的联网搜索开关只影响本次 Generation，Worker 使用 Tavily 将 `web_search` 作为本地 Tool 注入模型；它不属于 MCP 工具目录，也不会永久绑定 Conversation。Sidebar 的 MCP 入口打开独立工具页，按“个人工具 / 公开工具”和 Server 展示能力，允许逐 Tool 启用，Server 级按钮只是全选/清空快捷操作。启用配置属于当前用户；发送时以稳定的 `serverId.toolName` 快照到 Generation，执行时再通过远程 MCP Client 的 `tools()` 获取真实可执行工具。

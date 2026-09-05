@@ -483,7 +483,7 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 1. ORM/DB layer
 2. delta coalescing 的时间与大小阈值
 3. BullMQ concurrency
-4. embedding provider、Chunk Strategy 与 Pinecone index schema
+4. Chunk Strategy、召回参数与评测集；RAG 已选 PostgreSQL（pgvector + pg_textsearch + zhparser），两路共用同一套 chunk，RRF 融合后 Rerank。先做固定检索，再用同一评测集比较 Agentic RAG。
 5. Tool input/output 的脱敏、截断与前端展示细节
 6. reasoning 的最终视觉展示形态
 7. 最终部署拓扑
