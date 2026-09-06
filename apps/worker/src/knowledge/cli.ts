@@ -11,6 +11,11 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import { createKnowledgeEmbedder } from "./embedding";
 import { retrieveKnowledge } from "./retrieve";
+import { createKnowledgeReranker } from "./rerank";
+import {
+  compareKnowledgeRetrieval,
+  evaluateKnowledgeRetrieval,
+} from "./evaluate";
 
 function required(name: string) {
   const value = process.env[name];
@@ -31,7 +36,7 @@ async function main() {
   const [command, ownerId, baseOrName, argument] = process.argv.slice(2);
   if (!ownerId || !baseOrName)
     throw new Error(
-      "用法：knowledge <create|status|upload|search|delete> <ownerId> <name|baseId> [file|query|documentId]",
+      "用法：knowledge <create|status|upload|search|compare|evaluate|delete> <ownerId> <name|baseId> [file|query|documentId]",
     );
   const repository = createKnowledgeRepository();
   if (command === "create") return repository.createBase(ownerId, baseOrName);
@@ -46,11 +51,33 @@ async function main() {
       }),
     );
   if (!argument) throw new Error("缺少文件路径、查询或文档 ID");
-  if (command === "search")
-    return retrieveKnowledge(ownerId, baseOrName, argument, {
+  if (command === "search" || command === "compare" || command === "evaluate") {
+    const dependencies = {
       repository,
       embedder: createKnowledgeEmbedder(),
-    });
+      reranker: createKnowledgeReranker(),
+    };
+    if (command === "compare")
+      return compareKnowledgeRetrieval(
+        ownerId,
+        baseOrName,
+        argument,
+        dependencies,
+      );
+    if (command === "evaluate") {
+      //评估
+      const input = JSON.parse(await readFile(argument, "utf8"));
+      const price = process.env.RERANK_PRICE_PER_MILLION_TOKENS;
+      return evaluateKnowledgeRetrieval(
+        ownerId,
+        baseOrName,
+        input,
+        dependencies,
+        price ? Number(price) : undefined,
+      );
+    }
+    return retrieveKnowledge(ownerId, baseOrName, argument, dependencies);
+  }
   if (command === "delete") {
     const document = await repository.deleteDocument(
       ownerId,

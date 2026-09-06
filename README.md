@@ -52,11 +52,11 @@ pnpm db:migrate
 
 两条检索将使用同一套 chunk：`pgvector` 负责语义检索，`pg_textsearch + zhparser` 负责中文 BM25，再通过 RRF 融合和 Rerank 精排。BM25 的 `<@>` 返回负分，升序排列；向量采用余弦距离。数据库过滤条件仍需包含用户和知识库归属，扩展不会替应用完成鉴权。
 
-已完成知识库、文档、chunk 三层数据结构，以及独立 BullMQ 入库任务和混合检索入口。知识库不依赖会话，原文件使用独立的 R2 对象。两条检索使用同一套 chunk，当前以 RRF 合并结果；Rerank、知识库页面、聊天选择入口和上下文注入留到后续。
+已完成知识库、文档、chunk 三层数据结构，以及独立 BullMQ 入库任务和混合检索、精排入口。知识库不依赖会话，原文件使用独立的 R2 对象。两条检索使用同一套 chunk，以 RRF 合并候选后交给百炼精排；知识库页面、聊天选择入口和上下文注入留到后续。
 
 ### 本地验证知识库
 
-先配置 `apps/worker/.env.local` 的 `DASHSCOPE_API_KEY`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`，维度固定为 1024。执行 `pnpm db:migrate`，并运行 `pnpm dev:worker`。下面的 `ownerId` 使用现有用户 ID；这是受信任的本地开发工具，不是接受客户端 ownerId 的公开接口。
+先配置 `apps/worker/.env.local` 的 `DASHSCOPE_API_KEY`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`，维度固定为 1024。检索还需要 `RERANK_BASE_URL`（百炼业务空间的 `/api/v1` 地址）和 `RERANK_MODEL=qwen3.7-text-rerank`，复用百炼密钥；该模型使用 DashScope 原生重排接口，不是 Embedding 的 OpenAI 兼容地址。执行 `pnpm db:migrate`，并运行 `pnpm dev:worker`。下面的 `ownerId` 使用现有用户 ID；这是受信任的本地开发工具，不是接受客户端 ownerId 的公开接口。
 
 ```powershell
 pnpm --filter @ai-chat/worker knowledge create <ownerId> "学习资料"
@@ -73,7 +73,8 @@ pnpm --filter @ai-chat/worker knowledge delete <ownerId> <baseId> <documentId>
 - UTF-8 TXT/Markdown、文本型 PDF，文件不超过 10 MB，PDF 不超过 200 页；不做 OCR。
 - 使用 `@langchain/textsplitters` 的递归切块器，优先按段落、换行、中文标点拆分，再回退到字符。目标上限 800 个 UTF-16 码元，重叠预算 100（不保证每块正好重叠 100）；不跨 PDF 页，最多 1000 块。薄适配只处理 Unicode 码点回退和原文位置，不重新实现递归算法。保留页码和提取文本内的位置；不是 token 切块，也没有标题/表格结构解析。
 - Embedding 每批 10 条，每批 60 秒超时，不自动重试。使用百炼 OpenAI 兼容接口，未启用 DashScope 原生接口的 query/document 区分。
-- 按账户、知识库、ready 状态和 Embedding 模型过滤，语义与 BM25 各取 30 条，RRF（常数 60）取前 6 条。RRF 分数不是置信度；精排和无答案拒答策略尚未接入。
+- 按账户、知识库、ready 状态和 Embedding 模型过滤，语义与 BM25 各取 30 条，RRF（常数 60）合并去重后保留全部候选（最多 60 条），精排选前 6 条。结果中的 `score` 保留 RRF 分数，`rerankScore` 是精排分数，两者不混加，也不能当作回答正确的概率。无答案拒答策略尚未接入。
+- 精排单次请求超时 60 秒，不自动重试，不静默回退 RRF。响应校验数量、索引唯一性与范围、分数有效性；通过索引回填原 chunk 的来源，不信任上游返回的正文或 ID。空候选不发送请求。更换精排模型不需要重新 Embedding 文档。
 - 查询先取得允许访问的文档 ID，把该过滤放进 chunk 的 Top K 查询。向量直接按余弦距离排序，BM25 直接按索引打分排序；只物化已取出的候选，不预先物化全部 chunk。向量查询在事务内设置 `SET LOCAL hnsw.iterative_scan = strict_order`，补充过滤后的候选；受扫描上限约束，并非保证召回齐全。正式查询不强制索引，执行计划由 PostgreSQL 选择。
 - BM25 继续使用共享索引的语料统计，不是每个知识库独立计算 IDF。分块变更只影响新上传的文档；已有文档若要采用新策略，需要重新上传，不自动改写已有向量。
 
@@ -84,6 +85,29 @@ pnpm exec vitest run packages/db/src/rag-extensions.integration.test.ts
 ```
 
 实现参考：[pg_textsearch](https://github.com/timescale/pg_textsearch/tree/v1.4.0)、[pgvector](https://github.com/pgvector/pgvector/tree/v0.8.6)、[zhparser](https://github.com/amutu/zhparser/tree/2e995c4df672563992b4d7a147b8fa2d0d4cda6c)。
+
+### 对比 RRF 与精排
+
+```powershell
+pnpm --filter @ai-chat/worker knowledge compare <ownerId> <baseId> "数据库如何进行向量检索？"
+pnpm --filter @ai-chat/worker knowledge evaluate <ownerId> <baseId> "D:\资料\rag-eval.json"
+```
+
+`compare` 返回同一次召回的 RRF Top 6、精排 Top 6、候选 ID、耗时和精排 token 用量。`evaluate` 顺序执行最多 50 道已标注问题，文件格式：
+
+```json
+[
+  {
+    "id": "q1",
+    "query": "你的问题",
+    "relevantChunkIds": ["该知识库中人工确认相关的真实 chunk ID"]
+  }
+]
+```
+
+每道问题只做一次 Embedding 和数据库召回，两组复用相同候选。报告候选召回率、Recall@6、Precision@6、MRR@6 和平均耗时；精排组耗时为共同召回耗时加精排耗时。当前只评估有相关片段标注的问题，不是端到端回答评分，也不评估无答案拒答。chunk 重新生成后需更新标注；调参集和最终测试集应分开。任一请求失败会让本次评测失败，不跳过失败样本后给出更好看的平均分。
+
+报告只计算**精排新增费用**，不包含两组共有的 Embedding 成本。`totalTokens` 来自 API，缺失时为 `null`；可设置 `RERANK_PRICE_PER_MILLION_TOKENS`（元/百万 token）得到 `estimatedCny`，未配置单价则金额为 `null`。它是按输入单价计算的估算，不是已扣费账单，不考虑免费额度和折扣。真实费用以百炼账单为准。接口字段参考[百炼官方重排文档](https://help.aliyun.com/zh/model-studio/text-rerank-api)。
 
 ## Tool 与联网搜索
 

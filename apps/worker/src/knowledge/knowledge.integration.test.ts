@@ -22,6 +22,19 @@ const embedder = {
   model: "test-embedding",
   embed: async (texts: string[]) => texts.map(() => vector),
 };
+const reranker = {
+  model: "test-rerank",
+  async rerank(
+    _query: string,
+    candidates: import("@ai-chat/db").KnowledgeHit[],
+  ) {
+    return {
+      hits: candidates.slice(0, 6).map((h) => ({ ...h, rerankScore: 0.9 })),
+      totalTokens: 1,
+      requestId: "test",
+    };
+  },
+};
 let baseId: string;
 beforeAll(async () => {
   await migrateDatabase({
@@ -126,6 +139,7 @@ describe("知识库入库与真实 PostgreSQL 混合检索", () => {
     const fused = await retrieveKnowledge(ownerId, baseId, "数据库", {
       repository,
       embedder,
+      reranker,
     });
     expect(fused).toHaveLength(1);
     expect(fused[0]?.originalName).toBe("database.md");
@@ -136,6 +150,7 @@ describe("知识库入库与真实 PostgreSQL 混合检索", () => {
       retrieveKnowledge("other-user", baseId, "数据库", {
         repository,
         embedder: { ...embedder, embed },
+        reranker,
       }),
     ).rejects.toThrow("KNOWLEDGE_NOT_FOUND");
     expect(embed).not.toHaveBeenCalled();

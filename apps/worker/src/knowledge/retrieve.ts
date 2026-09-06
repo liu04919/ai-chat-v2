@@ -1,7 +1,8 @@
 import { createKnowledgeRepository, type KnowledgeHit } from "@ai-chat/db";
 import type { KnowledgeEmbedder } from "./embedding";
+import type { KnowledgeReranker } from "./rerank";
 
-export function reciprocalRankFusion(lists: KnowledgeHit[][], limit = 6) {
+export function reciprocalRankFusion(lists: KnowledgeHit[][]) {
   const hits = new Map<string, KnowledgeHit>();
   for (const list of lists) {
     const seen = new Set<string>();
@@ -15,19 +16,24 @@ export function reciprocalRankFusion(lists: KnowledgeHit[][], limit = 6) {
       });
     });
   }
-  return [...hits.values()]
-    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
-    .slice(0, limit);
+  return [...hits.values()].sort(
+    (a, b) => b.score - a.score || a.id.localeCompare(b.id),
+  );
 }
 
-export async function retrieveKnowledge(
+export type KnowledgeRetrievalDependencies = {
+  repository: Pick<
+    ReturnType<typeof createKnowledgeRepository>,
+    "requireOwner" | "retrieve"
+  >;
+  embedder: KnowledgeEmbedder;
+};
+
+export async function retrieveKnowledgeCandidates(
   ownerId: string,
   baseId: string,
   query: string,
-  dependencies: {
-    repository: ReturnType<typeof createKnowledgeRepository>;
-    embedder: KnowledgeEmbedder;
-  },
+  dependencies: KnowledgeRetrievalDependencies,
 ) {
   const { repository, embedder } = dependencies;
   await repository.requireOwner(ownerId, baseId);
@@ -41,4 +47,21 @@ export async function retrieveKnowledge(
     embedder.model,
   );
   return reciprocalRankFusion([result.semantic, result.lexical]);
+}
+
+export async function retrieveKnowledge(
+  ownerId: string,
+  baseId: string,
+  query: string,
+  dependencies: KnowledgeRetrievalDependencies & {
+    reranker: KnowledgeReranker;
+  },
+) {
+  const candidates = await retrieveKnowledgeCandidates(
+    ownerId,
+    baseId,
+    query,
+    dependencies,
+  );
+  return (await dependencies.reranker.rerank(query, candidates)).hits;
 }
