@@ -18,5 +18,7 @@ export default defineConfig([
     "**/dist/**",
     "**/node_modules/**",
     "**/next-env.d.ts",
+    "evals/retrieval/.venv/**",
+    "evals/retrieval/artifacts/**",
   ]),
 ]);

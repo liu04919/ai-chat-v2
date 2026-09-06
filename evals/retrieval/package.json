@@ -1,0 +1,13 @@
+{
+  "name": "@ai-chat/retrieval-eval",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "tsx --env-file-if-exists=../../apps/worker/.env.local --use-env-proxy src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-chat/db": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  }
+}

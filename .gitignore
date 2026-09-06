@@ -12,3 +12,6 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
+evals/retrieval/.venv/
+evals/retrieval/artifacts/
+evals/retrieval/__pycache__/

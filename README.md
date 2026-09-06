@@ -86,28 +86,11 @@ pnpm exec vitest run packages/db/src/rag-extensions.integration.test.ts
 
 实现参考：[pg_textsearch](https://github.com/timescale/pg_textsearch/tree/v1.4.0)、[pgvector](https://github.com/pgvector/pgvector/tree/v0.8.6)、[zhparser](https://github.com/amutu/zhparser/tree/2e995c4df672563992b4d7a147b8fa2d0d4cda6c)。
 
-### 对比 RRF 与精排
+### 独立检索评测
 
-```powershell
-pnpm --filter @ai-chat/worker knowledge compare <ownerId> <baseId> "数据库如何进行向量检索？"
-pnpm --filter @ai-chat/worker knowledge evaluate <ownerId> <baseId> "D:\资料\rag-eval.json"
-```
+评测入口位于 [evals/retrieval](evals/retrieval/README.md)，不再放在 Worker 的业务 CLI 中。使用独立 PostgreSQL 数据库、相同业务 schema/检索 SQL/Embedding/RRF/精排实现，公开数据不会混入用户知识库或影响业务 BM25 统计。
 
-`compare` 返回同一次召回的 RRF Top 6、精排 Top 6、候选 ID、耗时和精排 token 用量。`evaluate` 顺序执行最多 50 道已标注问题，文件格式：
-
-```json
-[
-  {
-    "id": "q1",
-    "query": "你的问题",
-    "relevantChunkIds": ["该知识库中人工确认相关的真实 chunk ID"]
-  }
-]
-```
-
-每道问题只做一次 Embedding 和数据库召回，两组复用相同候选。报告候选召回率、Recall@6、Precision@6、MRR@6 和平均耗时；精排组耗时为共同召回耗时加精排耗时。当前只评估有相关片段标注的问题，不是端到端回答评分，也不评估无答案拒答。chunk 重新生成后需更新标注；调参集和最终测试集应分开。任一请求失败会让本次评测失败，不跳过失败样本后给出更好看的平均分。
-
-报告只计算**精排新增费用**，不包含两组共有的 Embedding 成本。`totalTokens` 来自 API，缺失时为 `null`；可设置 `RERANK_PRICE_PER_MILLION_TOKENS`（元/百万 token）得到 `estimatedCny`，未配置单价则金额为 `null`。它是按输入单价计算的估算，不是已扣费账单，不考虑免费额度和折扣。真实费用以百炼账单为准。接口字段参考[百炼官方重排文档](https://help.aliyun.com/zh/model-studio/text-rerank-api)。
+四组对照为纯向量、纯 BM25、混合 RRF、混合 RRF＋精排，指标统一交给 Python `ranx` 计算。数据下载、固定抽题、预算记录、断点续跑和报告命令见评测目录；旧 `knowledge compare/evaluate` 已移除。这是检索层消融实验，不是最终回答或 Agentic RAG 评测。
 
 ## Tool 与联网搜索
 

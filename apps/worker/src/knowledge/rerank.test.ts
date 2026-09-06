@@ -2,11 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { KnowledgeHit } from "@ai-chat/db";
 import { createKnowledgeReranker } from "./rerank";
 import { retrieveKnowledge, reciprocalRankFusion } from "./retrieve";
-import {
-  compareKnowledgeRetrieval,
-  evaluateKnowledgeRetrieval,
-  retrievalMetrics,
-} from "./evaluate";
 
 const hit = (id: string): KnowledgeHit => ({
   id,
@@ -60,6 +55,31 @@ afterEach(() => {
 });
 
 describe("百炼精排适配", () => {
+  it("默认仍选 6 条，离线评测可以显式请求完整 50 条", async () => {
+    const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      const body = JSON.parse(init!.body as string);
+      return Response.json(
+        response(
+          Array.from({ length: body.parameters.top_n }, (_, index) => ({
+            index,
+            relevance_score: 1 - index / 100,
+          })),
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const candidates = Array.from({ length: 50 }, (_, i) => hit(String(i)));
+    const reranker = createKnowledgeReranker(env);
+    expect((await reranker.rerank("问题", candidates)).hits).toHaveLength(6);
+    expect(
+      (await reranker.rerank("问题", candidates, { topN: 50 })).hits,
+    ).toHaveLength(50);
+    for (const topN of [0, 61, 0.5, NaN])
+      await expect(
+        reranker.rerank("问题", candidates, { topN }),
+      ).rejects.toThrow("INVALID_RERANK_TOP_N");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
   it("遵循原生接口，按索引映射并保留来源与 RRF 分数", async () => {
     const fetchMock = vi.fn(async () =>
       Response.json(
@@ -203,53 +223,5 @@ describe("RRF 与精排流程", () => {
     await expect(
       retrieveKnowledge("owner", "base", "问题", dependencies),
     ).rejects.toThrow("RERANK_FAILED");
-  });
-  it("对照复用同一候选，指标和增量费用可复算", async () => {
-    const dependencies = makeDependencies();
-    const comparison = await compareKnowledgeRetrieval(
-      "owner",
-      "base",
-      "问题",
-      dependencies,
-    );
-    expect(dependencies.repository.retrieve).toHaveBeenCalledTimes(1);
-    expect(dependencies.embedder.embed).toHaveBeenCalledTimes(1);
-    expect(comparison.rrf.hits[0]?.id).toBe("0");
-    expect(comparison.reranked.hits[0]?.id).toBe("9");
-    const report = await evaluateKnowledgeRetrieval(
-      "owner",
-      "base",
-      [{ id: "q1", query: "问题", relevantChunkIds: ["9"] }],
-      dependencies,
-      1,
-    );
-    expect(report.summary.rrf.recallAt6).toBe(0);
-    expect(report.summary.reranked.recallAt6).toBe(1);
-    expect(report.incrementalRerankCost.estimatedCny).toBe(42 / 1_000_000);
-    expect(retrievalMetrics(["a", "b"], ["b", "c"])).toEqual({
-      recallAt6: 0.5,
-      precisionAt6: 1 / 6,
-      mrrAt6: 0.5,
-    });
-  });
-  it("没有单价不虚构金额，缺失标注不跑付费模型", async () => {
-    const dependencies = makeDependencies();
-    const report = await evaluateKnowledgeRetrieval(
-      "owner",
-      "base",
-      [{ id: "q1", query: "问题", relevantChunkIds: ["9"] }],
-      dependencies,
-    );
-    expect(report.incrementalRerankCost.estimatedCny).toBeNull();
-    dependencies.reranker.rerank.mockClear();
-    await expect(
-      evaluateKnowledgeRetrieval(
-        "owner",
-        "base",
-        [{ id: "q1", query: "问题", relevantChunkIds: [] }],
-        dependencies,
-      ),
-    ).rejects.toThrow();
-    expect(dependencies.reranker.rerank).not.toHaveBeenCalled();
   });
 });

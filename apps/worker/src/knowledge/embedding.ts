@@ -10,7 +10,11 @@ export type KnowledgeEmbedder = {
 
 export function createKnowledgeEmbedder(
   env: NodeJS.ProcessEnv = process.env,
+  onUsage?: (tokens: number) => void,
+  batchSize = 10,
 ): KnowledgeEmbedder {
+  if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 20)
+    throw new Error("INVALID_EMBEDDING_BATCH_SIZE");
   const {
     EMBEDDING_BASE_URL: baseURL,
     DASHSCOPE_API_KEY: apiKey,
@@ -28,8 +32,8 @@ export function createKnowledgeEmbedder(
     model,
     async embed(texts) {
       const vectors: number[][] = [];
-      for (let offset = 0; offset < texts.length; offset += 10) {
-        const batch = texts.slice(offset, offset + 10);
+      for (let offset = 0; offset < texts.length; offset += batchSize) {
+        const batch = texts.slice(offset, offset + batchSize);
         const result = await embedMany({
           model: provider.embeddingModel(model),
           values: batch,
@@ -37,6 +41,7 @@ export function createKnowledgeEmbedder(
           abortSignal: AbortSignal.timeout(60_000),
           providerOptions: { openai: { dimensions: KNOWLEDGE_DIMENSIONS } },
         });
+        onUsage?.(result.usage.tokens);
         if (result.embeddings.length !== batch.length)
           throw new Error("INVALID_EMBEDDING_COUNT");
         result.embeddings.forEach(validateKnowledgeVector);

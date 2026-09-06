@@ -5,7 +5,10 @@ import { beforeAll, afterAll, expect, it } from "vitest";
 import { createDatabase } from "./client";
 import { migrateDatabase } from "./migration";
 import { loadIntegrationTestEnvironment } from "./test-environment";
-import { knowledgeSearchQueries } from "./knowledge-search";
+import {
+  executeKnowledgeSearch,
+  knowledgeSearchQueries,
+} from "./knowledge-search";
 
 const databaseUrl = loadIntegrationTestEnvironment();
 const database = createDatabase(databaseUrl, 1);
@@ -81,6 +84,29 @@ it("同一条业务 SQL 可以走 HNSW，过滤 90% 候选后迭代补足 30 条
   expect(
     settings[0]?.hnsw_iterative_scan ?? settings[0]?.["hnsw.iterative_scan"],
   ).not.toBe("strict_order");
+});
+
+it("评测显式取 50 条时复用业务执行路径，仍保留归属过滤", async () => {
+  const result = await executeKnowledgeSearch(
+    database.db,
+    knowledgeSearchQueries(
+      owner,
+      base,
+      "数据库",
+      [1, ...Array(1023).fill(0)],
+      "test",
+      50,
+    ),
+  );
+  expect(result.semantic).toHaveLength(50);
+  expect(result.lexical).toHaveLength(50);
+  expect(
+    [...result.semantic, ...result.lexical].every(
+      (hit) => hit.documentId === doc,
+    ),
+  ).toBe(true);
+  expect(result.timing.semanticMs).toBeGreaterThanOrEqual(0);
+  expect(result.timing.lexicalMs).toBeGreaterThanOrEqual(0);
 });
 
 it("BM25 候选可使用索引，并且不会返回其他账户的 chunk", async () => {

@@ -6,7 +6,7 @@ import {
 } from "@ai-chat/contracts";
 import { and, eq, sql } from "drizzle-orm";
 import { getDatabase } from "./client";
-import { knowledgeSearchQueries } from "./knowledge-search";
+import { executeKnowledgeSearch, knowledgeSearchQueries } from "./knowledge-search";
 import {
   knowledgeBases,
   knowledgeChunks,
@@ -177,15 +177,8 @@ export function createKnowledgeRepository(db = getDatabase()) {
         vector,
         model,
       );
-      const [semantic, lexical] = await Promise.all([
-        db.transaction(async (tx) => {
-          // 仅作用于当前事务，不污染连接池；达到扫描上限时仍可能不足 30 条。
-          await tx.execute(sql`SET LOCAL hnsw.iterative_scan = strict_order`);
-          return tx.execute<KnowledgeHit>(queries.semantic);
-        }),
-        db.execute<KnowledgeHit>(queries.lexical),
-      ]);
-      return { semantic: [...semantic], lexical: [...lexical] };
+      const { semantic, lexical } = await executeKnowledgeSearch(db, queries);
+      return { semantic, lexical };
     },
   };
 }

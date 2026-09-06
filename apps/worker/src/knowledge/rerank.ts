@@ -7,6 +7,7 @@ export type KnowledgeReranker = {
   rerank(
     query: string,
     candidates: KnowledgeHit[],
+    options?: { topN?: number },
   ): Promise<{
     hits: RerankedKnowledgeHit[];
     totalTokens: number | null;
@@ -39,12 +40,19 @@ export function createKnowledgeReranker(
   const endpoint = `${baseURL.replace(/\/$/, "")}/services/rerank/text-rerank/text-rerank`;
   return {
     model,
-    async rerank(query, candidates) {
+    async rerank(query, candidates, options) {
+      const requestedTopN = options?.topN ?? 6;
+      if (
+        !Number.isInteger(requestedTopN) ||
+        requestedTopN < 1 ||
+        requestedTopN > 60
+      )
+        throw new Error("INVALID_RERANK_TOP_N");
       if (!query.trim() || query.length > 2000 || candidates.length > 60)
         throw new Error("INVALID_RERANK_INPUT");
       if (!candidates.length)
         return { hits: [], totalTokens: 0, requestId: null };
-      const topN = Math.min(6, candidates.length);
+      const topN = Math.min(requestedTopN, candidates.length);
       try {
         // 仅传 chunk 正文，不发送账户、对象存储 key 或其他内部元数据。
         const response = await fetch(endpoint, {

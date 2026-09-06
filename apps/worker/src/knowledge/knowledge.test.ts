@@ -79,7 +79,13 @@ describe("知识库解析与检索基线", () => {
   it("切块边界不会切断 emoji", async () => {
     const chunks = await chunkPages([{ page: 1, text: "a😀b" }], 2, 1);
     expect(chunks.map((c) => c.content).join("")).toBe("a😀b");
-    expect(chunks.every((c) => new TextDecoder().decode(new TextEncoder().encode(c.content)) === c.content)).toBe(true);
+    expect(
+      chunks.every(
+        (c) =>
+          new TextDecoder().decode(new TextEncoder().encode(c.content)) ===
+          c.content,
+      ),
+    ).toBe(true);
   });
   it("优先保留段落，中文标点可作为递归分隔符", async () => {
     const text =
@@ -153,17 +159,40 @@ describe("知识库解析与检索基线", () => {
       }),
     );
     try {
-      const embedder = createKnowledgeEmbedder({
-        EMBEDDING_BASE_URL: "https://example.test/v1",
-        DASHSCOPE_API_KEY: "test-key",
-        EMBEDDING_MODEL: "test",
-      });
+      const onUsage = vi.fn();
+      const embedder = createKnowledgeEmbedder(
+        {
+          EMBEDDING_BASE_URL: "https://example.test/v1",
+          DASHSCOPE_API_KEY: "test-key",
+          EMBEDDING_MODEL: "test",
+        },
+        onUsage,
+      );
       const result = await embedder.embed(
         Array.from({ length: 21 }, (_, i) => String(i)),
       );
       expect(batches).toEqual([10, 10, 1]);
+      expect(onUsage).toHaveBeenCalledTimes(3);
+      expect(onUsage.mock.calls.map(([tokens]) => tokens)).toEqual([1, 1, 1]);
       expect(result.map((v) => v[0])).toEqual(
         Array.from({ length: 21 }, (_, i) => i + 1),
+      );
+      batches.length = 0;
+      const evaluationEmbedder = createKnowledgeEmbedder(
+        {
+          EMBEDDING_BASE_URL: "https://example.test/v1",
+          DASHSCOPE_API_KEY: "test-key",
+          EMBEDDING_MODEL: "test",
+        },
+        undefined,
+        20,
+      );
+      await evaluationEmbedder.embed(
+        Array.from({ length: 21 }, (_, i) => String(i)),
+      );
+      expect(batches).toEqual([20, 1]);
+      expect(() => createKnowledgeEmbedder({}, undefined, 21)).toThrow(
+        "INVALID_EMBEDDING_BATCH_SIZE",
       );
     } finally {
       vi.unstubAllGlobals();
