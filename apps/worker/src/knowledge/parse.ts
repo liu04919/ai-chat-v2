@@ -1,30 +1,46 @@
 import { KNOWLEDGE_MAX_BYTES, type KnowledgeChunk } from "@ai-chat/contracts";
 import { PDFParse } from "pdf-parse";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 
-export function chunkPages(
+class UnicodeTextSplitter extends RecursiveCharacterTextSplitter {
+  override splitOnSeparator(text: string, separator: string) {
+    // 库的空分隔符回退使用 split("")；仅改为按码点拆分，避免切断 emoji。
+    return separator
+      ? super.splitOnSeparator(text, separator)
+      : Array.from(text);
+  }
+}
+
+export async function chunkPages(
   pages: { page: number; text: string }[],
   size = 800,
   overlap = 100,
-): KnowledgeChunk[] {
-  if (size < 1 || overlap < 0 || overlap >= size)
+): Promise<KnowledgeChunk[]> {
+  if (
+    !Number.isInteger(size) ||
+    !Number.isInteger(overlap) ||
+    size < 1 ||
+    overlap < 0 ||
+    overlap >= size
+  )
     throw new Error("INVALID_CHUNK_SIZE");
+  const splitter = new UnicodeTextSplitter({
+    chunkSize: size,
+    chunkOverlap: overlap,
+    separators: ["\n\n", "\n", "。", "！", "？", ";", "；", "，", ",", " ", ""],
+    keepSeparator: true,
+  });
   const chunks: KnowledgeChunk[] = [];
   for (const { page, text } of pages) {
-    for (let start = 0; start < text.length; ) {
-      let end = Math.min(start + size, text.length);
-      // UTF-16 下 emoji 可能占两个码元，不能把代理对切成无法入库的半个字符。
-      if (
-        end < text.length &&
-        /[\uD800-\uDBFF]/.test(text[end - 1]!) &&
-        /[\uDC00-\uDFFF]/.test(text[end]!)
-      )
-        end++;
-      if (text.slice(start, end).trim())
-        chunks.push({ content: text.slice(start, end), page, start, end });
+    let searchFrom = 0;
+    for (const content of await splitter.splitText(text)) {
+      // splitter 保留分隔符但会 trim；从前一块允许的重叠范围定位原文。
+      const start = text.indexOf(content, searchFrom);
+      if (start < 0) throw new Error("CHUNK_LOCATION_NOT_FOUND");
+      const end = start + content.length;
+      chunks.push({ content, page, start, end });
       if (chunks.length > 1000) throw new Error("DOCUMENT_TOO_LARGE");
-      if (end === text.length) break;
-      start = end - overlap;
-      if (/[\uDC00-\uDFFF]/.test(text[start] ?? "")) start++;
+      searchFrom = Math.max(start + 1, end - overlap);
     }
   }
   if (!chunks.length) throw new Error("NO_EXTRACTABLE_TEXT");

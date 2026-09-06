@@ -6,6 +6,7 @@ import {
 } from "@ai-chat/contracts";
 import { and, eq, sql } from "drizzle-orm";
 import { getDatabase } from "./client";
+import { knowledgeSearchQueries } from "./knowledge-search";
 import {
   knowledgeBases,
   knowledgeChunks,
@@ -169,18 +170,20 @@ export function createKnowledgeRepository(db = getDatabase()) {
       validateKnowledgeVector(vector);
       if (!query.trim() || query.length > 2000)
         throw new Error("INVALID_QUERY");
-      // 先按账户、知识库和模型筛选，再精确排序；小规模基线不依赖 ANN 的过滤后召回量。
-      const eligible = sql`SELECT c.*, d.original_name FROM knowledge_chunks c
-        JOIN knowledge_documents d ON d.id = c.document_id JOIN knowledge_bases b ON b.id = d.knowledge_base_id
-        WHERE b.id = ${baseId} AND b.owner_id = ${ownerId} AND d.status = 'ready' AND d.embedding_model = ${model}`;
-      const fields = sql`id, document_id AS "documentId", original_name AS "originalName", content, page, start_offset AS start, end_offset AS end`;
+      const queries = knowledgeSearchQueries(
+        ownerId,
+        baseId,
+        query,
+        vector,
+        model,
+      );
       const [semantic, lexical] = await Promise.all([
-        db.execute<KnowledgeHit>(
-          sql`WITH eligible AS MATERIALIZED (${eligible}) SELECT ${fields}, embedding <=> ${JSON.stringify(vector)}::vector AS score FROM eligible ORDER BY score, id LIMIT 20`,
-        ),
-        db.execute<KnowledgeHit>(
-          sql`WITH eligible AS MATERIALIZED (${eligible}), ranked AS (SELECT ${fields}, content <@> to_bm25query(${query}, 'knowledge_chunks_bm25_idx') AS score FROM eligible) SELECT * FROM ranked WHERE score < 0 ORDER BY score, id LIMIT 20`,
-        ),
+        db.transaction(async (tx) => {
+          // 仅作用于当前事务，不污染连接池；达到扫描上限时仍可能不足 30 条。
+          await tx.execute(sql`SET LOCAL hnsw.iterative_scan = strict_order`);
+          return tx.execute<KnowledgeHit>(queries.semantic);
+        }),
+        db.execute<KnowledgeHit>(queries.lexical),
       ]);
       return { semantic: [...semantic], lexical: [...lexical] };
     },

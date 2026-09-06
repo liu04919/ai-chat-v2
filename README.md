@@ -71,12 +71,13 @@ pnpm --filter @ai-chat/worker knowledge delete <ownerId> <baseId> <documentId>
 当前基线参数：
 
 - UTF-8 TXT/Markdown、文本型 PDF，文件不超过 10 MB，PDF 不超过 200 页；不做 OCR。
-- 每块约 800 个 UTF-16 码元、重叠约 100，不跨 PDF 页，最多 1000 块；保留页码和提取文本内的位置。它不是 token 切块，也没有标题/表格结构解析。
+- 使用 `@langchain/textsplitters` 的递归切块器，优先按段落、换行、中文标点拆分，再回退到字符。目标上限 800 个 UTF-16 码元，重叠预算 100（不保证每块正好重叠 100）；不跨 PDF 页，最多 1000 块。薄适配只处理 Unicode 码点回退和原文位置，不重新实现递归算法。保留页码和提取文本内的位置；不是 token 切块，也没有标题/表格结构解析。
 - Embedding 每批 10 条，每批 60 秒超时，不自动重试。使用百炼 OpenAI 兼容接口，未启用 DashScope 原生接口的 query/document 区分。
-- 按账户、知识库、ready 状态和 Embedding 模型过滤，语义与 BM25 各取 20 条，RRF（常数 60）取前 6 条。RRF 分数不是置信度；无答案拒答策略尚未接入。
-- 当前先过滤再精确计算向量距离，作为小规模召回基线；虽然建有 HNSW 索引，该查询不以 ANN 加速。后续用评测结果决定是否切换，并检查过滤后的召回量。BM25 使用共享索引的语料统计，不是每个知识库独立计算 IDF。
+- 按账户、知识库、ready 状态和 Embedding 模型过滤，语义与 BM25 各取 30 条，RRF（常数 60）取前 6 条。RRF 分数不是置信度；精排和无答案拒答策略尚未接入。
+- 查询先取得允许访问的文档 ID，把该过滤放进 chunk 的 Top K 查询。向量直接按余弦距离排序，BM25 直接按索引打分排序；只物化已取出的候选，不预先物化全部 chunk。向量查询在事务内设置 `SET LOCAL hnsw.iterative_scan = strict_order`，补充过滤后的候选；受扫描上限约束，并非保证召回齐全。正式查询不强制索引，执行计划由 PostgreSQL 选择。
+- BM25 继续使用共享索引的语料统计，不是每个知识库独立计算 IDF。分块变更只影响新上传的文档；已有文档若要采用新策略，需要重新上传，不自动改写已有向量。
 
-测试覆盖数据库/队列、账户隔离、失败与重复任务、原子发布、删除、解析和分批请求。测试使用可控向量验证流程，不能当成检索效果跑分；效果评测需要另外准备标注问题与相关 chunk。
+测试覆盖数据库/队列、账户隔离、失败与重复任务、原子发布、删除、解析和分批请求。`knowledge-search.integration.test.ts` 使用同一条业务 SQL 执行 `EXPLAIN (ANALYZE, BUFFERS)`，在仅测试启用的计划设置下验证两个索引可用，以及过滤掉 90% 数据后返回 30 条。测试使用可控向量验证流程，不能当成检索效果或性能跑分；效果评测需要另外准备标注问题与相关 chunk。
 
 ```bash
 pnpm exec vitest run packages/db/src/rag-extensions.integration.test.ts
