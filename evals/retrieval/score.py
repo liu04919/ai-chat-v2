@@ -11,13 +11,13 @@ ARMS = ["vector", "bm25", "hybrid", "hybrid_rerank"]
 METRICS = ["precision@5", "precision@10", "recall@5", "recall@10", "recall@50", "ndcg@10", "mrr@10"]
 
 
-def evaluate_runs(qrels_dict, rows):
+def evaluate_runs(qrels_dict, rows, arms=None):
     ids = [r["id"] for r in rows]
     if len(ids) != len(set(ids)) or set(ids) != set(qrels_dict):
         raise ValueError("结果必须覆盖全部选定问题且 ID 不重复；不允许静默丢弃失败样本")
     qrels = Qrels(qrels_dict)
     scores, per_query = {}, {}
-    for arm in ARMS:
+    for arm in ARMS if arms is None else arms:
         run_dict = {}
         for row in rows:
             hits = row["runs"][arm]

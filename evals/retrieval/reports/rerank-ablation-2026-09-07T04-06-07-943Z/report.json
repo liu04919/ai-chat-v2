@@ -1,0 +1,232 @@
+{
+  "status": "complete",
+  "queries": 100,
+  "corpusCount": 100001,
+  "engine": "ranx 0.3.21",
+  "metrics": {
+    "vector": {
+      "precision@5": 0.6579999999999999,
+      "precision@10": 0.442,
+      "recall@5": 0.7529678932178931,
+      "recall@10": 0.9248744588744588,
+      "recall@50": 0.9848282828282828,
+      "ndcg@10": 0.8841558880385735,
+      "mrr@10": 0.91
+    },
+    "bm25": {
+      "precision@5": 0.4720000000000001,
+      "precision@10": 0.301,
+      "recall@5": 0.5134632034632035,
+      "recall@10": 0.6160393217893217,
+      "recall@50": 0.7456233766233765,
+      "ndcg@10": 0.6154030161593875,
+      "mrr@10": 0.7451111111111111
+    },
+    "hybrid": {
+      "precision@5": 0.5720000000000001,
+      "precision@10": 0.37799999999999995,
+      "recall@5": 0.6295155122655123,
+      "recall@10": 0.7970955988455988,
+      "recall@50": 0.9671414141414141,
+      "ndcg@10": 0.7654481398039564,
+      "mrr@10": 0.8730238095238094
+    },
+    "vector_rerank": {
+      "precision@5": 0.7,
+      "precision@10": 0.44900000000000007,
+      "recall@5": 0.8063647186147186,
+      "recall@10": 0.9449621212121212,
+      "recall@50": 0.9848282828282828,
+      "ndcg@10": 0.9309461233261525,
+      "mrr@10": 0.9653333333333333
+    },
+    "hybrid_rerank": {
+      "precision@5": 0.7,
+      "precision@10": 0.44400000000000006,
+      "recall@5": 0.7996980519480519,
+      "recall@10": 0.9321994949494951,
+      "recall@50": 0.9671414141414141,
+      "ndcg@10": 0.9257633688283973,
+      "mrr@10": 0.9633333333333333
+    }
+  },
+  "comparisons": {
+    "vector_rerank-vector": {
+      "ndcg@10": {
+        "meanDelta": 0.04679023528757896,
+        "pairedBootstrap95CI": [
+          0.02325900012169932,
+          0.07134361518409507
+        ],
+        "wins": 46,
+        "ties": 35,
+        "losses": 19
+      },
+      "recall@10": {
+        "meanDelta": 0.020087662337662345,
+        "pairedBootstrap95CI": [
+          -0.00398530844155844,
+          0.04821980519480518
+        ],
+        "wins": 14,
+        "ties": 78,
+        "losses": 8
+      },
+      "mrr@10": {
+        "meanDelta": 0.05533333333333333,
+        "pairedBootstrap95CI": [
+          0.0225,
+          0.09158333333333334
+        ],
+        "wins": 13,
+        "ties": 85,
+        "losses": 2
+      }
+    },
+    "hybrid_rerank-hybrid": {
+      "ndcg@10": {
+        "meanDelta": 0.16031522902444087,
+        "pairedBootstrap95CI": [
+          0.12260257418904702,
+          0.2000307745202019
+        ],
+        "wins": 66,
+        "ties": 29,
+        "losses": 5
+      },
+      "recall@10": {
+        "meanDelta": 0.1351038961038961,
+        "pairedBootstrap95CI": [
+          0.09625062229437228,
+          0.17627196969696968
+        ],
+        "wins": 44,
+        "ties": 53,
+        "losses": 3
+      },
+      "mrr@10": {
+        "meanDelta": 0.09030952380952381,
+        "pairedBootstrap95CI": [
+          0.043997619047619056,
+          0.14307321428571426
+        ],
+        "wins": 14,
+        "ties": 85,
+        "losses": 1
+      }
+    },
+    "hybrid_rerank-vector_rerank": {
+      "ndcg@10": {
+        "meanDelta": -0.0051827544977552245,
+        "pairedBootstrap95CI": [
+          -0.016485764663587005,
+          0.0043107652999173265
+        ],
+        "wins": 4,
+        "ties": 90,
+        "losses": 6
+      },
+      "recall@10": {
+        "meanDelta": -0.012762626262626262,
+        "pairedBootstrap95CI": [
+          -0.0385959595959596,
+          0.005849873737373717
+        ],
+        "wins": 2,
+        "ties": 92,
+        "losses": 6
+      },
+      "mrr@10": {
+        "meanDelta": -0.002,
+        "pairedBootstrap95CI": [
+          -0.006000000000000001,
+          0.0
+        ],
+        "wins": 0,
+        "ties": 99,
+        "losses": 1
+      }
+    }
+  },
+  "candidateSummary": {
+    "queriesWithRelevantAdded": 1,
+    "queriesWithRelevantDropped": 6,
+    "queriesWithBoth": 0,
+    "addedRelevantPairs": 1,
+    "droppedRelevantPairs": 7,
+    "meanAddedCandidates": 18.35
+  },
+  "legacyHybridRerankStability": {
+    "meanDelta": 0.0,
+    "pairedBootstrap95CI": [
+      0.0,
+      0.0
+    ],
+    "wins": 0,
+    "ties": 100,
+    "losses": 0,
+    "identicalTop10Queries": 100
+  },
+  "rerankOnlyTiming": {
+    "vector_rerank": {
+      "p50Ms": 191.7154999999998,
+      "p95Ms": 373.7561549999994,
+      "knownTokens": 1404380,
+      "missingUsage": 0
+    },
+    "hybrid_rerank": {
+      "p50Ms": 201.21650000000045,
+      "p95Ms": 343.1444699999969,
+      "knownTokens": 1446845,
+      "missingUsage": 0
+    }
+  },
+  "failedAttempts": [],
+  "cost": {
+    "limitCny": 20,
+    "accountedCny": 12.865390500000016,
+    "actualTokens": 25652692,
+    "unresolvedRequests": 4,
+    "pricing": "CNY 0.5 / million input tokens, Beijing, both models; no free quota assumed",
+    "incrementalAccountedCny": 1.4256124999999908
+  },
+  "run": {
+    "parameters": {
+      "baselineFiles": {
+        "manifest.json": "97b1849855dbd2ac577e9e24b675f0ca1fec20cfd8447ed9b6c57d32c95ad843",
+        "run.json": "28f6384118d2251e01c17dbc020a8185ec30b443bd0ee0016c0f827d0f51d279",
+        "results.jsonl": "03d7483644736d90a679e96b51a7ac70ae133aef78c94104fefe161940f1345e",
+        "qrels.json": "0349063c1134017486c1fe54b9ebf40fccc8125c0217c092ef820ec19b00fda3"
+      },
+      "sourceHashes": {
+        "apps/worker/src/knowledge/rerank.ts": "f8bf7cdb6a0435b36521affe783c6e8ee489fd4e99631d50325260537fe70afc",
+        "evals/retrieval/src/rerank-ablation.ts": "ea1d51b5a3c5221dc29f5153b3382b6a612bb50b38848029a160786b83d07efc",
+        "evals/retrieval/src/rerank-ablation-support.ts": "d7386ed7d7e6df348e3d3ec94824e737c9af619cb4b5d190ebe88020356a4170",
+        "evals/retrieval/src/support.ts": "19d336916b14879d1b3dd02b2de7b1dbdb5d039193fecc61789b7624bf9089d5"
+      },
+      "rerankModel": "qwen3.7-text-rerank",
+      "providerEndpointHash": "9d919c69f8e6517e521159bf941fcd4a4e3e1b4c0426744c2b0c5a914d93eb40",
+      "candidateLimit": 50,
+      "rerankTopN": 50,
+      "order": "alternate vector-first and hybrid-first by fixed query order; sequential requests"
+    },
+    "startedAt": "2026-09-07T04:06:07.943Z",
+    "baselineStartedAt": "2026-09-06T10:25:28.224Z",
+    "corpusCount": 100001,
+    "queries": 100,
+    "budgetAtStart": {
+      "limitCny": 20,
+      "accountedCny": 11.439778000000025,
+      "actualTokens": 22801467,
+      "unresolvedRequests": 4,
+      "pricing": "CNY 0.5 / million input tokens, Beijing, both models; no free quota assumed"
+    },
+    "gitCommit": "7af077cbef9d10e0686d6994e667324e40dcdbdb",
+    "dirty": true,
+    "timingPolicy": "Only rerank requests timed freshly; no database, SQL or embedding calls. Old retrieval timings are not current end-to-end latency."
+  },
+  "scorerHashes": {
+    "score.py": "54b4208e873c5b5c30ce8abc68f6573d8111e975811f5848102799d8504ec432",
+    "rerank_score.py": "cc6b7cfe60391a7a3e3ac98f41946ace5d858a45154aea9f34e6874af5bf3bcf"
+  }
+}

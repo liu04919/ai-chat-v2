@@ -54,6 +54,30 @@ evals/retrieval/.venv/Scripts/python.exe evals/retrieval/score.py --publish
 
 `score.py --publish` 另外把报告、来源参数和逐题指标归档到 `reports/<运行时间>/`，可随代码提交，不包含文档正文或密钥。原始排名文件保留在本地 artifacts。
 
+## 补测：纯向量＋精排 vs 混合＋精排
+
+运行 `rerank-ablation` 复用上述完整实验的原始候选和 passage，不重新调用 Embedding、不连接数据库，也不覆盖旧排名或旧报告。两组均使用 50 条候选、相同模型、本轮新调用精排，逐题交替调用先后顺序；仅重排，不改写问题、不截断原文。这是固定精排预算的对照，不是完整候选并集实验。
+
+```powershell
+pnpm --filter @ai-chat/retrieval-eval rerank-ablation estimate
+pnpm --filter @ai-chat/retrieval-eval rerank-ablation run
+evals/retrieval/.venv/Scripts/python.exe evals/retrieval/rerank_score.py --publish
+```
+
+- 补测输出独立保存在 `artifacts/duretrieval-rerank-ablation/`，报告归档到 `reports/rerank-ablation-<时间>/`。保留基线、运行源码和评分代码的 SHA256；输入或运行代码变化时拒绝续跑，不覆盖原实验。
+- 与原实验共用 `artifacts/duretrieval/runner.lock` 和 `usage.jsonl`，累计上限仍为 ¥20，不重新发放预算。`estimate` 输出所有请求保守预留之和，不是预计账单；实际逐请求检查预算，成功按 usage 结算。补测目录 `cost.json` 同时记录新增和累计记账，原目录 `cost.json` 保留旧报告时点的值。
+- 每完成一次精排保存断点，已完成的 query/arm 不再调用；失败保留预算预留、写入失败记录并退出，没有自动重试。确认原因后重新运行同一命令即可续跑。两组未覆盖全部问题时拒绝评分。
+- `rerank_score.py` 复用 ranx，核对旧排名重算成绩与旧报告一致，保存五组指标、逐题胜平负、配对 bootstrap 区间、BM25 新增/丢失相关候选及旧混合精排重跑稳定性。新测耗时仅含精排请求，不包装成完整检索延迟或吞吐压测。
+
+2026-09-07 补测：纯向量＋精排 nDCG@10 **0.9309**，混合＋精排 **0.9258**；混合减纯向量的 95% CI 为 **[-0.0165, +0.0043]**，逐题胜/平/负 **4/90/6**。本样本未证明 BM25 在精排之后有稳定增益；不能推导为 BM25 普遍无用。精排相对各自未精排版本的收益仍然成立。详见 [补测报告](reports/rerank-ablation-2026-09-07T04-06-07-943Z/report.md)。
+
+补测无付费验证：
+
+```powershell
+pnpm exec vitest run evals/retrieval/src/rerank-ablation-support.test.ts evals/retrieval/src/support.test.ts apps/worker/src/knowledge/rerank.test.ts
+evals/retrieval/.venv/Scripts/python.exe -m unittest discover -s evals/retrieval -p 'test_*.py'
+```
+
 不要在既有目录里改参数覆盖结果；有结果后更换源码/配置会明确报错，需要先归档整个运行目录。重新准备/导入公开数据不意味着可以删除用户业务库。
 
 ## 无付费验证
