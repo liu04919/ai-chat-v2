@@ -27,6 +27,7 @@ export type KnowledgeRetrievalDependencies = {
     "requireOwner" | "retrieve"
   >;
   embedder: KnowledgeEmbedder;
+  signal?: AbortSignal;
 };
 
 export async function retrieveKnowledgeCandidates(
@@ -38,7 +39,9 @@ export async function retrieveKnowledgeCandidates(
   const { repository, embedder } = dependencies;
   await repository.requireOwner(ownerId, baseId);
   if (!query.trim() || query.length > 2000) throw new Error("INVALID_QUERY");
-  const [vector] = await embedder.embed([query]);
+  dependencies.signal?.throwIfAborted();
+  const [vector] = await embedder.embed([query], dependencies.signal);
+  dependencies.signal?.throwIfAborted();
   const result = await repository.retrieve(
     ownerId,
     baseId,
@@ -63,5 +66,6 @@ export async function retrieveKnowledge(
     query,
     dependencies,
   );
-  return (await dependencies.reranker.rerank(query, candidates)).hits;
+  dependencies.signal?.throwIfAborted();
+  return (await dependencies.reranker.rerank(query, candidates, { signal: dependencies.signal })).hits;
 }

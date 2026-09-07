@@ -6,6 +6,7 @@ import { Brain, Wrench } from "lucide-react";
 
 import { MessageAttachment } from "./message-attachment";
 import { MessageMarkdown } from "./message-markdown";
+import { KnowledgeSources } from "@/components/knowledge/knowledge-sources";
 
 type MessagePartsDto = UserMessagePartsDto | AssistantMessageViewPartsDto;
 
@@ -22,13 +23,17 @@ export function MessageParts({
   expandedReasoningIds?: ReadonlySet<string>;
   onReasoningToggle?: (partId: string, open: boolean) => void;
 }>) {
+  const sources = parts.flatMap((p) => p.type === "knowledge-sources" ? p.sources : []);
   return parts.map((part, index) => {
     switch (part.type) {
+      case "knowledge-sources":
+        return <KnowledgeSources key={part.id} sources={part.sources} />;
       case "text":
         return (
           <MessageMarkdown
             key={"id" in part ? part.id : `text-${index}`}
             text={part.text}
+            sources={sources}
           />
         );
       case "reasoning":

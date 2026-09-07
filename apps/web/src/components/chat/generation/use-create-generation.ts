@@ -100,7 +100,7 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
 
       return previousDetail;
     },
-    onSuccess: (response, { target }) => {
+    onSuccess: (response, { target, knowledgeBaseId }) => {
       const conversationId = target.conversationId;
 
       if (target.type === "new") {
@@ -125,7 +125,7 @@ export function createGenerationMutationOptions(queryClient: QueryClient) {
             return {
               ...current,
               activeGeneration,
-              latestGeneration: { id, status },
+              latestGeneration: { id, status, knowledgeBaseId: knowledgeBaseId ?? null },
             };
           },
         );

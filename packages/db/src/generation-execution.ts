@@ -54,6 +54,7 @@ export type ClaimedGenerationExecution = {
   mode: "chat" | "image";
   reasoningEffort: ReasoningEffortDto | null;
   tools: GenerationToolSelectionDto;
+  knowledgeBaseId?: string | null;
   messages: GenerationExecutionMessageRecord[];
   attachments: GenerationExecutionAttachmentRecord[];
 };
@@ -102,6 +103,7 @@ export async function claimGenerationExecution(
         reasoningEffort: generations.reasoningEffort,
         webSearchEnabled: generations.webSearchEnabled,
         mcpToolIds: generations.mcpToolIds,
+        knowledgeBaseId: generations.knowledgeBaseId,
       });
 
     if (!claimed) {
@@ -185,6 +187,7 @@ export async function claimGenerationExecution(
         ownerId: conversation.ownerId,
         mode: conversation.mode,
         reasoningEffort: claimed.reasoningEffort,
+        knowledgeBaseId: claimed.knowledgeBaseId,
         tools: {
           webSearch: claimed.webSearchEnabled,
           mcpToolIds: claimed.mcpToolIds,

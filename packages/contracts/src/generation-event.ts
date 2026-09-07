@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { knowledgeSourceSchema } from "./knowledge";
 
 const generationEventBase = {
   generationId: z.string().min(1),
@@ -71,6 +72,12 @@ export const generationCancelledEventSchema = z
   .strict();
 
 export const generationEventSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("knowledge.sources"),
+    ...generationEventBase,
+    partId: z.string().min(1),
+    sources: z.array(knowledgeSourceSchema).max(6),
+  }).strict(),
   generationStartedEventSchema,
   textDeltaEventSchema,
   reasoningDeltaEventSchema,

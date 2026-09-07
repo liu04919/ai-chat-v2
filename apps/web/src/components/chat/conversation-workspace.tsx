@@ -108,6 +108,7 @@ export function ConversationWorkspace({
     parts,
     reasoningEffort,
     tools,
+    knowledgeBaseId,
   }: ChatComposerSubmission) {
     cancelMutation.reset();
     await createMutation.mutateAsync({
@@ -116,6 +117,7 @@ export function ConversationWorkspace({
       parts,
       reasoningEffort,
       tools,
+      knowledgeBaseId,
     });
   }
 
@@ -190,6 +192,8 @@ export function ConversationWorkspace({
 
       <div className="mx-auto w-full max-w-3xl shrink-0 px-5 pb-6">
         <ChatComposer
+          key={conversationId}
+          initialKnowledgeBaseId={initialDetail.latestGeneration?.knowledgeBaseId ?? null}
           disabled={isGenerating}
           isSubmitting={createMutation.isPending}
           isStopping={cancelMutation.isPending}

@@ -197,6 +197,31 @@ function createFinalAnswerStream(): string {
 }
 
 describe("CatAPI Chat Adapter", () => {
+  it("发送本轮 RAG 指令，但不将旧引用原文重复发送给模型", async () => {
+    const requests: Request[] = [];
+    const model = createCatApiChatModel({
+      baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model",
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        return new Response(createFinalAnswerStream(), { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    for await (const part of model.stream({
+      instructions: "本轮仅引用提供的资料", reasoningEffort: "medium",
+      messages: [
+        { role: "assistant", parts: [
+          { id: "sources", type: "knowledge-sources", sources: [{ number: 1, chunkId: "c", documentId: "d", originalName: "old.txt", page: 1, content: "旧引用原文不应重发" }] },
+          { id: "text", type: "text", text: "历史回答需要保留" },
+        ] },
+        { role: "user", parts: [{ type: "text", text: "继续" }] },
+      ],
+    })) expect(part).toHaveProperty("type");
+    const body = await requests[0]!.text();
+    expect(body).toContain("本轮仅引用提供的资料");
+    expect(body).toContain("历史回答需要保留");
+    expect(body).not.toContain("旧引用原文不应重发");
+    expect(body).not.toContain("old.txt");
+  });
   it.each([1, 2])("为 %i 个无结果调用补齐历史，保留文字和已有结果，不重新执行工具", async (count) => {
     const history: Extract<ChatModelMessage, { role: "assistant" }> = {
       role: "assistant",

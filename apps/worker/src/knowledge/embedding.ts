@@ -5,7 +5,7 @@ import { embedMany } from "ai";
 
 export type KnowledgeEmbedder = {
   model: string;
-  embed(texts: string[]): Promise<number[][]>;
+  embed(texts: string[], signal?: AbortSignal): Promise<number[][]>;
 };
 
 export function createKnowledgeEmbedder(
@@ -30,7 +30,7 @@ export function createKnowledgeEmbedder(
   const provider = createOpenAI({ baseURL, apiKey });
   return {
     model,
-    async embed(texts) {
+    async embed(texts, signal) {
       const vectors: number[][] = [];
       for (let offset = 0; offset < texts.length; offset += batchSize) {
         const batch = texts.slice(offset, offset + batchSize);
@@ -38,7 +38,7 @@ export function createKnowledgeEmbedder(
           model: provider.embeddingModel(model),
           values: batch,
           maxRetries: 0,
-          abortSignal: AbortSignal.timeout(60_000),
+          abortSignal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000),
           providerOptions: { openai: { dimensions: KNOWLEDGE_DIMENSIONS } },
         });
         onUsage?.(result.usage.tokens);

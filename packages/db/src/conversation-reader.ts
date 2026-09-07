@@ -140,7 +140,7 @@ export async function getConversationRecordForOwner(
       .orderBy(desc(messages.sequence))
       .limit(CONVERSATION_MESSAGE_PAGE_SIZE + 1),
     database
-      .select({ id: generations.id, status: generations.status })
+      .select({ id: generations.id, status: generations.status, knowledgeBaseId: generations.knowledgeBaseId })
       .from(generations)
       .where(eq(generations.conversationId, row.id))
       .orderBy(desc(generations.createdAt), desc(generations.id))

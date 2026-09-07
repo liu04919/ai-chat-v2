@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { knowledgeSourcesPartSchema } from "./knowledge";
 
 const messageBase = {
   id: z.string().min(1),
@@ -76,6 +77,7 @@ export const assistantToolResultMessagePartSchema = z
   .strict();
 
 export const assistantMessagePartSchema = z.discriminatedUnion("type", [
+  knowledgeSourcesPartSchema,
   assistantReasoningMessagePartSchema,
   assistantTextMessagePartSchema,
   assistantAttachmentMessagePartSchema,
@@ -116,6 +118,7 @@ export const assistantToolResultViewPartSchema = z
   .strict();
 
 export const assistantMessageViewPartSchema = z.discriminatedUnion("type", [
+  knowledgeSourcesPartSchema,
   assistantReasoningMessagePartSchema,
   assistantTextMessagePartSchema,
   assistantAttachmentMessagePartSchema,

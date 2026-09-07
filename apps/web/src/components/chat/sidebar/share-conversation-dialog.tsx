@@ -62,7 +62,7 @@ export function ShareConversationDialog({
         <DialogHeader>
           <DialogTitle>分享对话</DialogTitle>
           <DialogDescription>
-            任何获得链接的人都可以查看。
+            任何获得链接的人都可以查看，包括回答中的知识库引用片段。
           </DialogDescription>
         </DialogHeader>
 

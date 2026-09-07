@@ -40,6 +40,8 @@ function throwForPersistenceResult(
   >,
 ): never {
   switch (result.kind) {
+    case "knowledge_not_found":
+      throw new GenerationServiceError({ code: "KNOWLEDGE_NOT_FOUND" }, 404);
     case "conversation_not_found":
       throw new GenerationServiceError(
         { code: "CONVERSATION_NOT_FOUND" },

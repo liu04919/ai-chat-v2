@@ -31,6 +31,7 @@ export const createGenerationRequestSchema = z
     parts: userMessagePartsSchema,
     reasoningEffort: reasoningEffortSchema.nullable(),
     tools: generationToolSelectionSchema,
+    knowledgeBaseId: z.string().min(1).max(100).nullable().optional(),
   })
   .strict()
   .superRefine((request, context) => {
@@ -59,6 +60,9 @@ export const createGenerationRequestSchema = z
     }
 
     const mode = request.target.type === "new" ? request.target.mode : null;
+    if (request.knowledgeBaseId && (mode === "image" || !request.parts.some((p) => p.type === "text" && p.text.trim()))) {
+      context.addIssue({ code: "custom", path: ["knowledgeBaseId"], message: "知识库问答需要文本问题，且仅支持聊天模式" });
+    }
     if (
       mode === "image" &&
       (request.tools.webSearch || request.tools.mcpToolIds.length > 0)
@@ -94,6 +98,7 @@ const simpleGenerationErrorSchema = z
       "UNAUTHORIZED",
       "INVALID_REQUEST",
       "CONVERSATION_NOT_FOUND",
+      "KNOWLEDGE_NOT_FOUND",
       "MESSAGE_ID_CONFLICT",
       "QUEUE_UNAVAILABLE",
     ]),

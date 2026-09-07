@@ -63,6 +63,7 @@ export function DraftWorkspace() {
     parts,
     reasoningEffort,
     tools,
+    knowledgeBaseId,
   }: ChatComposerSubmission) {
     const conversationId = crypto.randomUUID();
     await createMutation.mutateAsync({
@@ -71,6 +72,7 @@ export function DraftWorkspace() {
       parts,
       reasoningEffort,
       tools,
+      knowledgeBaseId,
     });
     startNavigation(() => {
       router.replace(`/chat/${conversationId}`);

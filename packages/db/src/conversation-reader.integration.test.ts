@@ -206,6 +206,7 @@ describe("Conversation ownership queries", () => {
       expect(detail?.latestGeneration).toEqual({
         id: activeGenerationId,
         status,
+        knowledgeBaseId: null,
       });
       expect(detail?.messages).toHaveLength(1);
       expect(detail?.messages[0]?.role).toBe("user");

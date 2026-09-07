@@ -21,6 +21,7 @@ import {
   conversations,
   generations,
   messages,
+  knowledgeBases,
 } from "./schema/index";
 
 type Database = ReturnType<typeof getDatabase>;
@@ -39,6 +40,7 @@ export type CreateGenerationCommandRecordResult =
   | { kind: "created"; generation: GenerationCommandRecord }
   | { kind: "idempotent"; generation: GenerationCommandRecord }
   | { kind: "conversation_not_found" }
+  | { kind: "knowledge_not_found" }
   | { kind: "message_id_conflict" }
   | { kind: "active_generation"; activeGenerationId: string }
   | { kind: "attachment_not_found"; attachmentId: string }
@@ -74,6 +76,7 @@ type ExistingCommandRow = {
   reasoningEffort: ReasoningEffortDto | null;
   webSearchEnabled: boolean | null;
   mcpToolIds: string[] | null;
+  knowledgeBaseId: string | null;
   generationCreatedAt: Date | null;
 };
 
@@ -113,6 +116,7 @@ async function findExistingCommand(
       reasoningEffort: generations.reasoningEffort,
       webSearchEnabled: generations.webSearchEnabled,
       mcpToolIds: generations.mcpToolIds,
+      knowledgeBaseId: generations.knowledgeBaseId,
       generationCreatedAt: generations.createdAt,
     })
     .from(messages)
@@ -145,6 +149,7 @@ function resolveExistingCommand(
     !targetMatches ||
     !messagePartsEqual(existing.parts, input.parts) ||
     existing.reasoningEffort !== input.reasoningEffort ||
+    existing.knowledgeBaseId !== (input.knowledgeBaseId ?? null) ||
     existing.webSearchEnabled !== input.tools.webSearch ||
     !existing.mcpToolIds ||
     existing.mcpToolIds.length !== input.tools.mcpToolIds.length ||
@@ -267,6 +272,25 @@ export async function createGenerationCommandRecord(
       }
 
       const textParts = input.parts.filter((part) => part.type === "text");
+      if (input.knowledgeBaseId) {
+        if (
+          conversation.mode !== "chat" ||
+          !textParts.some((p) => p.text.trim()) ||
+          textParts.map((p) => p.text).join("\n").length > 2000
+        ) {
+          throw new GenerationCommandRejected({ kind: "invalid_request" });
+        }
+        const [base] = await transaction
+          .select({ id: knowledgeBases.id })
+          .from(knowledgeBases)
+          .where(and(
+            eq(knowledgeBases.id, input.knowledgeBaseId),
+            eq(knowledgeBases.ownerId, input.ownerId),
+          ));
+        if (!base) {
+          throw new GenerationCommandRejected({ kind: "knowledge_not_found" });
+        }
+      }
       const attachmentIds = input.parts.flatMap((part) =>
         part.type === "attachment" ? [part.attachmentId] : [],
       );
@@ -380,6 +404,7 @@ export async function createGenerationCommandRecord(
           reasoningEffort: input.reasoningEffort,
           webSearchEnabled: input.tools.webSearch,
           mcpToolIds: input.tools.mcpToolIds,
+          knowledgeBaseId: input.knowledgeBaseId ?? null,
           createdAt: input.now,
         })
         .returning({

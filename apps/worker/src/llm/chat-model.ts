@@ -21,6 +21,7 @@ export type ChatModelMessage =
     };
 
 export type ChatModelRequest = {
+  instructions?: string;
   messages: ChatModelMessage[];
   reasoningEffort: ReasoningEffortDto;
   tools?: ToolSet;

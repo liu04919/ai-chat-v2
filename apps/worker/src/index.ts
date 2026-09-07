@@ -18,6 +18,7 @@ import { createGenerationToolResolver } from "./tools";
 import { createKnowledgeWorker } from "./knowledge/queue";
 import { createKnowledgeEmbedder } from "./knowledge/embedding";
 import { ingestKnowledge } from "./knowledge/ingest";
+import { retrieveChatKnowledge } from "./knowledge/chat-knowledge";
 
 function requireEnvironment(name: string): string {
   const value = process.env[name];
@@ -70,6 +71,7 @@ const worker = createBullMqGenerationWorker({
       eventWriter,
       objectStorage,
       toolResolver,
+      knowledgeRetriever: retrieveChatKnowledge,
     }),
 });
 

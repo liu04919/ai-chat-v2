@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import type { AssistantMessagePartDto } from "@ai-chat/contracts";
+import {
+  prepareChatKnowledge,
+  emptyKnowledgeResponse,
+  type ChatKnowledgeRetriever,
+} from "../knowledge/chat-knowledge";
 import type {
   GenerationCancellationSubscriber,
   GenerationEventWriter,
@@ -19,6 +24,7 @@ import type {
   GenerationToolResolver,
   ResolvedGenerationTools,
 } from "../tools/generation-tool-resolver";
+import { createAssistantOutput } from "./assistant-output";
 import { buildChatModelRequest } from "./chat-context-builder";
 import {
   coalesceChatModelStream,
@@ -33,6 +39,7 @@ export type ExecuteChatGenerationDependencies = {
   eventWriter: GenerationEventWriter;
   objectStorage: Pick<ObjectStorage, "createDownloadUrl">;
   toolResolver?: GenerationToolResolver;
+  knowledgeRetriever?: ChatKnowledgeRetriever;
   coalescing?: DeltaCoalescingOptions;
   createAssistantMessageId?: () => string;
   now?: () => Date;
@@ -46,72 +53,6 @@ function asError(error: unknown): Error {
   return error instanceof Error
     ? error
     : new Error("Chat Generation 执行失败", { cause: error });
-}
-
-type StreamDeltaPart = Extract<
-  ChatModelStreamPart,
-  { type: "text" | "reasoning" }
->;
-
-type AssistantToolCallPart = Extract<
-  AssistantMessagePartDto,
-  { type: "tool-call" }
->;
-type AssistantToolResultPart = Extract<
-  AssistantMessagePartDto,
-  { type: "tool-result" }
->;
-type JsonValue = AssistantToolCallPart["input"];
-
-function toJsonValue(value: unknown): JsonValue {
-  if (value === undefined) {
-    return null;
-  }
-
-  const serialized = JSON.stringify(value, (_key, nestedValue: unknown) => {
-    if (nestedValue instanceof Error) {
-      return { message: nestedValue.message };
-    }
-
-    return nestedValue;
-  });
-
-  return serialized === undefined
-    ? null
-    : (JSON.parse(serialized) as JsonValue);
-}
-
-function appendAssistantPart(
-  parts: AssistantMessagePartDto[],
-  part: AssistantMessagePartDto,
-): void {
-  if (parts.some((candidate) => candidate.id === part.id)) {
-    throw new Error(`Assistant part ${part.id} 在流中重复出现`);
-  }
-
-  parts.push(part);
-}
-
-function appendAssistantDelta(
-  parts: AssistantMessagePartDto[],
-  delta: StreamDeltaPart,
-): void {
-  const lastPart = parts.at(-1);
-
-  if (lastPart?.id === delta.partId) {
-    if (lastPart.type !== delta.type) {
-      throw new Error(`Assistant part ${delta.partId} 在流中改变了类型`);
-    }
-
-    lastPart.text += delta.delta;
-    return;
-  }
-
-  if (parts.some((part) => part.id === delta.partId)) {
-    throw new Error(`Assistant part ${delta.partId} 在流中非连续地重新出现`);
-  }
-
-  parts.push({ id: delta.partId, type: delta.type, text: delta.delta });
 }
 
 async function recordFailure(
@@ -134,11 +75,8 @@ async function recordFailure(
         generationId,
       });
     } else if (await isGenerationCancellationRequested(generationId)) {
-      return recordCancellation(
-        execution,
-        assistantParts,
-        dependencies,
-      );
+      // 用户停止可能先于失败更新到达数据库，不能把这次取消覆盖成生成失败。
+      return recordCancellation(execution, assistantParts, dependencies);
     }
   } catch (recordingError) {
     throw new AggregateError(
@@ -156,14 +94,20 @@ async function recordCancellation(
   dependencies: ExecuteChatGenerationDependencies,
 ): Promise<Extract<ExecuteChatGenerationResult, { kind: "cancelled" }>> {
   const generationId = execution.id;
+  // 只有引用、尚无任何模型输出时，不制造一条空的助手消息。
+  const visibleParts = assistantParts.some(
+    (p) => p.type !== "knowledge-sources",
+  )
+    ? assistantParts
+    : [];
   const assistantMessageId =
-    assistantParts.length > 0
+    visibleParts.length > 0
       ? (dependencies.createAssistantMessageId ?? randomUUID)()
       : null;
   const cancelled = await cancelGenerationExecution({
     generationId,
     assistantMessageId,
-    assistantParts,
+    assistantParts: visibleParts,
     now: (dependencies.now ?? (() => new Date()))(),
   });
 
@@ -179,13 +123,17 @@ async function recordCancellation(
   return { kind: "cancelled", assistantMessageId };
 }
 
+// 主流程管理本轮生命周期；知识库准备与回答投影分别封装，不在这里展开协议细节。
 export async function executeChatGeneration(
   execution: ClaimedGenerationExecution,
   dependencies: ExecuteChatGenerationDependencies,
 ): Promise<ExecuteChatGenerationResult> {
   const generationId = execution.id;
   const abortController = new AbortController();
-  const assistantParts: AssistantMessagePartDto[] = [];
+  const output = createAssistantOutput({
+    generationId,
+    eventWriter: dependencies.eventWriter,
+  });
   let resolvedTools: ResolvedGenerationTools | undefined;
   let unsubscribe: () => Promise<void>;
 
@@ -198,12 +146,13 @@ export async function executeChatGeneration(
     return recordFailure(
       execution,
       asError(error),
-      assistantParts,
+      output.getParts(),
       dependencies,
     );
   }
 
   try {
+    // 先订阅再查持久化标记，覆盖领取任务到建立订阅之间的取消窗口。
     if (await isGenerationCancellationRequested(generationId)) {
       abortController.abort("用户已请求停止生成");
     }
@@ -214,94 +163,51 @@ export async function executeChatGeneration(
       generationId,
     });
 
+    // 准备阶段只组装模型请求；引用保存与展示交给同一个回答收集器。
     const request = await buildChatModelRequest(
       execution,
       dependencies.objectStorage,
     );
-    abortController.signal.throwIfAborted();
-    if (dependencies.toolResolver) {
-      resolvedTools = await dependencies.toolResolver.resolve(execution.tools);
-      request.tools = resolvedTools.tools;
-    } else if (
-      execution.tools.webSearch ||
-      execution.tools.mcpToolIds.length > 0
-    ) {
-      throw new Error("Generation 选择了 Tool，但 Worker 未配置 Tool Resolver");
+    const knowledge = await prepareChatKnowledge(
+      execution,
+      request,
+      abortController.signal,
+      dependencies.knowledgeRetriever,
+    );
+    if (knowledge.kind !== "disabled") {
+      await output.appendSources(knowledge.sources);
     }
-    request.abortSignal = abortController.signal;
-    let finished = false;
+    abortController.signal.throwIfAborted();
+
+    let stream: AsyncIterable<ChatModelStreamPart>;
+    if (knowledge.kind === "empty") {
+      // 空库直接生成固定提示，不准备工具、不调用模型；仍走下方统一收尾。
+      stream = emptyKnowledgeResponse(generationId);
+    } else {
+      if (dependencies.toolResolver) {
+        resolvedTools = await dependencies.toolResolver.resolve(execution.tools);
+        request.tools = resolvedTools.tools;
+      } else if (
+        execution.tools.webSearch || execution.tools.mcpToolIds.length > 0
+      ) {
+        throw new Error("Generation 选择了 Tool，但 Worker 未配置 Tool Resolver");
+      }
+      request.abortSignal = abortController.signal;
+      stream = dependencies.chatModel.stream(request);
+    }
 
     for await (const part of coalesceChatModelStream(
-      dependencies.chatModel.stream(request),
+      stream,
       dependencies.coalescing,
     )) {
-      switch (part.type) {
-        case "text":
-          appendAssistantDelta(assistantParts, part);
-          await dependencies.eventWriter.append({
-            type: "text.delta",
-            generationId,
-            partId: part.partId,
-            delta: part.delta,
-          });
-          break;
-        case "reasoning":
-          appendAssistantDelta(assistantParts, part);
-          await dependencies.eventWriter.append({
-            type: "reasoning.delta",
-            generationId,
-            partId: part.partId,
-            delta: part.delta,
-          });
-          break;
-        case "tool-call": {
-          const toolName =
-            resolvedTools?.toPublicToolName(part.toolName) ?? part.toolName;
-          const toolCall: AssistantToolCallPart = {
-            id: part.partId,
-            type: "tool-call",
-            toolCallId: part.toolCallId,
-            toolName,
-            input: toJsonValue(part.input),
-          };
-          appendAssistantPart(assistantParts, toolCall);
-          await dependencies.eventWriter.append({
-            type: "tool.call",
-            generationId,
-            partId: toolCall.id,
-            toolCallId: toolCall.toolCallId,
-            toolName: toolCall.toolName,
-          });
-          break;
-        }
-        case "tool-result": {
-          const toolResult: AssistantToolResultPart = {
-            id: part.partId,
-            type: "tool-result",
-            toolCallId: part.toolCallId,
-            output: toJsonValue(part.output),
-            isError: part.isError,
-          };
-          appendAssistantPart(assistantParts, toolResult);
-          await dependencies.eventWriter.append({
-            type: "tool.result",
-            generationId,
-            partId: toolResult.id,
-            toolCallId: toolResult.toolCallId,
-            isError: toolResult.isError,
-          });
-          break;
-        }
-        case "finish":
-          finished = true;
-          break;
-      }
+      await output.consume(
+        part,
+        (name) => resolvedTools?.toPublicToolName(name) ?? name,
+      );
     }
 
-    if (!finished) {
-      throw new Error("Chat Model 流在 generation.finish 前结束");
-    }
-
+    const assistantParts = output.getCompletedParts();
+    // 数据库先确认 running → completed，再发布完成事件，避免页面读到未落库的回答。
     const assistantMessageId = await completeGenerationExecution({
       generationId,
       assistantMessageId: (
@@ -313,11 +219,7 @@ export async function executeChatGeneration(
 
     if (!assistantMessageId) {
       if (await isGenerationCancellationRequested(generationId)) {
-        return recordCancellation(
-          execution,
-          assistantParts,
-          dependencies,
-        );
+        return recordCancellation(execution, assistantParts, dependencies);
       }
 
       throw new Error("Generation 已不再处于 running，无法完成落库");
@@ -330,17 +232,19 @@ export async function executeChatGeneration(
 
     return { kind: "completed", assistantMessageId };
   } catch (error) {
+    // 数据库取消标记决定终态；不能仅凭网络 AbortError 判断是用户主动停止。
     if (await isGenerationCancellationRequested(generationId)) {
-      return recordCancellation(execution, assistantParts, dependencies);
+      return recordCancellation(execution, output.getParts(), dependencies);
     }
 
     return recordFailure(
       execution,
       asError(error),
-      assistantParts,
+      output.getParts(),
       dependencies,
     );
   } finally {
+    // 无论检索、工具还是模型在哪一步失败，都释放本轮持有的订阅和 MCP 连接。
     await Promise.all([unsubscribe(), resolvedTools?.close()]);
   }
 }

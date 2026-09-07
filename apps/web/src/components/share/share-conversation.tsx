@@ -5,6 +5,8 @@ import type {
 } from "@ai-chat/contracts";
 import { Brain, FileText, Wrench } from "lucide-react";
 import Image from "next/image";
+import { KnowledgeSources } from "@/components/knowledge/knowledge-sources";
+import { MessageMarkdown } from "@/components/chat/messages/message-markdown";
 
 import { ShareMessageMarkdown } from "./share-message-markdown";
 
@@ -62,9 +64,13 @@ function SharedMessage({
   message: MessageDto;
   token: string;
 }>) {
+  const sources = message.parts.flatMap((p) => p.type === "knowledge-sources" ? p.sources : []);
   const content = message.parts.map((part, index) => {
     switch (part.type) {
+      case "knowledge-sources":
+        return <KnowledgeSources key={part.id} sources={part.sources} />;
       case "text":
+        if (sources.length) return <MessageMarkdown key={"id" in part ? part.id : `text-${index}`} text={part.text} sources={sources} />;
         return (
           <ShareMessageMarkdown
             key={"id" in part ? part.id : `text-${index}`}

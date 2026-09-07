@@ -20,6 +20,7 @@ const generationErrorMessages: Record<GenerationErrorResponse["code"], string> =
   INVALID_REQUEST: "消息内容无效，请检查后重试",
   CONVERSATION_NOT_FOUND: "对话不存在或已被删除",
   MESSAGE_ID_CONFLICT: "消息状态发生冲突，请刷新后重试",
+  KNOWLEDGE_NOT_FOUND: "知识库不存在或无权访问，请重新选择",
   QUEUE_UNAVAILABLE: "生成服务暂时不可用，请重试",
   ATTACHMENT_NOT_FOUND: "附件不存在或已被移除",
   ATTACHMENT_NOT_READY: "附件仍在处理中，请稍后重试",

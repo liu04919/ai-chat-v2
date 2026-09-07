@@ -139,6 +139,9 @@ export function reduceGenerationEvents(
     }
 
     switch (event.type) {
+      case "knowledge.sources":
+        if (current.parts.some((p) => p.id === event.partId)) return { ...current, status: "connection-error" };
+        return { ...current, status: "running", hasStarted: true, parts: [...current.parts, { id: event.partId, type: "knowledge-sources", sources: event.sources }] };
       case "generation.started":
         return { ...current, status: "running", hasStarted: true };
       case "reasoning.delta":

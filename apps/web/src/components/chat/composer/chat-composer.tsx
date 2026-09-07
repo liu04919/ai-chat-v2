@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useMcpToolPreferences } from "@/components/tools/mcp-tool-preferences-provider";
+import { KnowledgeSelector } from "@/components/knowledge/knowledge-selector";
 
 import { DraftAttachmentList } from "./draft-attachment-list";
 import { handleComposerKeyDown } from "./composer-keyboard";
@@ -37,6 +38,7 @@ export type ChatComposerSubmission = {
   parts: UserMessagePartsDto;
   reasoningEffort: ReasoningEffortDto | null;
   tools: GenerationToolSelectionDto;
+  knowledgeBaseId: string | null;
 };
 
 export function ChatComposer({
@@ -49,6 +51,7 @@ export function ChatComposer({
   onSubmit,
   stopRequested = false,
   submitError,
+  initialKnowledgeBaseId = null,
 }: Readonly<{
   disabled?: boolean;
   isStopping?: boolean;
@@ -59,8 +62,10 @@ export function ChatComposer({
   onSubmit?: (submission: ChatComposerSubmission) => Promise<void>;
   stopRequested?: boolean;
   submitError?: string | null;
+  initialKnowledgeBaseId?: string | null;
 }>) {
   const [input, setInput] = useState("");
+  const [knowledgeBaseId, setKnowledgeBaseId] = useState(initialKnowledgeBaseId);
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffortDto>("medium");
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
@@ -90,6 +95,7 @@ export function ChatComposer({
     !onStopGeneration &&
     attachmentsReady &&
     hasContent &&
+    (mode !== "chat" || !knowledgeBaseId || (input.trim().length > 0 && input.trim().length <= 2000)) &&
     !isSubmitting;
   const hasActiveGeneration = Boolean(onStopGeneration);
   const isStopPending = stopRequested || isStopping;
@@ -120,6 +126,7 @@ export function ChatComposer({
     try {
       await onSubmit({
         parts,
+        knowledgeBaseId: mode === "chat" ? knowledgeBaseId : null,
         reasoningEffort: mode === "chat" ? reasoningEffort : null,
         tools: {
           webSearch: mode === "chat" && webSearchEnabled,
@@ -167,9 +174,12 @@ export function ChatComposer({
         onChange={(event) => setInput(event.target.value)}
         onKeyDown={(event) => handleComposerKeyDown(event, canSubmit)}
       />
+      {mode === "chat" && knowledgeBaseId && input.trim().length > 2000 ? (
+        <p role="alert" className="px-3 pb-2 text-xs text-destructive">知识库问题不能超过 2000 字符。</p>
+      ) : null}
 
       <div className="flex items-center justify-between gap-3 px-2 pb-1">
-        <div className="flex min-w-0 items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
           <input
             accept={acceptedFileTypes}
             className="sr-only"
@@ -194,6 +204,7 @@ export function ChatComposer({
 
           {mode === "chat" ? (
             <>
+              <KnowledgeSelector value={knowledgeBaseId} onChange={setKnowledgeBaseId} disabled={contentDisabled} />
               <Button
                 aria-label={
                   webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"

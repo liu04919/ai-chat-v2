@@ -4,6 +4,7 @@ import type { ConversationSummaryDto } from "@ai-chat/contracts";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronRight,
+  BookOpen,
   Ellipsis,
   ImageIcon,
   MessageSquareText,
@@ -261,6 +262,9 @@ export function ConversationSidebar({
         >
           <Wrench className="size-4" aria-hidden="true" />
           MCP 工具
+        </Link>
+        <Link href="/knowledge" aria-current={pathname === "/knowledge" ? "page" : undefined} className={`mt-2 flex h-10 items-center gap-2.5 rounded-xl px-3 text-sm transition-colors hover:bg-muted ${pathname === "/knowledge" ? "bg-background font-medium shadow-sm ring-1 ring-border" : "text-muted-foreground"}`}>
+          <BookOpen className="size-4" aria-hidden="true" />知识库
         </Link>
       </div>
 

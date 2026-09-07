@@ -7,7 +7,7 @@ import type {
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDatabase } from "./client";
-import { conversations, generations, messages } from "./schema/index";
+import { conversations, generations, knowledgeBases, messages } from "./schema/index";
 
 type Database = ReturnType<typeof getDatabase>;
 
@@ -110,6 +110,7 @@ export async function createRegenerationCommandRecord(
         reasoningEffort: generations.reasoningEffort,
         webSearchEnabled: generations.webSearchEnabled,
         mcpToolIds: generations.mcpToolIds,
+        knowledgeBaseId: generations.knowledgeBaseId,
       })
       .from(generations)
       .where(eq(generations.assistantMessageId, assistantMessage.id))
@@ -121,6 +122,18 @@ export async function createRegenerationCommandRecord(
       !sourceGeneration.reasoningEffort
     ) {
       return { kind: "regeneration_not_allowed" };
+    }
+
+    if (sourceGeneration.knowledgeBaseId) {
+      const [base] = await transaction
+        .select({ id: knowledgeBases.id })
+        .from(knowledgeBases)
+        .where(and(
+          eq(knowledgeBases.id, sourceGeneration.knowledgeBaseId),
+          eq(knowledgeBases.ownerId, input.ownerId),
+        ))
+        .limit(1);
+      if (!base) return { kind: "regeneration_not_allowed" };
     }
 
     // 重新生成没有回答版本切换：命令一旦成立，旧回答立即退出历史。
@@ -139,6 +152,7 @@ export async function createRegenerationCommandRecord(
         reasoningEffort: sourceGeneration.reasoningEffort,
         webSearchEnabled: sourceGeneration.webSearchEnabled,
         mcpToolIds: sourceGeneration.mcpToolIds,
+        knowledgeBaseId: sourceGeneration.knowledgeBaseId,
         createdAt: input.now,
       })
       .returning({

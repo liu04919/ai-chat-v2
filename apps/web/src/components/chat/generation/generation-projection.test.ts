@@ -9,6 +9,20 @@ import {
 const generationId = "generation_123";
 
 describe("Generation projection", () => {
+  it("检索引用事件和文本按流顺序投影，引用保留原文快照", () => {
+    const sources = [{ number: 1, chunkId: "chunk", documentId: "doc", originalName: "资料.md", page: 1, content: "原文" }];
+    const projection = reduceGenerationEvents(createGenerationProjection("conversation_123", generationId), [
+      { type: "generation.started", generationId },
+      { type: "knowledge.sources", generationId, partId: "sources", sources },
+      { type: "text.delta", generationId, partId: "answer", delta: "回答[1](#knowledge-1)" },
+      { type: "generation.completed", generationId },
+    ]);
+    expect(projection.parts).toEqual([
+      { id: "sources", type: "knowledge-sources", sources },
+      { id: "answer", type: "text", text: "回答[1](#knowledge-1)" },
+    ]);
+    expect(projection.status).toBe("completed");
+  });
   it("按 part 首次出现的顺序保留 reasoning 与 text 的交替结构", () => {
     const events: GenerationEventDto[] = [
       { type: "generation.started", generationId },

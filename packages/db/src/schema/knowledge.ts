@@ -12,6 +12,7 @@ import {
 import { user } from "./auth";
 
 export const knowledgeStatus = pgEnum("knowledge_status", [
+  "uploading",
   "pending",
   "processing",
   "ready",

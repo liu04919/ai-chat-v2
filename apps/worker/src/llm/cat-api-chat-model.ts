@@ -68,6 +68,9 @@ function toAssistantModelMessages(
 
   for (const part of message.parts) {
     switch (part.type) {
+      case "knowledge-sources":
+        // 历史不重复注入原文；本轮选择的知识库重新检索。
+        break;
       case "reasoning":
         content.push({ type: "text", text: reasoningHistoryLabel(part.text) });
         break;
@@ -182,6 +185,7 @@ export function createCatApiChatModel(
     async *stream(request): AsyncIterable<ChatModelStreamPart> {
       const result = streamText({
         model,
+        instructions: request.instructions,
         maxRetries: 0,
         messages: request.messages.flatMap(toModelMessages),
         abortSignal: request.abortSignal,

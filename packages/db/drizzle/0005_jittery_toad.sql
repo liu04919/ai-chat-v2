@@ -1,0 +1,1 @@
+ALTER TABLE "generations" ADD COLUMN "knowledge_base_id" text;

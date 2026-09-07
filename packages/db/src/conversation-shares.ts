@@ -55,6 +55,7 @@ function toAssistantViewParts(
       case "reasoning":
       case "text":
       case "attachment":
+      case "knowledge-sources":
         return part;
       case "tool-call":
         return {

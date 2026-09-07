@@ -16,6 +16,8 @@ import remarkMath from "remark-math";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { KnowledgeSourceDto } from "@ai-chat/contracts";
+import { KnowledgeCitation } from "@/components/knowledge/knowledge-sources";
 import {
   getMarkdownCodePresentation,
   type MarkdownCodeNode,
@@ -215,11 +217,18 @@ const disallowedMarkdownElements = ["img"];
 const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins = [rehypeKatex, rehypeHighlight];
 
-export function MessageMarkdown({ text }: Readonly<{ text: string }>) {
+export function MessageMarkdown({ text, sources }: Readonly<{ text: string; sources?: readonly KnowledgeSourceDto[] }>) {
   return (
     <div className="message-markdown min-w-0 break-words [&_.katex-display]:my-4 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
       <Markdown
-        components={markdownComponents}
+        components={sources ? { ...markdownComponents, a: (props) => {
+          if (props.href?.startsWith("#knowledge-")) {
+            const number = Number(props.href.slice("#knowledge-".length));
+            const source = sources.find((s) => s.number === number);
+            return source ? <KnowledgeCitation source={source} compact /> : <span title="引用编号无对应资料">{props.children}</span>;
+          }
+          return markdownComponents.a(props);
+        } } : markdownComponents}
         disallowedElements={disallowedMarkdownElements}
         rehypePlugins={rehypePlugins}
         remarkPlugins={remarkPlugins}

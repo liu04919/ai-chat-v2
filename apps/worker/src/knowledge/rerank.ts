@@ -7,7 +7,7 @@ export type KnowledgeReranker = {
   rerank(
     query: string,
     candidates: KnowledgeHit[],
-    options?: { topN?: number },
+    options?: { topN?: number; signal?: AbortSignal },
   ): Promise<{
     hits: RerankedKnowledgeHit[];
     totalTokens: number | null;
@@ -58,7 +58,7 @@ export function createKnowledgeReranker(
         const response = await fetch(endpoint, {
           method: "POST",
           redirect: "error",
-          signal: AbortSignal.timeout(60_000),
+          signal: options?.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000),
           headers: {
             Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",

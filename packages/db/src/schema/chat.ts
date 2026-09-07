@@ -104,6 +104,8 @@ export const generations = pgTable(
     status: generationStatus("status").default("queued").notNull(),
     reasoningEffort: reasoningEffort("reasoning_effort").$type<ReasoningEffortDto>(),
     webSearchEnabled: boolean("web_search_enabled").default(false).notNull(),
+    // 选择快照不随知识库删除而清空；再次执行时重新校验归属。
+    knowledgeBaseId: text("knowledge_base_id"),
     mcpToolIds: jsonb("mcp_tool_ids")
       .$type<GenerationToolSelectionDto["mcpToolIds"]>()
       .default(sql`'[]'::jsonb`)

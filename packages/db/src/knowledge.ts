@@ -4,9 +4,12 @@ import {
   knowledgeDocumentInputSchema,
   type KnowledgeChunk,
 } from "@ai-chat/contracts";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDatabase } from "./client";
-import { executeKnowledgeSearch, knowledgeSearchQueries } from "./knowledge-search";
+import {
+  executeKnowledgeSearch,
+  knowledgeSearchQueries,
+} from "./knowledge-search";
 import {
   knowledgeBases,
   knowledgeChunks,
@@ -43,6 +46,13 @@ export function createKnowledgeRepository(db = getDatabase()) {
   }
   return {
     requireOwner,
+    async listBases(ownerId: string) {
+      return db
+        .select()
+        .from(knowledgeBases)
+        .where(eq(knowledgeBases.ownerId, ownerId))
+        .orderBy(desc(knowledgeBases.createdAt));
+    },
     async createBase(ownerId: string, name: string) {
       if (!name.trim() || name.trim().length > 100)
         throw new Error("INVALID_NAME");
@@ -57,7 +67,8 @@ export function createKnowledgeRepository(db = getDatabase()) {
       return db
         .select()
         .from(knowledgeDocuments)
-        .where(eq(knowledgeDocuments.knowledgeBaseId, baseId));
+        .where(eq(knowledgeDocuments.knowledgeBaseId, baseId))
+        .orderBy(desc(knowledgeDocuments.createdAt));
     },
     async createDocument(
       ownerId: string,
@@ -67,6 +78,7 @@ export function createKnowledgeRepository(db = getDatabase()) {
         mediaType: string;
         sizeBytes: number;
         objectKey: string;
+        status?: "uploading" | "pending";
       },
     ) {
       await requireOwner(ownerId, baseId);
@@ -78,9 +90,40 @@ export function createKnowledgeRepository(db = getDatabase()) {
           id: randomUUID(),
           knowledgeBaseId: baseId,
           objectKey: input.objectKey,
+          status: input.status ?? "pending",
         })
         .returning();
       return document!;
+    },
+    async getDocument(ownerId: string, baseId: string, documentId: string) {
+      await requireOwner(ownerId, baseId);
+      const [document] = await db
+        .select()
+        .from(knowledgeDocuments)
+        .where(
+          and(
+            eq(knowledgeDocuments.id, documentId),
+            eq(knowledgeDocuments.knowledgeBaseId, baseId),
+          ),
+        );
+      if (!document) throw new Error("KNOWLEDGE_NOT_FOUND");
+      return document;
+    },
+    async confirmUpload(ownerId: string, baseId: string, documentId: string) {
+      await requireOwner(ownerId, baseId);
+      // 条件更新只允许一个完成请求把待上传文件交给入库队列。
+      const [document] = await db
+        .update(knowledgeDocuments)
+        .set({ status: "pending", updatedAt: new Date() })
+        .where(
+          and(
+            eq(knowledgeDocuments.id, documentId),
+            eq(knowledgeDocuments.knowledgeBaseId, baseId),
+            eq(knowledgeDocuments.status, "uploading"),
+          ),
+        )
+        .returning();
+      return document;
     },
     async claim(documentId: string) {
       const [document] = await db
@@ -95,14 +138,20 @@ export function createKnowledgeRepository(db = getDatabase()) {
         .returning();
       return document;
     },
-    async fail(documentId: string, errorCode: string) {
+    async fail(
+      documentId: string,
+      errorCode: string,
+      expectedStatus?: "pending",
+    ) {
       await db
         .update(knowledgeDocuments)
         .set({ status: "failed", errorCode, updatedAt: new Date() })
         .where(
           and(
             eq(knowledgeDocuments.id, documentId),
-            sql`${knowledgeDocuments.status} in ('pending', 'processing')`,
+            expectedStatus
+              ? eq(knowledgeDocuments.status, expectedStatus)
+              : sql`${knowledgeDocuments.status} in ('pending', 'processing')`,
           ),
         );
     },

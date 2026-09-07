@@ -49,6 +49,7 @@ export const conversationDetailResponseSchema = z
       .object({
         id: z.string().min(1),
         status: generationStatusSchema,
+        knowledgeBaseId: z.string().nullable().optional(),
       })
       .strict()
       .nullable(),
