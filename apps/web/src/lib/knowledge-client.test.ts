@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { uploadKnowledgeFile } from "./knowledge-client";
+import { removeKnowledgeBase, uploadKnowledgeFile } from "./knowledge-client";
 
 const document = {
   id: "document-1",
@@ -23,6 +23,35 @@ const instruction = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("知识库文件直传", () => {
+  it.each([false, true])(
+    "删除知识库保留清理结果：%s",
+    async (cleanupFailed) => {
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({ baseId: "kb", cleanupFailed }));
+      vi.stubGlobal("fetch", fetch);
+      expect(await removeKnowledgeBase("kb")).toEqual({
+        baseId: "kb",
+        cleanupFailed,
+      });
+      expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/knowledge-bases/kb", {
+        method: "DELETE",
+      });
+    },
+  );
+  it("删除失败抛出明确错误，不伪装为成功", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          Response.json({ code: "KNOWLEDGE_NOT_FOUND" }, { status: 404 }),
+        ),
+    );
+    await expect(removeKnowledgeBase("kb")).rejects.toThrow(
+      "知识库或文件不存在",
+    );
+  });
   it("业务接口只收 JSON 元信息，文件发往 R2，成功后调用完成接口", async () => {
     const file = new File(["test"], "资料.md", {
       type: "application/octet-stream",

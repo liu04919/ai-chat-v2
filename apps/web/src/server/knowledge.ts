@@ -136,3 +136,26 @@ export async function deleteKnowledgeDocument(
   }
   return { documentId };
 }
+
+export async function deleteKnowledgeBase(
+  ownerId: string,
+  baseId: string,
+  dependencies: {
+    repository: Repository;
+    storage: Pick<ObjectStorage, "deleteObject">;
+  },
+) {
+  const deleted = await dependencies.repository.deleteBase(ownerId, baseId);
+  let cleanupFailed = false;
+  // 数据库已提交后再清理 R2；一个对象失败不妨碍清理其余对象，也不假装回滚成功。
+  for (let offset = 0; offset < deleted.objectKeys.length; offset += 5) {
+    const results = await Promise.allSettled(
+      deleted.objectKeys
+        .slice(offset, offset + 5)
+        .map((key) => dependencies.storage.deleteObject(key)),
+    );
+    if (results.some((result) => result.status === "rejected"))
+      cleanupFailed = true;
+  }
+  return { baseId: deleted.baseId, cleanupFailed };
+}

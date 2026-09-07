@@ -24,6 +24,7 @@ import {
 import type { ChatModelRequest } from "../../../worker/src/llm/chat-model";
 import {
   deleteKnowledgeDocument,
+  deleteKnowledgeBase,
   createKnowledgeUpload,
   completeKnowledgeUpload,
   toKnowledgeDocument,
@@ -264,6 +265,149 @@ async function readyBase() {
 }
 
 describe("完整传统 RAG：上传、入库、生成和引用", () => {
+  it("删除知识库级联清理所有状态的文档和分块，但保留回答与分享引用", async () => {
+    const { base, document } = await readyBase();
+    const input = command(base.id);
+    await createGenerationCommandRecord(input, database.db);
+    await executeGeneration(input.generationId, execution().deps);
+    const token = randomUUID().replaceAll("-", "").repeat(2);
+    await createConversationShareRecordForOwner(
+      {
+        ownerId,
+        conversationId: input.target.conversationId,
+        id: randomUUID(),
+        token,
+        now: new Date(),
+      },
+      database.db,
+    );
+    const before = await getConversationForOwner(
+      ownerId,
+      input.target.conversationId,
+    );
+    const shareBefore = await getConversationShareRecordByToken(
+      token,
+      database.db,
+    );
+    const waiting = await repository.createDocument(ownerId, base.id, {
+      originalName: "waiting.txt",
+      mediaType: "text/plain",
+      sizeBytes: 4,
+      objectKey: `test/${randomUUID()}`,
+      status: "uploading",
+    });
+    const processing = await uploadKnowledgeDocument(
+      ownerId,
+      base.id,
+      new File(["test"], "processing.txt"),
+      dependencies,
+    );
+    await repository.claim(processing.id);
+    const failed = await uploadKnowledgeDocument(
+      ownerId,
+      base.id,
+      new File(["test"], "failed.txt"),
+      dependencies,
+    );
+    await repository.fail(failed.id, "TEST_FAILURE");
+    const documents = await repository.listDocuments(ownerId, base.id);
+    const otherBase = await repository.createBase(ownerId, "不能误删");
+    expect(await deleteKnowledgeBase(ownerId, base.id, dependencies)).toEqual({
+      baseId: base.id,
+      cleanupFailed: false,
+    });
+    expect(
+      (await repository.listBases(ownerId)).some((b) => b.id === base.id),
+    ).toBe(false);
+    expect(await repository.requireOwner(ownerId, otherBase.id)).toBeTruthy();
+    for (const doc of documents) expect(objects.has(doc.objectKey)).toBe(false);
+    const remaining =
+      await database.client`SELECT id FROM knowledge_chunks WHERE document_id = ${document.id}`;
+    expect(remaining).toHaveLength(0);
+    expect(await repository.claim(waiting.id)).toBeUndefined();
+    expect(
+      await repository.publish(
+        processing.id,
+        embedder.model,
+        [{ content: "late", page: 1, start: 0, end: 4 }],
+        [vector],
+      ),
+    ).toBe(false);
+    expect(
+      (await getConversationForOwner(ownerId, input.target.conversationId))
+        ?.messages,
+    ).toEqual(before?.messages);
+    expect(
+      (await getConversationShareRecordByToken(token, database.db))?.snapshot,
+    ).toEqual(shareBefore?.snapshot);
+    expect(
+      (await createGenerationCommandRecord(command(base.id), database.db)).kind,
+    ).toBe("knowledge_not_found");
+  });
+
+  it("拒绝越权删除，不调用 R2；空库可删除，重复删除返回不存在", async () => {
+    const base = await repository.createBase(ownerId, "删除边界");
+    const deleteObject = vi.fn(storage.deleteObject);
+    const deps = { repository, storage: { deleteObject } };
+    await expect(
+      deleteKnowledgeBase(strangerId, base.id, deps),
+    ).rejects.toThrow("KNOWLEDGE_NOT_FOUND");
+    expect(await repository.requireOwner(ownerId, base.id)).toBeTruthy();
+    expect(await deleteKnowledgeBase(ownerId, base.id, deps)).toEqual({
+      baseId: base.id,
+      cleanupFailed: false,
+    });
+    await expect(deleteKnowledgeBase(ownerId, base.id, deps)).rejects.toThrow(
+      "KNOWLEDGE_NOT_FOUND",
+    );
+    expect(deleteObject).not.toHaveBeenCalled();
+  });
+
+  it("R2 部分删除失败仍尝试其他文件，返回清理警告而不是假装数据库回滚", async () => {
+    const base = await repository.createBase(ownerId, "清理失败");
+    for (let i = 0; i < 3; i++)
+      await uploadKnowledgeDocument(
+        ownerId,
+        base.id,
+        new File(["test"], `${i}.txt`),
+        dependencies,
+      );
+    const docs = await repository.listDocuments(ownerId, base.id);
+    const failedKey = docs[0]!.objectKey;
+    const deleteObject = vi.fn(async (key: string) => {
+      if (key === failedKey) throw new Error("R2 unavailable");
+      await storage.deleteObject(key);
+    });
+    expect(
+      await deleteKnowledgeBase(ownerId, base.id, {
+        repository,
+        storage: { deleteObject },
+      }),
+    ).toEqual({ baseId: base.id, cleanupFailed: true });
+    expect(deleteObject).toHaveBeenCalledTimes(3);
+    await expect(repository.requireOwner(ownerId, base.id)).rejects.toThrow(
+      "KNOWLEDGE_NOT_FOUND",
+    );
+    expect(objects.has(failedKey)).toBe(true);
+    expect(docs.slice(1).every((doc) => !objects.has(doc.objectKey))).toBe(
+      true,
+    );
+    await storage.deleteObject(failedKey);
+  });
+
+  it("并发删除同一知识库只有一次成功和一次对象清理", async () => {
+    const { base } = await readyBase();
+    const deleteObject = vi.fn(storage.deleteObject);
+    const deps = { repository, storage: { deleteObject } };
+    const results = await Promise.allSettled([
+      deleteKnowledgeBase(ownerId, base.id, deps),
+      deleteKnowledgeBase(ownerId, base.id, deps),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
+    expect(deleteObject).toHaveBeenCalledTimes(1);
+  });
+
   it("待上传不入队、不能被 Worker 领取；并发确认只入队一次", async () => {
     const base = await repository.createBase(ownerId, "直传状态测试");
     const enqueue = vi.fn(async () => {});
@@ -457,7 +601,7 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
       execution().deps,
     );
     if (result.kind !== "completed") throw new Error("未完成");
-    await database.client`DELETE FROM knowledge_bases WHERE id = ${base.id} AND owner_id = ${ownerId}`;
+    await deleteKnowledgeBase(ownerId, base.id, dependencies);
     const regenerated = await createRegenerationCommandRecord(
       {
         ownerId,

@@ -37,6 +37,12 @@ export const knowledgeBaseSchema = z
 export const knowledgeBaseListSchema = z
   .object({ bases: z.array(knowledgeBaseSchema) })
   .strict();
+export const deleteKnowledgeBaseResponseSchema = z
+  .object({
+    baseId: z.string().min(1),
+    cleanupFailed: z.boolean(),
+  })
+  .strict();
 export const knowledgeDocumentSchema = z
   .object({
     id: z.string().min(1),

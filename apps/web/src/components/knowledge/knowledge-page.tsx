@@ -28,6 +28,7 @@ import {
   uploadKnowledgeFile,
 } from "@/lib/knowledge-client";
 import { useKnowledgeBases } from "./knowledge-provider";
+import { DeleteKnowledgeBaseButton } from "./delete-knowledge-base-button";
 
 const statusLabels = {
   uploading: "待上传",
@@ -204,6 +205,7 @@ export function KnowledgePage() {
   const catalog = useKnowledgeBases();
   const client = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [cleanupWarning, setCleanupWarning] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const create = useMutation({
@@ -236,6 +238,11 @@ export function KnowledgePage() {
             构建你的知识库
           </Button>
         </header>
+        {cleanupWarning ? (
+          <p role="alert" className="mb-5 text-sm text-destructive">
+            知识库已删除，但部分原文件清理失败。
+          </p>
+        ) : null}
         {catalog.isError ? (
           <Button variant="outline" onClick={() => void catalog.refetch()}>
             加载失败，重试
@@ -248,15 +255,28 @@ export function KnowledgePage() {
               className="flex gap-2 overflow-x-auto lg:flex-col"
             >
               {catalog.data.map((base) => (
-                <Button
+                <div
                   key={base.id}
-                  variant={selected?.id === base.id ? "outline" : "ghost"}
-                  className="shrink-0 justify-start truncate"
-                  aria-pressed={selected?.id === base.id}
-                  onClick={() => setSelectedId(base.id)}
+                  className={`group/knowledge-base flex min-w-0 shrink-0 items-center gap-1 rounded-xl border pr-1 ${selected?.id === base.id ? "border-border" : "border-transparent"}`}
                 >
-                  {base.name}
-                </Button>
+                  <Button
+                    variant="ghost"
+                    className="min-w-0 flex-1 justify-start"
+                    aria-pressed={selected?.id === base.id}
+                    onClick={() => setSelectedId(base.id)}
+                  >
+                    <span className="truncate">{base.name}</span>
+                  </Button>
+                  <DeleteKnowledgeBaseButton
+                    base={base}
+                    onDeleted={(cleanupFailed) => {
+                      setSelectedId((current) =>
+                        current === base.id ? null : current,
+                      );
+                      setCleanupWarning(cleanupFailed);
+                    }}
+                  />
+                </div>
               ))}
             </nav>
             <div className="min-w-0">

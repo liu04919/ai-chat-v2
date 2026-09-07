@@ -1,5 +1,6 @@
 import {
   createKnowledgeUploadResponseSchema,
+  deleteKnowledgeBaseResponseSchema,
   knowledgeDocumentInputSchema,
   knowledgeBaseListSchema,
   knowledgeBaseSchema,
@@ -39,6 +40,13 @@ export async function createKnowledgeBase(name: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
+    }),
+  );
+}
+export async function removeKnowledgeBase(baseId: string) {
+  return deleteKnowledgeBaseResponseSchema.parse(
+    await knowledgeRequest(`/${encodeURIComponent(baseId)}`, {
+      method: "DELETE",
     }),
   );
 }

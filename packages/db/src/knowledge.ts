@@ -62,6 +62,32 @@ export function createKnowledgeRepository(db = getDatabase()) {
         .returning();
       return base!;
     },
+    async deleteBase(ownerId: string, baseId: string) {
+      return db.transaction(async (tx) => {
+        // 先锁父行，阻止并发新增文档；删除返回的对象 key 就是本次清理范围。
+        const [base] = await tx
+          .select({ id: knowledgeBases.id })
+          .from(knowledgeBases)
+          .where(
+            and(
+              eq(knowledgeBases.id, baseId),
+              eq(knowledgeBases.ownerId, ownerId),
+            ),
+          )
+          .for("update");
+        if (!base) throw new Error("KNOWLEDGE_NOT_FOUND");
+        const documents = await tx
+          .delete(knowledgeDocuments)
+          .where(eq(knowledgeDocuments.knowledgeBaseId, baseId))
+          .returning({ objectKey: knowledgeDocuments.objectKey });
+        // chunk 通过文档外键级联删除；Generation 和引用快照不受影响。
+        await tx.delete(knowledgeBases).where(eq(knowledgeBases.id, baseId));
+        return {
+          baseId,
+          objectKeys: documents.map((document) => document.objectKey),
+        };
+      });
+    },
     async listDocuments(ownerId: string, baseId: string) {
       await requireOwner(ownerId, baseId);
       return db
