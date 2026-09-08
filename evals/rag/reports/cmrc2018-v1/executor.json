@@ -1,0 +1,101 @@
+{
+  "protocol": "ragas-0.4.3-codex-blind-v1",
+  "modelRequested": "gpt-6-astra",
+  "forkTurns": "none",
+  "reasoningEffort": "inherited; not separately overridden",
+  "scope": "Only assigned request file; no web, other files, memory, model API calls, or delegation",
+  "outputPolicy": "Native output schema; original statements preserved; no expected target scores supplied",
+  "billing": "Codex account usage, excluded from metered relay API CNY ledger; not free inference",
+  "tasks": [
+    {
+      "task": "/root/pilot_statements",
+      "requestFile": "pilot/statements-00.requests.json",
+      "outputFile": "pilot/statements-00.outputs.json"
+    },
+    {
+      "task": "/root/pilot_accuracy",
+      "requestFile": "pilot/accuracy-00.requests.json",
+      "outputFile": "pilot/accuracy-00.outputs.json"
+    },
+    {
+      "task": "/root/pilot_faithfulness",
+      "requestFile": "pilot/nli-00.requests.json",
+      "outputFile": "pilot/nli-00.outputs.json"
+    },
+    {
+      "task": "/root/test_statements_a",
+      "requestFile": "test/statements-00-676ef192.requests.json",
+      "outputFile": "test/statements-00-676ef192.outputs.json"
+    },
+    {
+      "task": "/root/test_statements_b",
+      "requestFile": "test/statements-01-e1fe852c.requests.json",
+      "outputFile": "test/statements-01-e1fe852c.outputs.json"
+    },
+    {
+      "task": "/root/test_statements_c",
+      "requestFile": "test/statements-00-1a68e557.requests.json",
+      "outputFile": "test/statements-00-1a68e557.outputs.json"
+    },
+    {
+      "task": "/root/test_statements_final",
+      "requestFile": "test/statements-00-7cfa0e07.requests.json",
+      "outputFile": "test/statements-00-7cfa0e07.outputs.json"
+    },
+    {
+      "task": "/root/test_accuracy_a",
+      "requestFile": "test/accuracy-00-08ab8136.requests.json",
+      "outputFile": "test/accuracy-00-08ab8136.outputs.json"
+    },
+    {
+      "task": "/root/test_accuracy_b",
+      "requestFile": "test/accuracy-01-1b27e095.requests.json",
+      "outputFile": "test/accuracy-01-1b27e095.outputs.json"
+    },
+    {
+      "task": "/root/test_accuracy_c",
+      "requestFile": "test/accuracy-02-c2cbc26f.requests.json",
+      "outputFile": "test/accuracy-02-c2cbc26f.outputs.json"
+    },
+    {
+      "task": "/root/test_accuracy_d",
+      "requestFile": "test/accuracy-00-1c719e5c.requests.json",
+      "outputFile": "test/accuracy-00-1c719e5c.outputs.json"
+    },
+    {
+      "task": "/root/test_accuracy_final",
+      "requestFile": "test/accuracy-00-9a1ef48c.requests.json",
+      "outputFile": "test/accuracy-00-9a1ef48c.outputs.json"
+    },
+    {
+      "task": "/root/test_evidence_a",
+      "requestFile": "test/nli-00-8da555b2.requests.json",
+      "outputFile": "test/nli-00-8da555b2.outputs.json"
+    },
+    {
+      "task": "/root/test_evidence_b",
+      "requestFile": "test/nli-01-707b3ee9.requests.json",
+      "outputFile": "test/nli-01-707b3ee9.outputs.json"
+    },
+    {
+      "task": "/root/test_evidence_c",
+      "requestFile": "test/nli-02-0730f20e.requests.json",
+      "outputFile": "test/nli-02-0730f20e.outputs.json"
+    },
+    {
+      "task": "/root/test_evidence_d",
+      "requestFile": "test/nli-03-d9d3f674.requests.json",
+      "outputFile": "test/nli-03-d9d3f674.outputs.json"
+    },
+    {
+      "task": "/root/test_evidence_e",
+      "requestFile": "test/nli-00-661b9a10.requests.json",
+      "outputFile": "test/nli-00-661b9a10.outputs.json"
+    },
+    {
+      "task": "/root/test_evidence_final",
+      "requestFile": "test/nli-00-c63798db.requests.json",
+      "outputFile": "test/nli-00-c63798db.outputs.json"
+    }
+  ]
+}

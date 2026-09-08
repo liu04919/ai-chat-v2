@@ -1,0 +1,35 @@
+{
+  "chunks": [
+    [
+      600,
+      80
+    ],
+    [
+      1000,
+      150
+    ],
+    [
+      800,
+      0
+    ],
+    [
+      800,
+      100
+    ]
+  ],
+  "candidates": [
+    10,
+    20,
+    30
+  ],
+  "retained": [
+    3,
+    6
+  ],
+  "seed": "ai-chat-cmrc2018-rag-v1",
+  "selection": "max mean known-answer hit@6, then MRR@6; tie keep baseline, else lower retained context bytes",
+  "corpusHash": "54d569e59c76ca1410036dcd343650c8af72c4fa674a0b27a59ccb0d387b8aec",
+  "model": "qwen3.7-text-embedding",
+  "dimensions": 1024,
+  "parser": "1cc52881b0f27809056eabd5358ae3636d88bb71b3d4be762b39476a9151969a"
+}

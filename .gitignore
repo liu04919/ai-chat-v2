@@ -1,6 +1,7 @@
 node_modules/
 .pnpm-store/
 .next/
+.next-rag-eval/
 .turbo/
 dist/
 coverage/
@@ -15,3 +16,6 @@ Thumbs.db
 evals/retrieval/.venv/
 evals/retrieval/artifacts/
 evals/retrieval/__pycache__/
+evals/rag/artifacts/
+evals/rag/.venv/
+evals/rag/__pycache__/

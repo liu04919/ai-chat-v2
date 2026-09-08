@@ -1,0 +1,896 @@
+{
+  "summary": {
+    "count": 50,
+    "corpusLengthProfile": {
+      "count": 848,
+      "atMost800": 748,
+      "median": 455,
+      "max": 980,
+      "unit": "UTF-16 characters"
+    },
+    "judge": [
+      "gpt-6-astra"
+    ],
+    "judgeExecutor": "Codex fresh-context subagents, batched native prompts",
+    "attempts": 65,
+    "failedAttempts": 15,
+    "firstAttemptSuccess": 0.76,
+    "answerAccuracy": {
+      "mean": 0.745,
+      "ci95": [
+        0.67,
+        0.82
+      ]
+    },
+    "faithfulness": {
+      "mean": 0.9608333333333333,
+      "ci95": [
+        0.925,
+        0.99
+      ]
+    },
+    "answerAccuracyDistribution": {
+      "0": 1,
+      "1": 25,
+      "0.25": 1,
+      "0.5": 21,
+      "0.75": 2
+    },
+    "evidenceHitAt6": {
+      "mean": 1,
+      "ci95": [
+        1,
+        1
+      ]
+    },
+    "evidenceMrrAt6": {
+      "mean": 1,
+      "ci95": [
+        1,
+        1
+      ]
+    },
+    "citationFormat": {
+      "total": 53,
+      "valid": 53,
+      "answersWithCitation": 50
+    },
+    "firstTextMs": {
+      "count": 50,
+      "p50": 23143.866200000048,
+      "p95": 49963.927200000035
+    },
+    "totalMs": {
+      "count": 50,
+      "p50": 24438.155400000047,
+      "p95": 51271.55960000004
+    },
+    "cost": {
+      "limitCny": 20,
+      "accountedCny": 4.54955325,
+      "requests": 1458,
+      "unresolved": 25,
+      "halted": false,
+      "pricesCnyPerMillion": {
+        "qwen3.7-text-embedding": {
+          "input": 0.5,
+          "output": 0
+        },
+        "qwen3.7-text-rerank": {
+          "input": 0.5,
+          "output": 0
+        },
+        "gpt-5.6-sol": {
+          "input": 0.75,
+          "output": 3
+        },
+        "gpt-6-astra": {
+          "input": 1.875,
+          "output": 7.5
+        }
+      }
+    }
+  },
+  "perQuestion": [
+    {
+      "id": "DEV_188_QUERY_1",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 14693.2105,
+        "sourcesMs": 938.0482000000001,
+        "totalMs": 14918.9949
+      }
+    },
+    {
+      "id": "DEV_594_QUERY_2",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 35113.1351,
+        "sourcesMs": 934.2209000000003,
+        "totalMs": 35174.345700000005
+      }
+    },
+    {
+      "id": "DEV_68_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 13289.7287,
+        "sourcesMs": 842.5509999999995,
+        "totalMs": 13436.677499999998
+      }
+    },
+    {
+      "id": "DEV_523_QUERY_4",
+      "answerAccuracy": 0.5,
+      "faithfulness": 0.5,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 2,
+        "valid": 2
+      },
+      "timing": {
+        "firstTextMs": 31645.6477,
+        "sourcesMs": 1078.8108,
+        "totalMs": 38829.5726
+      }
+    },
+    {
+      "id": "DEV_64_QUERY_0",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 14555.782600000006,
+        "sourcesMs": 917.4847000000009,
+        "totalMs": 16468.56350000002
+      }
+    },
+    {
+      "id": "DEV_288_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 16840.772200000007,
+        "sourcesMs": 872.8350999999966,
+        "totalMs": 17783.252000000008
+      }
+    },
+    {
+      "id": "DEV_218_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 15109.81719999999,
+        "sourcesMs": 892.1465999999782,
+        "totalMs": 16150.988299999997
+      }
+    },
+    {
+      "id": "DEV_30_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 16650.877500000002,
+        "sourcesMs": 891.3576999999932,
+        "totalMs": 18145.935299999983
+      }
+    },
+    {
+      "id": "DEV_341_QUERY_2",
+      "answerAccuracy": 0.5,
+      "faithfulness": 0.6666666666666666,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 18547.089200000017,
+        "sourcesMs": 820.1272000000172,
+        "totalMs": 22887.759900000005
+      }
+    },
+    {
+      "id": "DEV_1927_QUERY_1",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 49274.986399999965,
+        "sourcesMs": 974.2097999999824,
+        "totalMs": 51002.9344
+      }
+    },
+    {
+      "id": "DEV_491_QUERY_1",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 42530.8714,
+        "sourcesMs": 979.9318999999668,
+        "totalMs": 42631.1789
+      }
+    },
+    {
+      "id": "DEV_593_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 18996.772799999977,
+        "sourcesMs": 852.2859999999637,
+        "totalMs": 19085.132299999997
+      }
+    },
+    {
+      "id": "DEV_45_QUERY_3",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 25772.2512,
+        "sourcesMs": 891.3773999999976,
+        "totalMs": 26680.7512
+      }
+    },
+    {
+      "id": "DEV_11_QUERY_2",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 20700.645499999984,
+        "sourcesMs": 827.6476999999722,
+        "totalMs": 20863.95769999997
+      }
+    },
+    {
+      "id": "DEV_1087_QUERY_2",
+      "answerAccuracy": 0.75,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 23864.341000000015,
+        "sourcesMs": 986.2886999999755,
+        "totalMs": 25810.281699999992
+      }
+    },
+    {
+      "id": "DEV_104_QUERY_0",
+      "answerAccuracy": 0.75,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 23143.866200000048,
+        "sourcesMs": 861.273600000015,
+        "totalMs": 24438.155400000047
+      }
+    },
+    {
+      "id": "DEV_412_QUERY_2",
+      "answerAccuracy": 0,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 13631.791400000002,
+        "sourcesMs": 1109.068800000001,
+        "totalMs": 14944.9876
+      }
+    },
+    {
+      "id": "DEV_1536_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 40065.16719999991,
+        "sourcesMs": 955.9785999999149,
+        "totalMs": 41534.74959999998
+      }
+    },
+    {
+      "id": "DEV_37_QUERY_3",
+      "answerAccuracy": 0.5,
+      "faithfulness": 0.75,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 17067.33559999999,
+        "sourcesMs": 924.3629000000656,
+        "totalMs": 20742.020600000047
+      }
+    },
+    {
+      "id": "DEV_1_QUERY_3",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 16434.922199999994,
+        "sourcesMs": 942.6183000000019,
+        "totalMs": 21505.204000000005
+      }
+    },
+    {
+      "id": "DEV_543_QUERY_0",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 16578.826699999976,
+        "sourcesMs": 838.0259000000078,
+        "totalMs": 17442.72419999994
+      }
+    },
+    {
+      "id": "DEV_606_QUERY_2",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 40467.24749999994,
+        "sourcesMs": 867.265199999907,
+        "totalMs": 43033.5037
+      }
+    },
+    {
+      "id": "DEV_1176_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 61952.632700000075,
+        "sourcesMs": 861.2918000000063,
+        "totalMs": 62165.443600000115
+      }
+    },
+    {
+      "id": "DEV_1178_QUERY_2",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 47976.71059999999,
+        "sourcesMs": 1036.1795000000857,
+        "totalMs": 49089.070600000094
+      }
+    },
+    {
+      "id": "DEV_1572_QUERY_3",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 29625.87930000003,
+        "sourcesMs": 831.7889999999898,
+        "totalMs": 34455.09939999995
+      }
+    },
+    {
+      "id": "DEV_414_QUERY_1",
+      "answerAccuracy": 0.5,
+      "faithfulness": 0.75,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 35231.133400000006,
+        "sourcesMs": 1240.8207,
+        "totalMs": 35372.9369
+      }
+    },
+    {
+      "id": "DEV_94_QUERY_2",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 38704.97539999988,
+        "sourcesMs": 966.9937999999383,
+        "totalMs": 38845.77150000003
+      }
+    },
+    {
+      "id": "DEV_1056_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 16353.567200000005,
+        "sourcesMs": 987.6857000000018,
+        "totalMs": 18307.300800000005
+      }
+    },
+    {
+      "id": "DEV_175_QUERY_0",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 3,
+        "valid": 3
+      },
+      "timing": {
+        "firstTextMs": 80352.61250000002,
+        "sourcesMs": 925.0537999999942,
+        "totalMs": 80407.59530000002
+      }
+    },
+    {
+      "id": "DEV_1084_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 14545.32070000004,
+        "sourcesMs": 1065.1470999999437,
+        "totalMs": 15293.066000000108
+      }
+    },
+    {
+      "id": "DEV_357_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 15406.949699999997,
+        "sourcesMs": 994.4306999999098,
+        "totalMs": 16185.618800000055
+      }
+    },
+    {
+      "id": "DEV_89_QUERY_2",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 25413.913599999854,
+        "sourcesMs": 932.2186999998521,
+        "totalMs": 26855.098400000017
+      }
+    },
+    {
+      "id": "DEV_607_QUERY_0",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 12840.373499999987,
+        "sourcesMs": 904.7064999998547,
+        "totalMs": 22073.819499999983
+      }
+    },
+    {
+      "id": "DEV_254_QUERY_1",
+      "answerAccuracy": 0.25,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 20183.902699999977,
+        "sourcesMs": 898.8410000000149,
+        "totalMs": 22905.387099999934
+      }
+    },
+    {
+      "id": "DEV_624_QUERY_2",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 27741.371700000018,
+        "sourcesMs": 844.4131000000052,
+        "totalMs": 28966.86679999996
+      }
+    },
+    {
+      "id": "DEV_1109_QUERY_1",
+      "answerAccuracy": 0.5,
+      "faithfulness": 0.5,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 20801.445999999967,
+        "sourcesMs": 981.5047999999952,
+        "totalMs": 21024.107400000008
+      }
+    },
+    {
+      "id": "DEV_409_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 13499.09850000008,
+        "sourcesMs": 787.7727000000887,
+        "totalMs": 13662.485099999933
+      }
+    },
+    {
+      "id": "DEV_468_QUERY_3",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 49274.62839999981,
+        "sourcesMs": 875.5034999998752,
+        "totalMs": 49340.45799999987
+      }
+    },
+    {
+      "id": "DEV_1507_QUERY_3",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 80259.28029999998,
+        "sourcesMs": 1001.4453000000212,
+        "totalMs": 80415.48999999999
+      }
+    },
+    {
+      "id": "DEV_578_QUERY_2",
+      "answerAccuracy": 0.5,
+      "faithfulness": 0.875,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 40467.868400000036,
+        "sourcesMs": 849.1098000002094,
+        "totalMs": 40552.44330000016
+      }
+    },
+    {
+      "id": "DEV_601_QUERY_3",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 27576.970900000073,
+        "sourcesMs": 921.6022000000812,
+        "totalMs": 28906.03960000002
+      }
+    },
+    {
+      "id": "DEV_366_QUERY_2",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 49963.927200000035,
+        "sourcesMs": 840.9362000001129,
+        "totalMs": 51271.55960000004
+      }
+    },
+    {
+      "id": "DEV_558_QUERY_3",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 18218.374899999937,
+        "sourcesMs": 827.3811999999452,
+        "totalMs": 18320.830000000075
+      }
+    },
+    {
+      "id": "DEV_231_QUERY_2",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 15361.017999999924,
+        "sourcesMs": 845.9270999999717,
+        "totalMs": 15466.959100000095
+      }
+    },
+    {
+      "id": "DEV_1134_QUERY_1",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 26253.941499999957,
+        "sourcesMs": 1301.6872999999905,
+        "totalMs": 26443.55939999997
+      }
+    },
+    {
+      "id": "DEV_1161_QUERY_3",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 30783.059799999988,
+        "sourcesMs": 1048.3385999999591,
+        "totalMs": 31000.43689999997
+      }
+    },
+    {
+      "id": "DEV_405_QUERY_3",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 24317.465199999977,
+        "sourcesMs": 1013.7875000000931,
+        "totalMs": 24473.94610000006
+      }
+    },
+    {
+      "id": "DEV_365_QUERY_0",
+      "answerAccuracy": 0.5,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 40977.577300000004,
+        "sourcesMs": 942.7501000000047,
+        "totalMs": 41130.074199999974
+      }
+    },
+    {
+      "id": "DEV_1867_QUERY_2",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 13455.646200000017,
+        "sourcesMs": 1028.9055999999982,
+        "totalMs": 13705.558799999999
+      }
+    },
+    {
+      "id": "DEV_1649_QUERY_0",
+      "answerAccuracy": 1,
+      "faithfulness": 1,
+      "evidenceHitAt6": 1,
+      "evidenceMrrAt6": 1,
+      "citationFormat": {
+        "count": 1,
+        "valid": 1
+      },
+      "timing": {
+        "firstTextMs": 15462.320000000065,
+        "sourcesMs": 919.6928999999072,
+        "totalMs": 15633.301900000079
+      }
+    }
+  ]
+}

@@ -14,11 +14,14 @@ export default defineConfig([
   },
   globalIgnores([
     "**/.next/**",
+    "**/.next-rag-eval/**",
     "**/coverage/**",
     "**/dist/**",
     "**/node_modules/**",
     "**/next-env.d.ts",
     "evals/retrieval/.venv/**",
     "evals/retrieval/artifacts/**",
+    "evals/rag/artifacts/**",
+    "evals/rag/.venv/**",
   ]),
 ]);

@@ -1,0 +1,37 @@
+{
+  "source": {
+    "repository": "https://github.com/ymcui/cmrc2018",
+    "revision": "c0eb1b6ba219847457e6af3180da722bbeb656af",
+    "path": "squad-style-data/cmrc2018_dev.json",
+    "sha256": "e9ff74231f05c230c6fa88b84441ee334d97234cbb610991cd94b82db00c7f1f",
+    "license": "CC-BY-SA-4.0"
+  },
+  "seed": "ai-chat-cmrc2018-rag-v1",
+  "files": {
+    "corpus.json": "54d569e59c76ca1410036dcd343650c8af72c4fa674a0b27a59ccb0d387b8aec",
+    "chunks.json": "9c2ef84d5ef335a154648944be5d18f7c49bdbc4e686f6c0815e7f7b64248e01",
+    "pilot.json": "f80eaea442db6c738ef9a1e54e7852627e55569ed0eb4f58ba98cdde2bb08829",
+    "test.json": "c39b4d7423a82aa732c28f260e7797a1b5438e2c4ebc8fdedf34d24aab78f203",
+    "tune.json": "be44490cafd8316334e8999c10b744e511727af847f90e76b9cabfcdffb530a3",
+    "excluded.json": "c125cc5601601df905ef5fb77604d5a033120602a232975db4a8cbdd319f67d9"
+  },
+  "corpusCount": 848,
+  "originalQuestionCount": 3219,
+  "eligibleQuestionCount": 3043,
+  "excludedQuestionCount": 176,
+  "pilotCount": 5,
+  "testCount": 50,
+  "tuneCount": 20,
+  "corpusCharacters": 432097,
+  "corpusUtf8Bytes": 1193097,
+  "chunkCount": 948,
+  "chunkUtf8Bytes": 1212485,
+  "split": {
+    "size": 800,
+    "overlap": 100,
+    "unit": "JS UTF-16 characters",
+    "parserSha256": "1cc52881b0f27809056eabd5358ae3636d88bb71b3d4be762b39476a9151969a"
+  },
+  "selectedQuestionsWithoutContainedAnswer": [],
+  "protocol": "Full dev corpus; 5 pilot + 20 tuning + 50 held-out test, disjoint source articles; adapted full-RAG evaluation, NOT official CMRC leaderboard"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@ai-chat/rag-eval",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "data:prepare": "tsx --use-env-proxy src/prepare.ts",
+    "host": "tsx --env-file-if-exists=../../apps/worker/.env.local --use-env-proxy src/host.ts",
+    "bench": "tsx --use-env-proxy src/run.ts",
+    "tune": "tsx --env-file-if-exists=../../apps/worker/.env.local --use-env-proxy src/tune.ts",
+    "report": "tsx src/report.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-chat/contracts": "workspace:*",
+    "@ai-chat/db": "workspace:*",
+    "ioredis": "^6.0.0"
+  }
+}

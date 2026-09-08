@@ -1,0 +1,242 @@
+[
+  {
+    "size": 800,
+    "overlap": 100,
+    "candidates": 30,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 8051,
+    "candidateHit": 1
+  },
+  {
+    "size": 600,
+    "overlap": 80,
+    "candidates": 30,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 3450.05,
+    "candidateHit": 1
+  },
+  {
+    "size": 600,
+    "overlap": 80,
+    "candidates": 20,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 3452.25,
+    "candidateHit": 1
+  },
+  {
+    "size": 600,
+    "overlap": 80,
+    "candidates": 10,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 3533.8,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 0,
+    "candidates": 30,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 3907.15,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 100,
+    "candidates": 30,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 4024.05,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 0,
+    "candidates": 20,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 4056.1,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 100,
+    "candidates": 20,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 4067,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 0,
+    "candidates": 10,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 4139.55,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 100,
+    "candidates": 10,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 4182,
+    "candidateHit": 1
+  },
+  {
+    "size": 1000,
+    "overlap": 150,
+    "candidates": 30,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 4415.6,
+    "candidateHit": 1
+  },
+  {
+    "size": 1000,
+    "overlap": 150,
+    "candidates": 20,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 4495.15,
+    "candidateHit": 1
+  },
+  {
+    "size": 1000,
+    "overlap": 150,
+    "candidates": 10,
+    "retained": 3,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 4578.15,
+    "candidateHit": 1
+  },
+  {
+    "size": 600,
+    "overlap": 80,
+    "candidates": 30,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 6825.15,
+    "candidateHit": 1
+  },
+  {
+    "size": 600,
+    "overlap": 80,
+    "candidates": 20,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 6857.9,
+    "candidateHit": 1
+  },
+  {
+    "size": 600,
+    "overlap": 80,
+    "candidates": 10,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 6920.15,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 0,
+    "candidates": 20,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 7707,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 0,
+    "candidates": 30,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 7790.4,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 100,
+    "candidates": 20,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 7908.85,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 0,
+    "candidates": 10,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 8244.65,
+    "candidateHit": 1
+  },
+  {
+    "size": 800,
+    "overlap": 100,
+    "candidates": 10,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 8332.8,
+    "candidateHit": 1
+  },
+  {
+    "size": 1000,
+    "overlap": 150,
+    "candidates": 20,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 8931.85,
+    "candidateHit": 1
+  },
+  {
+    "size": 1000,
+    "overlap": 150,
+    "candidates": 30,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 9115.95,
+    "candidateHit": 1
+  },
+  {
+    "size": 1000,
+    "overlap": 150,
+    "candidates": 10,
+    "retained": 6,
+    "knownAnswerHit": 1,
+    "mrr": 0.975,
+    "contextBytes": 9192.45,
+    "candidateHit": 1
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "size": 800,
+  "overlap": 100,
+  "candidates": 30,
+  "retained": 6,
+  "knownAnswerHit": 1,
+  "mrr": 0.975,
+  "contextBytes": 8051,
+  "candidateHit": 1
+}

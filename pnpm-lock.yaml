@@ -181,6 +181,18 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
 
+  evals/rag:
+    dependencies:
+      '@ai-chat/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ai-chat/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      ioredis:
+        specifier: ^6.0.0
+        version: 6.0.0
+
   evals/retrieval:
     dependencies:
       '@ai-chat/db':
