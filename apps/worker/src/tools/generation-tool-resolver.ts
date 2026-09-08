@@ -1,4 +1,4 @@
-import type { GenerationToolSelectionDto } from "@ai-chat/contracts";
+import type { GenerationToolSelectionDto, KnowledgeSourceDto } from "@ai-chat/contracts";
 import {
   createRemoteMcpClient,
   type McpServerRegistry,
@@ -11,9 +11,25 @@ import {
   toMcpRuntimeToolName,
 } from "./tool-names";
 import { createTavilyWebSearchTool } from "./web-search-tool";
+import type { ChatKnowledgeRetriever } from "../knowledge/chat-knowledge-retriever";
+import {
+  createKnowledgeSearchTool,
+  KNOWLEDGE_SEARCH_TOOL_NAME,
+  KNOWLEDGE_TOOL_INSTRUCTIONS,
+} from "./knowledge-search-tool";
+
+/** 由 Worker 提供的本轮上下文，不属于模型可填写的工具参数。 */
+export type GenerationToolContext = {
+  ownerId: string;
+  knowledgeBaseId: string | null;
+  signal: AbortSignal;
+};
 
 export type ResolvedGenerationTools = {
   tools: ToolSet | undefined;
+  instructions?: string;
+  activeTools(): string[];
+  takeSources(toolCallId: string): KnowledgeSourceDto[];
   toPublicToolName(runtimeName: string): string;
   close(): Promise<void>;
 };
@@ -21,6 +37,7 @@ export type ResolvedGenerationTools = {
 export type GenerationToolResolver = {
   resolve(
     selection: GenerationToolSelectionDto,
+    context: GenerationToolContext,
   ): Promise<ResolvedGenerationTools>;
 };
 
@@ -33,6 +50,7 @@ export function createGenerationToolResolver(options: {
   registry: McpServerRegistry;
   tavilyApiKey?: string;
   tavilyFetch?: typeof fetch;
+  knowledgeRetriever?: ChatKnowledgeRetriever;
   mcpClientFactory?: (
     server: ReturnType<McpServerRegistry["get"]>,
   ) => Promise<RuntimeMcpClient>;
@@ -40,11 +58,12 @@ export function createGenerationToolResolver(options: {
   const mcpClientFactory = options.mcpClientFactory ?? createRemoteMcpClient;
 
   return {
-    async resolve(selection) {
+    async resolve(selection, context) {
       const tools: ToolSet = {};
       const publicNames = new Map<string, string>();
       const clients: RuntimeMcpClient[] = [];
       let closed = false;
+      let knowledge: ReturnType<typeof createKnowledgeSearchTool> | undefined;
 
       async function close(): Promise<void> {
         if (closed) {
@@ -62,6 +81,21 @@ export function createGenerationToolResolver(options: {
       }
 
       try {
+        context.signal.throwIfAborted();
+        if (context.knowledgeBaseId) {
+          if (!options.knowledgeRetriever) {
+            throw new Error("KNOWLEDGE_RETRIEVER_NOT_CONFIGURED");
+          }
+          knowledge = createKnowledgeSearchTool({
+            ownerId: context.ownerId,
+            baseId: context.knowledgeBaseId,
+            signal: context.signal,
+            retrieve: options.knowledgeRetriever,
+          });
+          tools[KNOWLEDGE_SEARCH_TOOL_NAME] = knowledge.tool;
+          publicNames.set(KNOWLEDGE_SEARCH_TOOL_NAME, KNOWLEDGE_SEARCH_TOOL_NAME);
+        }
+
         if (selection.webSearch) {
           if (!options.tavilyApiKey?.trim()) {
             throw new Error("联网搜索已启用，但 Worker 未配置 TAVILY_API_KEY");
@@ -85,7 +119,9 @@ export function createGenerationToolResolver(options: {
         for (const [serverId, selectedToolNames] of selectionsByServer) {
           const client = await mcpClientFactory(options.registry.get(serverId));
           clients.push(client);
+          context.signal.throwIfAborted();
           const serverTools = await client.tools();
+          context.signal.throwIfAborted();
 
           for (const toolName of selectedToolNames) {
             const selectedTool = serverTools[toolName];
@@ -106,6 +142,16 @@ export function createGenerationToolResolver(options: {
 
         return {
           tools: Object.keys(tools).length > 0 ? tools : undefined,
+          instructions: knowledge ? KNOWLEDGE_TOOL_INSTRUCTIONS : undefined,
+          activeTools() {
+            return Object.keys(tools).filter(
+              (name) => name !== KNOWLEDGE_SEARCH_TOOL_NAME || knowledge?.canSearch(),
+            );
+          },
+          // 没有引用的工具返回空数组，主流程无需识别某一种工具。
+          takeSources(toolCallId) {
+            return knowledge?.takeSources(toolCallId) ?? [];
+          },
           toPublicToolName(runtimeName) {
             return publicNames.get(runtimeName) ?? runtimeName;
           },

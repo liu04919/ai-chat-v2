@@ -18,7 +18,7 @@ import { createGenerationToolResolver } from "./tools";
 import { createKnowledgeWorker } from "./knowledge/queue";
 import { createKnowledgeEmbedder } from "./knowledge/embedding";
 import { ingestKnowledge } from "./knowledge/ingest";
-import { retrieveChatKnowledge } from "./knowledge/chat-knowledge";
+import { retrieveChatKnowledge } from "./knowledge/chat-knowledge-retriever";
 
 function requireEnvironment(name: string): string {
   const value = process.env[name];
@@ -50,6 +50,7 @@ const chatModel = createCatApiChatModel({
 const toolResolver = createGenerationToolResolver({
   registry: createConfiguredMcpServerRegistry(process.env),
   tavilyApiKey: process.env.TAVILY_API_KEY,
+  knowledgeRetriever: retrieveChatKnowledge,
 });
 // 图片渠道使用独立凭证；尚未配置时只让图片任务明确失败，不影响 Chat。
 const imageModel: ImageModel = {
@@ -71,7 +72,6 @@ const worker = createBullMqGenerationWorker({
       eventWriter,
       objectStorage,
       toolResolver,
-      knowledgeRetriever: retrieveChatKnowledge,
     }),
 });
 

@@ -275,8 +275,7 @@ export async function createGenerationCommandRecord(
       if (input.knowledgeBaseId) {
         if (
           conversation.mode !== "chat" ||
-          !textParts.some((p) => p.text.trim()) ||
-          textParts.map((p) => p.text).join("\n").length > 2000
+          !textParts.some((p) => p.text.trim())
         ) {
           throw new GenerationCommandRejected({ kind: "invalid_request" });
         }

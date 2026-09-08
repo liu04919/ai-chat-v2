@@ -25,6 +25,8 @@ export type ChatModelRequest = {
   messages: ChatModelMessage[];
   reasoningEffort: ReasoningEffortDto;
   tools?: ToolSet;
+  /** 每个模型步骤重新计算可用工具，例如检索次数耗尽后移除知识库工具。 */
+  activeTools?: () => string[];
   abortSignal?: AbortSignal;
 };
 

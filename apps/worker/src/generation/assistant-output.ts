@@ -80,32 +80,44 @@ function appendAssistantDelta(
 export function createAssistantOutput(input: {
   generationId: string;
   eventWriter: GenerationEventWriter;
+  signal?: AbortSignal;
+  toPublicToolName?: (name: string) => string;
+  takeSources?: (toolCallId: string) => KnowledgeSourceDto[];
 }) {
-  const { generationId, eventWriter } = input;
+  const { generationId, eventWriter, signal, takeSources } = input;
+  const toPublicToolName = input.toPublicToolName ?? ((name: string) => name);
   const parts: AssistantMessagePartDto[] = [];
   let finished = false;
 
-  return {
-    async appendSources(sources: KnowledgeSourceDto[]) {
-      const part = knowledgeSourcesPartSchema.parse({
-        id: `knowledge-${generationId}`,
-        type: "knowledge-sources",
-        sources,
-      });
-      // 引用由服务器提供，不是模型生成；既随回答保存，也立即发给页面展示。
-      appendAssistantPart(parts, part);
-      await eventWriter.append({
-        type: "knowledge.sources",
-        generationId,
-        partId: part.id,
-        sources: part.sources,
-      });
-    },
+  async function appendSources(sources: KnowledgeSourceDto[]) {
+    const index = parts.findIndex((p) => p.type === "knowledge-sources");
+    const previous = parts[index];
+    const merged = new Map(
+      previous?.type === "knowledge-sources"
+        ? previous.sources.map((s) => [s.chunkId, s])
+        : [],
+    );
+    for (const source of sources) merged.set(source.chunkId, source);
+    const part = knowledgeSourcesPartSchema.parse({
+      id: `knowledge-${generationId}`,
+      type: "knowledge-sources",
+      sources: [...merged.values()].sort((a, b) => a.number - b.number),
+    });
+    // 引用由服务器提供，不是模型生成；既随回答保存，也立即发给页面展示。
+    // 多次检索更新同一份累计快照，页面和刷新后的历史都只展示一组引用。
+    if (index >= 0) parts[index] = part;
+    else appendAssistantPart(parts, part);
+    await eventWriter.append({
+      type: "knowledge.sources",
+      generationId,
+      partId: part.id,
+      sources: part.sources,
+    });
+  }
 
-    async consume(
-      part: ChatModelStreamPart,
-      toPublicToolName: (name: string) => string = (name) => name,
-    ) {
+  return {
+    async consume(part: ChatModelStreamPart) {
+      signal?.throwIfAborted();
       // 先累计，再发送事件：即使发送失败，取消处理仍可取得已经收到的片段。
       // 调用方必须逐片 await，保证 Parts 与展示事件保持相同顺序。
       switch (part.type) {
@@ -155,6 +167,16 @@ export function createAssistantOutput(input: {
             toolCallId: toolResult.toolCallId,
             isError: toolResult.isError,
           });
+          // 引用也是工具结果的展示投影，只读取服务器按调用 ID 保存的资料，
+          // 不从模型返回值解析；结果事件发送期间若被取消，不再发布引用。
+          if (!part.isError) {
+            signal?.throwIfAborted();
+            const sources = takeSources?.(part.toolCallId) ?? [];
+            if (sources.length > 0) {
+              signal?.throwIfAborted();
+              await appendSources(sources);
+            }
+          }
           break;
         }
         case "finish":

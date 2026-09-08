@@ -6,7 +6,7 @@ import {
 import type { AssistantMessagePartDto } from "@ai-chat/contracts";
 import {
   isStepCount,
-  streamText,
+  ToolLoopAgent,
   type ModelMessage,
 } from "ai";
 
@@ -15,7 +15,7 @@ import type {
   ChatModelMessage,
   ChatModelStreamPart,
 } from "./chat-model";
-import { toRuntimeHistoryToolName } from "../tools/tool-names";
+import { KNOWLEDGE_SEARCH_TOOL_NAME, toRuntimeHistoryToolName } from "../tools/tool-names";
 
 export type CatApiChatModelConfig = {
   baseUrl: string;
@@ -56,6 +56,9 @@ function toAssistantModelMessages(
   let content: AssistantContentPart[] = [];
   const toolNames = new Map<string, string>();
   const pendingToolCalls = new Map<string, string>();
+  const knowledgeCalls = new Set(message.parts.flatMap((p) =>
+    p.type === "tool-call" && p.toolName === KNOWLEDGE_SEARCH_TOOL_NAME ? [p.toolCallId] : [],
+  ));
 
   function flushAssistant(): void {
     if (content.length === 0) {
@@ -69,7 +72,7 @@ function toAssistantModelMessages(
   for (const part of message.parts) {
     switch (part.type) {
       case "knowledge-sources":
-        // 历史不重复注入原文；本轮选择的知识库重新检索。
+        // 历史不重复注入原文；本轮需要资料时由工具重新检索。
         break;
       case "reasoning":
         content.push({ type: "text", text: reasoningHistoryLabel(part.text) });
@@ -80,6 +83,7 @@ function toAssistantModelMessages(
       case "attachment":
         throw new Error("Chat Model 暂不支持 Assistant Attachment 历史");
       case "tool-call":
+        if (knowledgeCalls.has(part.toolCallId)) break;
         toolNames.set(
           part.toolCallId,
           toRuntimeHistoryToolName(part.toolName),
@@ -93,6 +97,8 @@ function toAssistantModelMessages(
         });
         break;
       case "tool-result": {
+        // 成对移除旧知识库调用/结果，防止关库或换库后仍借旧原文作答。
+        if (knowledgeCalls.has(part.toolCallId)) break;
         const toolName = toolNames.get(part.toolCallId);
         if (!toolName) {
           throw new Error(
@@ -183,15 +189,17 @@ export function createCatApiChatModel(
 
   return {
     async *stream(request): AsyncIterable<ChatModelStreamPart> {
-      const result = streamText({
+      const agent = new ToolLoopAgent({
         model,
         instructions: request.instructions,
         maxRetries: 0,
-        messages: request.messages.flatMap(toModelMessages),
-        abortSignal: request.abortSignal,
-        ...(request.tools
-          ? { tools: request.tools, stopWhen: isStepCount(8) }
-          : {}),
+        tools: request.tools,
+        stopWhen: isStepCount(request.tools ? 8 : 1),
+        prepareStep: ({ stepNumber }) => ({
+          activeTools: stepNumber >= 7 ? [] : request.activeTools?.(),
+          // 给最后一步留出回答机会，不能在工具刚完成时直接截断整个循环。
+          ...(stepNumber >= 7 ? { toolChoice: "none" as const } : {}),
+        }),
         providerOptions: {
           openai: {
             forceReasoning: true,
@@ -200,6 +208,10 @@ export function createCatApiChatModel(
             store: false,
           } satisfies OpenAILanguageModelResponsesOptions,
         },
+      });
+      const result = await agent.stream({
+        messages: request.messages.flatMap(toModelMessages),
+        abortSignal: request.abortSignal,
       });
 
       for await (const part of result.stream) {
@@ -248,6 +260,9 @@ export function createCatApiChatModel(
             };
             break;
           case "finish":
+            if (part.finishReason === "tool-calls") {
+              throw new Error("MODEL_TOOL_STEP_LIMIT: 工具循环结束，但模型尚未完成回答");
+            }
             yield { type: "finish", reason: part.finishReason };
             break;
           case "error":

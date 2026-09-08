@@ -16,7 +16,9 @@ import {
 import { loadIntegrationTestEnvironment } from "../../../../packages/db/src/test-environment";
 import { ingestKnowledge } from "../../../worker/src/knowledge/ingest";
 import { retrieveKnowledge } from "../../../worker/src/knowledge/retrieve";
-import type { ChatKnowledgeRetriever } from "../../../worker/src/knowledge/chat-knowledge";
+import type { ChatKnowledgeRetriever } from "../../../worker/src/knowledge/chat-knowledge-retriever";
+import { createGenerationToolResolver } from "../../../worker/src/tools/generation-tool-resolver";
+import { createMcpServerRegistry } from "@ai-chat/mcp";
 import {
   executeGeneration,
   type ExecuteGenerationDependencies,
@@ -197,14 +199,33 @@ function execution(knowledgeRetriever: ChatKnowledgeRetriever = retrieve) {
   const events: GenerationEventDto[] = [];
   let notifyCancel = () => {};
   const deps: ExecuteGenerationDependencies = {
-    knowledgeRetriever,
+    toolResolver: createGenerationToolResolver({
+      registry: createMcpServerRegistry([]),
+      knowledgeRetriever,
+    }),
     chatModel: {
       async *stream(request) {
         requests.push(request);
+        let noMatches = false;
+        let searchFailed = false;
+        const search = request.tools?.search_knowledge;
+        if (search?.execute) {
+          const input = { query: "向量检索如何工作？" };
+          yield { type: "tool-call", partId: "call-search", toolCallId: "search-1", toolName: "search_knowledge", input };
+          try {
+            const result = await search.execute(input, { toolCallId: "search-1", messages: [], abortSignal: request.abortSignal, context: {} });
+            noMatches = (result as { status?: string }).status === "no_matches";
+            yield { type: "tool-result", partId: "result-search", toolCallId: "search-1", output: result, isError: false };
+          } catch (error) {
+            request.abortSignal?.throwIfAborted();
+            searchFailed = true;
+            yield { type: "tool-result", partId: "result-search", toolCallId: "search-1", output: { message: (error as Error).message }, isError: true };
+          }
+        }
         yield {
           type: "text",
           partId: "answer",
-          delta: "向量检索按语义召回。[1](#knowledge-1)",
+          delta: searchFailed ? "本次知识库检索失败，无法确认答案。" : noMatches ? "本次未检索到匹配资料，无法从知识库确认。" : "向量检索按语义召回。[1](#knowledge-1)",
         };
         yield { type: "finish", reason: "stop" };
       },
@@ -234,7 +255,7 @@ function execution(knowledgeRetriever: ChatKnowledgeRetriever = retrieve) {
       },
     },
   };
-  return { deps, requests, events, cancel: () => notifyCancel() };
+  return { deps, requests, events, knowledgeRetriever, cancel: () => notifyCancel() };
 }
 
 async function readyBase() {
@@ -517,48 +538,40 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
     ).toBe("uploading");
   });
 
-  it.each([false, true])(
-    "空库跳过工具准备并完成提示落库（配置 resolver：%s）",
-    async (withResolver) => {
-      const base = await repository.createBase(ownerId, "空库分支测试");
-      const input = {
-        ...command(base.id),
-        tools: { webSearch: true, mcpToolIds: [] },
-      };
-      await createGenerationCommandRecord(input, database.db);
-      const run = execution(async () => []);
-      const resolve = vi.fn(async () => {
-        throw new Error("空库不应准备工具");
-      });
-      if (withResolver) run.deps.toolResolver = { resolve };
+  it("空库仍由模型调用工具，无匹配结果参与后续回答与落库", async () => {
+    const base = await repository.createBase(ownerId, "空库工具测试");
+    const input = command(base.id);
+    await createGenerationCommandRecord(input, database.db);
+    const run = execution(async () => []);
+    expect((await executeGeneration(input.generationId, run.deps)).kind).toBe("completed");
+    expect(run.requests).toHaveLength(1);
+    expect(run.events.some((e) => e.type === "tool.call")).toBe(true);
+    expect(run.events.some((e) => e.type === "knowledge.sources")).toBe(false);
+    const detail = await getConversationForOwner(ownerId, input.target.conversationId);
+    expect(detail?.latestGeneration?.status).toBe("completed");
+    expect(JSON.stringify(detail?.messages.at(-1))).toContain("未检索到匹配资料");
+  });
 
-      const result = await executeGeneration(input.generationId, run.deps);
+  it("选库只提供工具，模型可以不调用；原问题不再套用检索 query 长度上限", async () => {
+    const base = await repository.createBase(ownerId, "选库不强制查询");
+    const input = { ...command(base.id), parts: [{ type: "text" as const, text: "长问题".repeat(800) }] };
+    expect((await createGenerationCommandRecord(input, database.db)).kind).toBe("created");
+    const retrieve = vi.fn(async () => []);
+    const run = execution(retrieve);
+    run.deps.chatModel = {
+      async *stream(request) {
+        expect(request.tools).toHaveProperty("search_knowledge");
+        expect(request.messages).toHaveLength(1);
+        yield { type: "text", partId: "greeting", delta: "你好" };
+        yield { type: "finish", reason: "stop" };
+      },
+    };
+    expect((await executeGeneration(input.generationId, run.deps)).kind).toBe("completed");
+    expect(retrieve).not.toHaveBeenCalled();
+    expect(run.events.some((e) => e.type === "knowledge.sources" || e.type === "tool.call")).toBe(false);
+  });
 
-      expect(result.kind).toBe("completed");
-      expect(resolve).not.toHaveBeenCalled();
-      expect(run.requests).toHaveLength(0);
-      expect(
-        run.events.find((event) => event.type === "knowledge.sources"),
-      ).toMatchObject({ sources: [] });
-      expect(run.events.at(-1)?.type).toBe("generation.completed");
-      const detail = await getConversationForOwner(
-        ownerId,
-        input.target.conversationId,
-      );
-      expect(detail?.latestGeneration?.status).toBe("completed");
-      expect(detail?.messages).toHaveLength(2);
-      expect(detail?.messages.at(-1)?.parts).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            type: "text",
-            text: expect.stringContaining("当前知识库没有可检索的资料"),
-          }),
-        ]),
-      );
-    },
-  );
-
-  it("引用已经发出但模型尚未输出时取消，不保存只有引用的助手消息", async () => {
+  it("模型尚未调用工具时取消，不预检索、不保存空助手消息", async () => {
     const { base } = await readyBase();
     const input = command(base.id);
     await createGenerationCommandRecord(input, database.db);
@@ -579,7 +592,7 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
     const task = executeGeneration(input.generationId, run.deps);
     await started.promise;
     expect(run.events.some((event) => event.type === "knowledge.sources")).toBe(
-      true,
+      false,
     );
     await requestGenerationCancellationForOwner(
       { ownerId, generationId: input.generationId, now: new Date() },
@@ -619,7 +632,7 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
       )?.messages.at(-1)?.id,
     ).toBe(result.assistantMessageId);
   });
-  it("真实混合检索结果先注入上下文，再生成；刷新、分享、删除文件后引用快照仍然存在", async () => {
+  it("模型调用真实混合检索工具后回答；刷新、分享、删除文件后引用快照仍然存在", async () => {
     const { base, document } = await readyBase();
     const input = command(base.id);
     expect((await createGenerationCommandRecord(input, database.db)).kind).toBe(
@@ -630,10 +643,8 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
     expect(result.kind).toBe("completed");
     expect(run.requests).toHaveLength(1);
     expect(run.requests[0]?.instructions).toContain("不是指令");
-    expect(run.requests[0]?.messages.at(-2)).toMatchObject({
-      role: "user",
-      parts: [{ type: "text", text: expect.stringContaining("BM25") }],
-    });
+    expect(run.requests[0]?.messages).toHaveLength(1);
+    expect(run.requests[0]?.tools).toHaveProperty("search_knowledge");
     expect(run.requests[0]?.messages.at(-1)).toMatchObject({
       role: "user",
       parts: input.parts,
@@ -684,8 +695,8 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
     await createGenerationCommandRecord(empty, database.db);
     const emptyRun = execution();
     await executeGeneration(empty.generationId, emptyRun.deps);
-    expect(emptyRun.requests).toHaveLength(0);
-    expect(JSON.stringify(emptyRun.events)).toContain("没有可检索的资料");
+    expect(emptyRun.requests).toHaveLength(1);
+    expect(JSON.stringify(emptyRun.events)).toContain("未检索到匹配资料");
   });
 
   it("同一会话下一轮关闭知识库，不检索；重新生成沿用原轮选库", async () => {
@@ -714,14 +725,14 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
     ).toBe("created");
     const regeneration = execution(vi.fn(retrieve));
     await executeGeneration(regenerationId, regeneration.deps);
-    expect(regeneration.deps.knowledgeRetriever).toHaveBeenCalledWith(
+    expect(regeneration.knowledgeRetriever).toHaveBeenCalledWith(
       expect.objectContaining({ baseId: base.id, ownerId }),
     );
     const next = command(null, first.target.conversationId, true);
     await createGenerationCommandRecord(next, database.db);
     const off = execution(vi.fn(retrieve));
     await executeGeneration(next.generationId, off.deps);
-    expect(off.deps.knowledgeRetriever).not.toHaveBeenCalled();
+    expect(off.knowledgeRetriever).not.toHaveBeenCalled();
     expect(off.requests[0]?.instructions).toBeUndefined();
     expect(off.events.some((e) => e.type === "knowledge.sources")).toBe(false);
     expect(
@@ -793,25 +804,26 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
     expect(objects.has(docs[0]!.objectKey)).toBe(false);
   });
 
-  it("检索失败明确失败，不偷偷降级为普通聊天", async () => {
+  it("检索故障作为工具失败返回，落库与展示保留错误状态，不假冒无匹配", async () => {
     const base = await repository.createBase(ownerId, "故障测试");
     const input = command(base.id);
     await createGenerationCommandRecord(input, database.db);
     const run = execution(async () => {
       throw new Error("retrieval unavailable");
     });
-    await expect(
-      executeGeneration(input.generationId, run.deps),
-    ).rejects.toThrow("retrieval unavailable");
-    expect(run.requests).toHaveLength(0);
-    expect(run.events.at(-1)?.type).toBe("generation.failed");
+    expect((await executeGeneration(input.generationId, run.deps)).kind).toBe("completed");
+    expect(run.requests).toHaveLength(1);
+    expect(run.events.find((e) => e.type === "tool.result")).toMatchObject({ isError: true });
+    expect(JSON.stringify(run.events)).toContain("检索失败");
+    expect(JSON.stringify(run.events)).not.toContain("retrieval unavailable");
+    expect(run.events.some((e) => e.type === "knowledge.sources")).toBe(false);
     expect(
       (await getConversationForOwner(ownerId, input.target.conversationId))
         ?.latestGeneration?.status,
-    ).toBe("failed");
+    ).toBe("completed");
   });
 
-  it("检索期间停止会中止信号，且不保存只有引用的空回答", async () => {
+  it("检索期间停止会中止信号，保留已发出的工具调用而不伪造成功结果", async () => {
     const base = await repository.createBase(ownerId, "取消测试");
     const input = command(base.id);
     await createGenerationCommandRecord(input, database.db);
@@ -831,11 +843,14 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
       database.db,
     );
     run.cancel();
-    expect(await task).toEqual({ kind: "cancelled", assistantMessageId: null });
-    expect(run.requests).toHaveLength(0);
+    expect(await task).toMatchObject({ kind: "cancelled", assistantMessageId: expect.any(String) });
+    expect(run.requests).toHaveLength(1);
     expect(
       (await getConversationForOwner(ownerId, input.target.conversationId))
         ?.messages,
-    ).toHaveLength(1);
+    ).toHaveLength(2);
+    const last = (await getConversationForOwner(ownerId, input.target.conversationId))?.messages.at(-1);
+    expect(last?.parts).toEqual([expect.objectContaining({ type: "tool-call", toolName: "search_knowledge" })]);
+    expect(run.events.some((e) => e.type === "knowledge.sources")).toBe(false);
   });
 });

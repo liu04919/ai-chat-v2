@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ChatModelMessage, ChatModelStreamPart } from "./chat-model";
 import { createCatApiChatModel } from "./cat-api-chat-model";
+import { createKnowledgeSearchTool } from "../tools/knowledge-search-tool";
 
 function sseEvent(value: unknown): string {
   return `data: ${JSON.stringify(value)}\n\n`;
@@ -212,6 +213,9 @@ describe("CatAPI Chat Adapter", () => {
         { role: "assistant", parts: [
           { id: "sources", type: "knowledge-sources", sources: [{ number: 1, chunkId: "c", documentId: "d", originalName: "old.txt", page: 1, content: "旧引用原文不应重发" }] },
           { id: "text", type: "text", text: "历史回答需要保留" },
+          { id: "kc", type: "tool-call", toolCallId: "kc", toolName: "search_knowledge", input: { query: "上轮私有查询" } },
+          { id: "kr", type: "tool-result", toolCallId: "kc", output: { content: "旧工具原文不应重发" }, isError: false },
+          { id: "unfinished", type: "tool-call", toolCallId: "unfinished", toolName: "search_knowledge", input: { query: "停止的私有查询" } },
         ] },
         { role: "user", parts: [{ type: "text", text: "继续" }] },
       ],
@@ -221,6 +225,57 @@ describe("CatAPI Chat Adapter", () => {
     expect(body).toContain("历史回答需要保留");
     expect(body).not.toContain("旧引用原文不应重发");
     expect(body).not.toContain("old.txt");
+    expect(body).not.toContain("旧工具原文不应重发");
+    expect(body).not.toContain("私有查询");
+    expect(body).not.toContain("search_knowledge");
+    expect(body).not.toContain("TOOL_RESULT_UNAVAILABLE");
+  });
+  it("知识库工具在 SDK 循环内改写查询、累计结果，三次后移除工具并生成回答", async () => {
+    const requests: Request[] = [];
+    const retrieve = vi.fn(async ({ query }: { query: string }) => [{ number: 1, chunkId: query, documentId: "d", originalName: "资料", page: 1, content: `evidence ${query}` }]);
+    const search = createKnowledgeSearchTool({ ownerId: "o", baseId: "b", signal: new AbortController().signal, retrieve });
+    const model = createCatApiChatModel({
+      baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        const n = requests.length;
+        return new Response(n <= 3
+          ? createToolCallStream().replaceAll("web_search", "search_knowledge").replaceAll("call_search", `call_${n}`).replaceAll("Redis latest", `query_${n}`)
+          : createFinalAnswerStream(), { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    const parts: ChatModelStreamPart[] = [];
+    for await (const part of model.stream({ messages: [{ role: "user", parts: [{ type: "text", text: "研究资料" }] }], reasoningEffort: "low",
+      tools: { search_knowledge: search.tool }, activeTools: () => search.canSearch() ? ["search_knowledge"] : [],
+    })) parts.push(part);
+    expect(retrieve.mock.calls.map(([arg]) => arg.query)).toEqual(["query_1", "query_2", "query_3"]);
+    expect(parts.filter((p) => p.type === "tool-result")).toHaveLength(3);
+    expect(parts.at(-1)).toEqual({ type: "finish", reason: "stop" });
+    expect(requests).toHaveLength(4);
+    const final = await requests[3]!.json() as { tools?: unknown[]; input: unknown };
+    expect(final.tools ?? []).toEqual([]);
+    expect(JSON.stringify(final.input)).toContain("evidence query_3");
+    expect(JSON.stringify(final.input)).not.toContain("chunkId");
+  });
+
+  it("第八个模型步骤禁用工具，保留最后一次回答机会", async () => {
+    const requests: Request[] = [];
+    const execute = vi.fn(async () => ({ ok: true }));
+    const model = createCatApiChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        const n = requests.length;
+        return new Response(n < 8 ? createToolCallStream().replaceAll("call_search", `call_${n}`) : createFinalAnswerStream(), { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    for await (const part of model.stream({ messages: [{ role: "user", parts: [{ type: "text", text: "查询" }] }], reasoningEffort: "low",
+      tools: { web_search: tool({ inputSchema: z.object({ query: z.string() }), execute }) },
+    })) void part;
+    expect(requests).toHaveLength(8);
+    expect(execute).toHaveBeenCalledTimes(7);
+    const final = await requests[7]!.json() as { tools?: unknown[] };
+    // 无可用工具时，provider 会同时省略 tools/tool_choice，不必强求某个线协议字段。
+    expect(final.tools ?? []).toEqual([]);
   });
   it.each([1, 2])("为 %i 个无结果调用补齐历史，保留文字和已有结果，不重新执行工具", async (count) => {
     const history: Extract<ChatModelMessage, { role: "assistant" }> = {

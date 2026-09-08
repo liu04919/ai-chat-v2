@@ -1,6 +1,7 @@
 import { MCP_TOOL_ID_SEPARATOR } from "@ai-chat/contracts";
 
 const MCP_RUNTIME_PREFIX = "mcp__";
+export const KNOWLEDGE_SEARCH_TOOL_NAME = "search_knowledge";
 
 function sanitizeRuntimeSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_");

@@ -1,11 +1,6 @@
 import { randomUUID } from "node:crypto";
 
 import type { AssistantMessagePartDto } from "@ai-chat/contracts";
-import {
-  prepareChatKnowledge,
-  emptyKnowledgeResponse,
-  type ChatKnowledgeRetriever,
-} from "../knowledge/chat-knowledge";
 import type {
   GenerationCancellationSubscriber,
   GenerationEventWriter,
@@ -19,7 +14,7 @@ import {
   isGenerationCancellationRequested,
 } from "@ai-chat/db";
 
-import type { ChatModel, ChatModelStreamPart } from "../llm/chat-model";
+import type { ChatModel } from "../llm/chat-model";
 import type {
   GenerationToolResolver,
   ResolvedGenerationTools,
@@ -39,7 +34,6 @@ export type ExecuteChatGenerationDependencies = {
   eventWriter: GenerationEventWriter;
   objectStorage: Pick<ObjectStorage, "createDownloadUrl">;
   toolResolver?: GenerationToolResolver;
-  knowledgeRetriever?: ChatKnowledgeRetriever;
   coalescing?: DeltaCoalescingOptions;
   createAssistantMessageId?: () => string;
   now?: () => Date;
@@ -94,20 +88,14 @@ async function recordCancellation(
   dependencies: ExecuteChatGenerationDependencies,
 ): Promise<Extract<ExecuteChatGenerationResult, { kind: "cancelled" }>> {
   const generationId = execution.id;
-  // 只有引用、尚无任何模型输出时，不制造一条空的助手消息。
-  const visibleParts = assistantParts.some(
-    (p) => p.type !== "knowledge-sources",
-  )
-    ? assistantParts
-    : [];
   const assistantMessageId =
-    visibleParts.length > 0
+    assistantParts.length > 0
       ? (dependencies.createAssistantMessageId ?? randomUUID)()
       : null;
   const cancelled = await cancelGenerationExecution({
     generationId,
     assistantMessageId,
-    assistantParts: visibleParts,
+    assistantParts,
     now: (dependencies.now ?? (() => new Date()))(),
   });
 
@@ -123,18 +111,21 @@ async function recordCancellation(
   return { kind: "cancelled", assistantMessageId };
 }
 
-// 主流程管理本轮生命周期；知识库准备与回答投影分别封装，不在这里展开协议细节。
+// 主流程管理本轮生命周期；工具执行与回答投影分别封装，不在这里展开协议细节。
 export async function executeChatGeneration(
   execution: ClaimedGenerationExecution,
   dependencies: ExecuteChatGenerationDependencies,
 ): Promise<ExecuteChatGenerationResult> {
   const generationId = execution.id;
   const abortController = new AbortController();
+  let resolvedTools: ResolvedGenerationTools | undefined;
   const output = createAssistantOutput({
     generationId,
     eventWriter: dependencies.eventWriter,
+    signal: abortController.signal,
+    toPublicToolName: (name) => resolvedTools?.toPublicToolName(name) ?? name,
+    takeSources: (toolCallId) => resolvedTools?.takeSources(toolCallId) ?? [],
   });
-  let resolvedTools: ResolvedGenerationTools | undefined;
   let unsubscribe: () => Promise<void>;
 
   try {
@@ -168,42 +159,30 @@ export async function executeChatGeneration(
       execution,
       dependencies.objectStorage,
     );
-    const knowledge = await prepareChatKnowledge(
-      execution,
-      request,
-      abortController.signal,
-      dependencies.knowledgeRetriever,
-    );
-    if (knowledge.kind !== "disabled") {
-      await output.appendSources(knowledge.sources);
+    if (dependencies.toolResolver) {
+      resolvedTools = await dependencies.toolResolver.resolve(execution.tools, {
+        ownerId: execution.ownerId,
+        knowledgeBaseId: execution.knowledgeBaseId ?? null,
+        signal: abortController.signal,
+      });
+      request.tools = resolvedTools.tools;
+      request.instructions = resolvedTools.instructions;
+      request.activeTools = resolvedTools.activeTools;
+    } else if (
+      execution.tools.webSearch || execution.tools.mcpToolIds.length > 0 || execution.knowledgeBaseId
+    ) {
+      throw new Error("Generation 选择了 Tool，但 Worker 未配置 Tool Resolver");
     }
+    // 所有工具只在模型调用时执行；准备阶段不检索、不创建临时资料消息。
     abortController.signal.throwIfAborted();
-
-    let stream: AsyncIterable<ChatModelStreamPart>;
-    if (knowledge.kind === "empty") {
-      // 空库直接生成固定提示，不准备工具、不调用模型；仍走下方统一收尾。
-      stream = emptyKnowledgeResponse(generationId);
-    } else {
-      if (dependencies.toolResolver) {
-        resolvedTools = await dependencies.toolResolver.resolve(execution.tools);
-        request.tools = resolvedTools.tools;
-      } else if (
-        execution.tools.webSearch || execution.tools.mcpToolIds.length > 0
-      ) {
-        throw new Error("Generation 选择了 Tool，但 Worker 未配置 Tool Resolver");
-      }
-      request.abortSignal = abortController.signal;
-      stream = dependencies.chatModel.stream(request);
-    }
+    request.abortSignal = abortController.signal;
 
     for await (const part of coalesceChatModelStream(
-      stream,
+      dependencies.chatModel.stream(request),
       dependencies.coalescing,
     )) {
-      await output.consume(
-        part,
-        (name) => resolvedTools?.toPublicToolName(name) ?? name,
-      );
+      abortController.signal.throwIfAborted();
+      await output.consume(part);
     }
 
     const assistantParts = output.getCompletedParts();

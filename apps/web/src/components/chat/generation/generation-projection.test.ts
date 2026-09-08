@@ -9,6 +9,21 @@ import {
 const generationId = "generation_123";
 
 describe("Generation projection", () => {
+  it("重复来源事件更新同一累计快照，重放不会重复展示", () => {
+    const first = { number: 1, chunkId: "c1", documentId: "d", originalName: "资料", page: 1, content: "原文" };
+    const second = { ...first, number: 7, chunkId: "c7" };
+    const event: GenerationEventDto = { type: "knowledge.sources", generationId, partId: "sources", sources: [first, second] };
+    const projection = reduceGenerationEvents(createGenerationProjection("c", generationId), [
+      { ...event, sources: [first] },
+      { type: "text.delta", generationId, partId: "answer", delta: "回答" },
+      event, event,
+    ]);
+    expect(projection.status).toBe("running");
+    expect(projection.parts).toEqual([
+      { id: "sources", type: "knowledge-sources", sources: [first, second] },
+      { id: "answer", type: "text", text: "回答" },
+    ]);
+  });
   it("检索引用事件和文本按流顺序投影，引用保留原文快照", () => {
     const sources = [{ number: 1, chunkId: "chunk", documentId: "doc", originalName: "资料.md", page: 1, content: "原文" }];
     const projection = reduceGenerationEvents(createGenerationProjection("conversation_123", generationId), [

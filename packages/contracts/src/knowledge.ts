@@ -76,7 +76,8 @@ export const createKnowledgeUploadResponseSchema = z
 // 引用是当次检索资料的快照，不包含向量、内部评分或对象存储地址。
 export const knowledgeSourceSchema = z
   .object({
-    number: z.number().int().min(1).max(6),
+    // 本轮最多三次检索，每次六条；编号跨调用稳定，不在每次检索时归一。
+    number: z.number().int().min(1).max(18),
     chunkId: z.string().min(1),
     documentId: z.string().min(1),
     originalName: z.string(),
@@ -88,7 +89,7 @@ export const knowledgeSourcesPartSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("knowledge-sources"),
-    sources: z.array(knowledgeSourceSchema).max(6),
+    sources: z.array(knowledgeSourceSchema).max(18),
   })
   .strict();
 export type KnowledgeBaseDto = z.infer<typeof knowledgeBaseSchema>;

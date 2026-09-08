@@ -223,6 +223,8 @@ const worker = createBullMqGenerationWorker({
                 }
               : undefined,
             toPublicToolName: (runtimeName) => runtimeName,
+            activeTools: () => selection.webSearch ? ["web_search"] : [],
+            takeSources: () => [],
             close: async () => {},
           };
         },

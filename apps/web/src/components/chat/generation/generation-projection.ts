@@ -139,9 +139,26 @@ export function reduceGenerationEvents(
     }
 
     switch (event.type) {
-      case "knowledge.sources":
-        if (current.parts.some((p) => p.id === event.partId)) return { ...current, status: "connection-error" };
-        return { ...current, status: "running", hasStarted: true, parts: [...current.parts, { id: event.partId, type: "knowledge-sources", sources: event.sources }] };
+      case "knowledge.sources": {
+        const index = current.parts.findIndex((p) => p.id === event.partId);
+        if (index >= 0 && current.parts[index]?.type !== "knowledge-sources") {
+          return { ...current, status: "connection-error" };
+        }
+        // 每次都是累计快照；保留首次出现的位置，恢复 SSE 时也不重复引用列表。
+        const sourcePart = {
+          id: event.partId,
+          type: "knowledge-sources" as const,
+          sources: event.sources,
+        };
+        return {
+          ...current,
+          status: "running",
+          hasStarted: true,
+          parts: index < 0
+            ? [...current.parts, sourcePart]
+            : current.parts.map((p, i) => i === index ? sourcePart : p),
+        };
+      }
       case "generation.started":
         return { ...current, status: "running", hasStarted: true };
       case "reasoning.delta":
