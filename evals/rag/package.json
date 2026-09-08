@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "data:prepare": "tsx --use-env-proxy src/prepare.ts",
+    "compare:prepare": "tsx src/compare-prepare.ts",
     "host": "tsx --env-file-if-exists=../../apps/worker/.env.local --use-env-proxy src/host.ts",
     "bench": "tsx --use-env-proxy src/run.ts",
     "tune": "tsx --env-file-if-exists=../../apps/worker/.env.local --use-env-proxy src/tune.ts",

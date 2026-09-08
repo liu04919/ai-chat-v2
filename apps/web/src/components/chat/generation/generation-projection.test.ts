@@ -1,4 +1,4 @@
-import type { GenerationEventDto } from "@ai-chat/contracts";
+import { generationEventSchema, type GenerationEventDto } from "@ai-chat/contracts";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,6 +9,26 @@ import {
 const generationId = "generation_123";
 
 describe("Generation projection", () => {
+  it("前端接收累计 18 条来源，重放不重复且可继续接收正文", () => {
+    const sources = Array.from({ length: 18 }, (_, index) => ({
+      number: index + 1, chunkId: `chunk-${index}`, documentId: "doc",
+      originalName: "资料", page: 1, content: `原文 ${index + 1}`,
+    }));
+    const events = [6, 12, 18, 18].map((count) => generationEventSchema.parse({
+      type: "knowledge.sources", generationId, partId: "sources", sources: sources.slice(0, count),
+    }));
+    const projection = reduceGenerationEvents(createGenerationProjection("c", generationId), [
+      ...events,
+      { type: "text.delta", generationId, partId: "answer", delta: "回答[18](#knowledge-18)" },
+      { type: "generation.completed", generationId },
+    ]);
+    expect(projection.status).toBe("completed");
+    expect(projection.parts).toEqual([
+      { id: "sources", type: "knowledge-sources", sources },
+      { id: "answer", type: "text", text: "回答[18](#knowledge-18)" },
+    ]);
+  });
+
   it("重复来源事件更新同一累计快照，重放不会重复展示", () => {
     const first = { number: 1, chunkId: "c1", documentId: "d", originalName: "资料", page: 1, content: "原文" };
     const second = { ...first, number: 7, chunkId: "c7" };

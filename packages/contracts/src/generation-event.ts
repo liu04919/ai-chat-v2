@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { knowledgeSourceSchema } from "./knowledge";
+import { knowledgeSourcesPartSchema } from "./knowledge";
 
 const generationEventBase = {
   generationId: z.string().min(1),
@@ -76,7 +76,8 @@ export const generationEventSchema = z.discriminatedUnion("type", [
     type: z.literal("knowledge.sources"),
     ...generationEventBase,
     partId: z.string().min(1),
-    sources: z.array(knowledgeSourceSchema).max(6),
+    // SSE 与落库消息共用累计来源上限，支持多次检索后的 18 条来源。
+    sources: knowledgeSourcesPartSchema.shape.sources,
   }).strict(),
   generationStartedEventSchema,
   textDeltaEventSchema,

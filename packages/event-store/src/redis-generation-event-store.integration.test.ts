@@ -57,6 +57,26 @@ afterAll(async () => {
 });
 
 describe("Redis GenerationEvent writer and reader", () => {
+  it("累计来源从 6 条增至 18 条后仍能写入并读回完成事件", async () => {
+    const generationId = `generation-${randomUUID()}`;
+    keyFor(generationId);
+    const reader = createReader();
+    const sources = Array.from({ length: 18 }, (_, index) => ({
+      number: index + 1, chunkId: `chunk-${index}`, documentId: "doc",
+      originalName: "资料", page: 1, content: `原文 ${index + 1}`,
+    }));
+    const events = [
+      ...[6, 12, 18].map((count) => ({
+        type: "knowledge.sources" as const, generationId, partId: "sources",
+        sources: sources.slice(0, count),
+      })),
+      { type: "text.delta" as const, generationId, partId: "answer", delta: "回答[18](#knowledge-18)" },
+      { type: "generation.completed" as const, generationId },
+    ];
+    for (const event of events) await writer.append(event);
+    expect((await reader.read({ generationId, limit: 10 })).map((row) => row.event)).toEqual(events);
+  });
+
   it("保持事件顺序，并从 cursor 之后继续读取", async () => {
     const generationId = `generation-${randomUUID()}`;
     keyFor(generationId);

@@ -9,8 +9,8 @@ import {
   createGenerationResponseSchema, conversationDetailResponseSchema, generationEventSchema,
 } from "@ai-chat/contracts";
 import { sha256, type CorpusDocument, type EvalQuestion } from "./dataset";
+import { root, codeRoot, variant } from "./paths";
 
-const root = fileURLToPath(new URL("../artifacts/cmrc2018/", import.meta.url));
 const read = <T>(name: string): T => JSON.parse(readFileSync(join(root, name), "utf8")) as T;
 const save = (name: string, value: unknown) => writeFileSync(join(root, name), JSON.stringify(value, null, 2) + "\n");
 const append = (name: string, value: unknown) => appendFileSync(join(root, name), JSON.stringify(value) + "\n");
@@ -100,6 +100,7 @@ async function main() {
       let pending = "", streamedText = "", terminal = "";
       let firstTextMs: number | null = null;
       let sourcesMs: number | null = null;
+      const toolEvents: { elapsedMs: number; event: unknown }[] = [];
       const decoder = new TextDecoder();
       for await (const bytes of stream.body) {
         pending += decoder.decode(bytes, { stream: true });
@@ -108,6 +109,7 @@ async function main() {
           const event = generationEventSchema.parse(JSON.parse(line.slice(5)));
           if (event.type === "text.delta") { firstTextMs ??= performance.now() - started; streamedText += event.delta; }
           if (event.type === "knowledge.sources") sourcesMs ??= performance.now() - started;
+          if (event.type === "tool.call" || event.type === "tool.result") toolEvents.push({ elapsedMs: performance.now() - started, event });
           if (["generation.completed", "generation.failed", "generation.cancelled"].includes(event.type)) terminal = event.type;
         }
       }
@@ -119,10 +121,11 @@ async function main() {
       append(filename, {
         id: q.id, question: q.question, referenceAnswers: q.answers.map((a) => a.text), goldDocumentId: q.documentId,
         conversationId: ids.conversationId, generationId: generation.generation.id,
-        answer, sources, terminal, ok,
+        // 失败时可能没有落库回答，另留 SSE 已到达的正文用于诊断，不把它算成成功答案。
+        answer, streamedText, sources, terminal, ok, toolEvents, startedAt: Date.now() - (performance.now() - started), completedAt: Date.now(), variant,
         // 断点恢复重放不是实时 TTFT，不能掺进时延统计。
         timing: resumed ? null : { firstTextMs, sourcesMs, totalMs: performance.now() - started },
-        git: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+        git: execFileSync("git", ["rev-parse", "HEAD"], { cwd: codeRoot, encoding: "utf8" }).trim(),
       });
       console.log(`${command} ${q.id}: ${ok ? "completed" : "failed"}`);
       if (!ok && !process.argv.includes("--continue-on-failure")) throw new Error("ANSWER_FAILED_RECORDED");

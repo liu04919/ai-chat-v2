@@ -29,6 +29,9 @@ class JudgeProtocolTests(unittest.IsolatedAsyncioTestCase):
         async def create(**kwargs):
             self.assertTrue(kwargs["stream"])
             self.assertEqual(kwargs["max_output_tokens"], 8192)
+            self.assertEqual(kwargs["input"][0]["role"], "user")
+            self.assertEqual(kwargs["input"][0]["content"][0]["type"], "input_text")
+            self.assertNotIn("previous_response_id", kwargs)
             self.assertEqual(kwargs["text"]["format"]["schema"], Rating.model_json_schema())
             return FakeStream(events)
         return ResponsesJudge(SimpleNamespace(responses=SimpleNamespace(create=create)), "gpt-5.6-sol")

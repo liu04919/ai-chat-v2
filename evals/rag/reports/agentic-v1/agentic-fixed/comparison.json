@@ -1,0 +1,2831 @@
+{
+  "plan": {
+    "protocol": "cmrc2018-paired-agentic-v1",
+    "traditionalCommit": "7134eb0",
+    "agenticCommit": "9e55d20c71fb6b1ee8569de7a401b075dfd93753",
+    "manifestSha256": "c0881347504869731ed120eec37c305ae361ee1d7e9d472ce3588658ad8c175a",
+    "corpusReuse": "Existing isolated HTTP-ingested evaluation database, same 848 documents / 948 chunks. No duplicate ingestion or BM25 corpus change.",
+    "model": "gpt-5.6-sol",
+    "reasoning": "medium",
+    "channel": "Local Codex Proxy / Responses",
+    "outputTokenCapPerCall": 8192,
+    "judge": "gpt-6-astra",
+    "judging": "Native Ragas 0.4.3 prompts / schemas, blind structured judgments, native score replay",
+    "pilot": 5,
+    "test": 50,
+    "paidRetrievalBudgetCny": 10,
+    "criteria": [
+      "AnswerAccuracy",
+      "Faithfulness",
+      "known-answer evidence hit in cumulative sources",
+      "citation-format validity",
+      "generation first-attempt completion",
+      "latency",
+      "model calls and tokens",
+      "knowledge-tool calls"
+    ],
+    "limitations": [
+      "Historical test set has been inspected; this is a fixed regression comparison, not a new unseen benchmark",
+      "Short answerable encyclopedic passages; agentic special cases reported separately",
+      "One sampled response per variant/question; model randomness and shared subscription load limit inference",
+      "Extra model calls/context are part of the agentic treatment; record cost, no claim of equal compute",
+      "No automatic retries or post-test prompt tuning"
+    ],
+    "agenticRevision": {
+      "baseCommit": "9e55d20c71fb6b1ee8569de7a401b075dfd93753",
+      "patchSha256": "81684d1041c7d021dcb04753776c9775050032d845dbbccc11aa877428be747c",
+      "change": "SSE sources reuse message snapshot schema (18 max)",
+      "previousRun": "agentic",
+      "rerun": "all 5 pilot and 50 test questions; no previous answers reused"
+    }
+  },
+  "agenticVariant": "agentic-fixed",
+  "variants": {
+    "traditional": {
+      "summary": {
+        "sampleCount": 50,
+        "firstAttemptCompleted": 50,
+        "attempts": 50,
+        "answerAccuracy": 0.885,
+        "faithfulness": 0.9815909090909091,
+        "evidenceHit": 1,
+        "sourcesMean": 6,
+        "knowledgeCallsMean": 0,
+        "modelCalls": 50,
+        "inputTokens": 132022,
+        "outputTokens": 3665,
+        "unknownUsage": 0,
+        "validCitations": 51,
+        "citationCount": 51,
+        "firstTextP50Ms": 3434.5432000000146,
+        "totalP50Ms": 5078.9064,
+        "totalP95Ms": 11276.303899999999
+      },
+      "rows": [
+        {
+          "id": "DEV_188_QUERY_1",
+          "question": "紫堇属植物的花序有什么类型？",
+          "reference": "圆锥花序或总状花序",
+          "referenceAnswers": [
+            "圆锥花序或总状花序",
+            "圆锥花序或总状花序",
+            "圆锥花序或总状花序"
+          ],
+          "answer": "紫堇属植物的花序主要有两种类型：**圆锥花序**和**总状花序**，可生于茎的顶端或侧部。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2941,
+          "outputTokens": 52,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3376.5498000000002,
+            "sourcesMs": 897.0212000000001,
+            "totalMs": 5078.9064
+          }
+        },
+        {
+          "id": "DEV_594_QUERY_2",
+          "question": "《张居正》这部小说描写了哪些真是人物？",
+          "reference": "张居正、高拱、冯保、李贵妃、邵大侠、何心隐、游七等",
+          "referenceAnswers": [
+            "张居正、高拱、冯保、李贵妃、邵大侠、何心隐、游七等",
+            "张居正、高拱、冯保、李贵妃、邵大侠、何心隐、游七等",
+            "张居正、高拱、冯保、李贵妃、邵大侠、何心隐、游七等"
+          ],
+          "answer": "熊召政的长篇历史小说《张居正》描写的真实历史人物包括：\n\n- 张居正\n- 高拱\n- 冯保\n- 李贵妃\n- 邵大侠\n- 何心隐\n- 游七\n\n此外，书中的玉娘属于虚构人物。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2852,
+          "outputTokens": 125,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 4951.885899999999,
+            "sourcesMs": 942.5117,
+            "totalMs": 7163.0489
+          }
+        },
+        {
+          "id": "DEV_68_QUERY_0",
+          "question": "冠饰角龙类是哪种恐龙下目的一个演化支？",
+          "reference": "角龙",
+          "referenceAnswers": [
+            "角龙",
+            "角龙",
+            "角龙"
+          ],
+          "answer": "冠饰角龙类是**角龙下目**的一个演化支。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2521,
+          "outputTokens": 29,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3204.5437999999995,
+            "sourcesMs": 933.6010000000006,
+            "totalMs": 4192.2845
+          }
+        },
+        {
+          "id": "DEV_523_QUERY_4",
+          "question": "在窑内烧制的花瓶为什么会变成红橙色？",
+          "reference": "氧化作用使花瓶变成红橙色",
+          "referenceAnswers": [
+            "氧化作用使花瓶变成红橙色",
+            "氧化作用使花瓶变成红橙色",
+            "氧化作用"
+          ],
+          "answer": "因为制作花瓶的黏土富含铁。在窑内通入空气加热时，黏土中的铁成分发生氧化，形成呈红色或橙红色的氧化铁类物质，因此陶胎变成红橙色。烧制最后重新打开通风口后，陶胎会再次氧化并恢复红橙色，而经过特殊涂料处理的图案仍保持黑色，这就形成了黑彩陶器的色彩对比。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 0.75,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2509,
+          "outputTokens": 276,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8488.0765,
+            "sourcesMs": 825.1345000000001,
+            "totalMs": 12114.813299999998
+          }
+        },
+        {
+          "id": "DEV_64_QUERY_0",
+          "question": "大沙地站在哪里？",
+          "reference": "黄埔区大沙地西路港湾路口西侧的地底",
+          "referenceAnswers": [
+            "黄埔区大沙地西路港湾路口西侧的地底",
+            "黄埔区大沙地西路港湾路口西侧的地底",
+            "黄埔区大沙地西路港湾路口西侧的地底"
+          ],
+          "answer": "大沙地站位于**广州市黄埔区大沙地西路与港湾路交叉口西侧地下**，邻近黄埔区公安分局、大沙购物城和黄埔商业城，是广州地铁5号线的车站。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3229,
+          "outputTokens": 68,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3561.2674000000006,
+            "sourcesMs": 892.4197000000022,
+            "totalMs": 5772.922300000002
+          }
+        },
+        {
+          "id": "DEV_288_QUERY_0",
+          "question": "威尔特郡是什么地方的名誉郡和单一管理区？",
+          "reference": "英国英格兰西南区域",
+          "referenceAnswers": [
+            "英国英格兰西南区域",
+            "英国英格兰西南区域",
+            "英国英格兰西南区域"
+          ],
+          "answer": "威尔特郡是**英国英格兰西南区域**的名誉郡和单一管理区。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3375,
+          "outputTokens": 37,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3152.4484999999986,
+            "sourcesMs": 897.8839000000007,
+            "totalMs": 4888.085500000001
+          }
+        },
+        {
+          "id": "DEV_218_QUERY_0",
+          "question": "魔岩文化股份有限公司是在哪一年成立？",
+          "reference": "1992年",
+          "referenceAnswers": [
+            "1992年",
+            "1992年",
+            "1992年"
+          ],
+          "answer": "魔岩文化股份有限公司成立于 **1992年**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2562,
+          "outputTokens": 24,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3087.0786000000007,
+            "sourcesMs": 880.2108000000007,
+            "totalMs": 3899.356399999997
+          }
+        },
+        {
+          "id": "DEV_30_QUERY_0",
+          "question": "这次选举被视为对马其顿共和国什么的考验？",
+          "reference": "长期以来希望加入欧盟和北约的决心",
+          "referenceAnswers": [
+            "长期以来希望加入欧盟和北约的决心",
+            "长期以来希望加入欧盟和北约的决心",
+            "长期以来希望加入欧盟和北约的决心"
+          ],
+          "answer": "这次选举被视为对马其顿共和国**长期以来希望加入欧盟和北约的决心**的一次重要考验。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2895,
+          "outputTokens": 43,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 4009.2046000000046,
+            "sourcesMs": 915.8957000000009,
+            "totalMs": 5444.580200000004
+          }
+        },
+        {
+          "id": "DEV_341_QUERY_2",
+          "question": "瑞尼尔山因为什么可能引发巨大的火山泥流？",
+          "reference": "庞大的冰川",
+          "referenceAnswers": [
+            "庞大的冰川",
+            "庞大的冰川",
+            "庞大的冰川"
+          ],
+          "answer": "瑞尼尔山因为拥有庞大的冰川，火山活动可能使大量冰雪融化并形成巨大的火山泥流，进而威胁整个浦亚鲁普河谷。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 0.5,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2673,
+          "outputTokens": 55,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3516.8315000000002,
+            "sourcesMs": 902.3419999999969,
+            "totalMs": 5303.779199999997
+          }
+        },
+        {
+          "id": "DEV_1927_QUERY_1",
+          "question": "谁成立了萤火虫工作室？",
+          "reference": "西蒙·布雷德伯里，埃里克·乌列特和大卫·莱斯特",
+          "referenceAnswers": [
+            "西蒙·布雷德伯里，埃里克·乌列特和大卫·莱斯特",
+            "西蒙·布雷德伯里，埃里克·乌列特和大卫·莱斯特",
+            "西蒙·布雷德伯里，埃里克·乌列特和大卫·莱斯特"
+          ],
+          "answer": "萤火虫工作室由**西蒙·布雷德伯里、埃里克·乌列特和大卫·莱斯特**于1999年8月共同成立。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2574,
+          "outputTokens": 52,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3096.7482999999993,
+            "sourcesMs": 935.5007999999943,
+            "totalMs": 4787.318500000001
+          }
+        },
+        {
+          "id": "DEV_491_QUERY_1",
+          "question": "现存的石垣是在哪一年重建的板敷橹？",
+          "reference": "1992年（平成4年）",
+          "referenceAnswers": [
+            "1992年（平成4年）",
+            "1992年（平成4年）",
+            "1992年（平成4年）"
+          ],
+          "answer": "现存的板敷橹于 **1992年（平成4年）** 重建。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2989,
+          "outputTokens": 32,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 4155.624599999996,
+            "sourcesMs": 855.2246999999988,
+            "totalMs": 5212.564699999995
+          }
+        },
+        {
+          "id": "DEV_593_QUERY_0",
+          "question": "沈龙元在足球运动中最擅长的为甚是哪里？",
+          "reference": "右前卫",
+          "referenceAnswers": [
+            "右前卫",
+            "右前卫",
+            "右前卫"
+          ],
+          "answer": "沈龙元在足球运动中最擅长的位置是**右前卫**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2681,
+          "outputTokens": 30,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3414.5032999999967,
+            "sourcesMs": 972.0693000000028,
+            "totalMs": 4769.705799999996
+          }
+        },
+        {
+          "id": "DEV_45_QUERY_3",
+          "question": "班杰的兴趣爱好是什么？",
+          "reference": "功夫和创意绘画以及料理和音乐",
+          "referenceAnswers": [
+            "功夫和创意绘画以及料理和音乐",
+            "功夫和创意绘画以及料理和音乐",
+            "功夫和创意绘画以及料理和音乐"
+          ],
+          "answer": "班杰的兴趣爱好包括**功夫、创意绘画、料理和音乐**。他从八岁起学习功夫，精通跆拳道、空手道、散打、咏春、气功和太极等多种武术。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2569,
+          "outputTokens": 70,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 4274.036399999997,
+            "sourcesMs": 799.8188999999984,
+            "totalMs": 6400.609299999996
+          }
+        },
+        {
+          "id": "DEV_11_QUERY_2",
+          "question": "徐晓飞现在效力于哪个球队？",
+          "reference": "日本四国（地区）联赛球队",
+          "referenceAnswers": [
+            "日本四国（地区）联赛球队",
+            "日本四国（地区）联赛球队",
+            "日本四国（地区）联赛球队"
+          ],
+          "answer": "资料显示，徐晓飞于2012年4月复出，加盟了一支**日本四国地区联赛球队**；但资料未注明该球队的具体名称。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2604,
+          "outputTokens": 94,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 5422.513800000001,
+            "sourcesMs": 957.0993999999919,
+            "totalMs": 6446.234499999991
+          }
+        },
+        {
+          "id": "DEV_1087_QUERY_2",
+          "question": "19世纪华裔美国留辫子吊眼睛、卷曲长指甲侦探之一形象出自于他的哪部作品？",
+          "reference": "《傅满洲》",
+          "referenceAnswers": [
+            "《傅满洲》",
+            "《傅满洲》",
+            "《傅满洲》"
+          ],
+          "answer": "这一形象出自彼得·塞勒斯出演的《傅满洲》；他在片中饰演傅满洲这一虚构角色。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 1975,
+          "outputTokens": 211,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 9003.67259999999,
+            "sourcesMs": 885.9747999999963,
+            "totalMs": 10687.55369999999
+          }
+        },
+        {
+          "id": "DEV_104_QUERY_0",
+          "question": "上海轨道交通17号线在2010年改名为什么？",
+          "reference": "上海轨道交通20号线",
+          "referenceAnswers": [
+            "上海轨道交通20号线",
+            "上海轨道交通20号线",
+            "上海轨道交通20号线"
+          ],
+          "answer": "上海轨道交通原规划的 **17号线** 在2011年线路编号调整后改名为 **20号线**（编号L3）[1](#knowledge-1)。",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2063,
+          "outputTokens": 137,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 10062.704700000002,
+            "sourcesMs": 859.7957999999926,
+            "totalMs": 11276.303899999999
+          }
+        },
+        {
+          "id": "DEV_412_QUERY_2",
+          "question": "诺丁汉郡的第一大镇是什么？",
+          "reference": "诺定咸",
+          "referenceAnswers": [
+            "诺定咸",
+            "诺定咸",
+            "曼斯菲尔德"
+          ],
+          "answer": "诺丁汉郡的第一大镇是**曼斯菲尔德（Mansfield）**。[1](#knowledge-1)",
+          "accuracy": 0,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3394,
+          "outputTokens": 34,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3055.7188999999926,
+            "sourcesMs": 893.6946000000025,
+            "totalMs": 4165.0055999999895
+          }
+        },
+        {
+          "id": "DEV_1536_QUERY_0",
+          "question": "侏罗纪海岸位于哪个海峡？",
+          "reference": "英吉利海峡",
+          "referenceAnswers": [
+            "英吉利海峡",
+            "英吉利海峡",
+            "英吉利海峡"
+          ],
+          "answer": "侏罗纪海岸位于英国南部的**英吉利海峡**沿岸。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2603,
+          "outputTokens": 33,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3127.9677000000083,
+            "sourcesMs": 820.2876000000106,
+            "totalMs": 4191.5002000000095
+          }
+        },
+        {
+          "id": "DEV_37_QUERY_3",
+          "question": "普朗特培养了哪些国际知名的力学家？",
+          "reference": "除近代力学另一奠基人冯·卡门外，还有、A．Ｌ．纳戴、威廉·普拉格等。",
+          "referenceAnswers": [
+            "除近代力学另一奠基人冯·卡门外，还有、A．Ｌ．纳戴、威廉·普拉格等。",
+            "除近代力学另一奠基人冯·卡门外，还有、A．Ｌ．纳戴、威廉·普拉格等。",
+            "除近代力学另一奠基人冯·卡门外，还有、A．Ｌ．纳戴、威廉·普拉格等。"
+          ],
+          "answer": "普朗特培养的国际知名力学家包括：\n\n- 西奥多·冯·卡门  \n- A. L. 纳戴  \n- 威廉·普拉格  \n- 陆士嘉——他的关门弟子，也是唯一的女学生和唯一的中国学生  \n\n此外，铁木辛柯等人也曾跟随普朗特从事研究工作。[1](#knowledge-1)",
+          "accuracy": 0.5,
+          "faithfulness": 0.875,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3009,
+          "outputTokens": 235,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8031.149399999995,
+            "sourcesMs": 818.0296999999991,
+            "totalMs": 10727.275999999998
+          }
+        },
+        {
+          "id": "DEV_1_QUERY_3",
+          "question": "戏曲锣鼓所运用的敲击乐器主要有什么类型？",
+          "reference": "鼓、锣、钹和板",
+          "referenceAnswers": [
+            "鼓、锣、钹和板",
+            "鼓、锣、钹和板",
+            "鼓、锣、钹和板"
+          ],
+          "answer": "戏曲锣鼓所用的敲击乐器主要分为四类：\n\n1. **鼓类**：如单皮鼓（板鼓）、大鼓、堂鼓、怀鼓、花盆鼓等。  \n2. **锣类**：如大锣、小锣、钲锣、云锣等。  \n3. **钹类**：如铙钹、大钹、小钹、水钹、碰钟等。  \n4. **板类**：如檀板、木鱼、梆子等，主要用于打拍子。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2358,
+          "outputTokens": 141,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3696.15370000001,
+            "sourcesMs": 914.2881000000052,
+            "totalMs": 8245.972799999989
+          }
+        },
+        {
+          "id": "DEV_543_QUERY_0",
+          "question": "《三遂平妖传》的全称是什么？",
+          "reference": "《北宋三遂平妖传》",
+          "referenceAnswers": [
+            "《北宋三遂平妖传》",
+            "《北宋三遂平妖传》",
+            "《北宋三遂平妖传》"
+          ],
+          "answer": "《三遂平妖传》的全称是《北宋三遂平妖传》，又名《新平妖传》。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2112,
+          "outputTokens": 39,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3622.7422999999835,
+            "sourcesMs": 886.7756999999983,
+            "totalMs": 5038.059099999984
+          }
+        },
+        {
+          "id": "DEV_606_QUERY_2",
+          "question": "钝头鹦嘴鱼喜欢在什么地方生活？",
+          "reference": "偏爱生存于岩礁底质，尤其是圆石斜坡",
+          "referenceAnswers": [
+            "偏爱生存于岩礁底质，尤其是圆石斜坡",
+            "偏爱生存于岩礁底质，尤其是圆石斜坡",
+            "岩礁底质，尤其是圆石斜坡。"
+          ],
+          "answer": "钝头鹦嘴鱼偏爱生活在水深 **1～35米**、以岩礁为底质的海域，尤其喜欢**圆石斜坡**；在较陡峭的礁岸附近，常可发现它们成群洄游。[1](#knowledge-1)",
+          "accuracy": 0.5,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3058,
+          "outputTokens": 75,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 2979.9702000000107,
+            "sourcesMs": 839.0390999999945,
+            "totalMs": 5405.471600000019
+          }
+        },
+        {
+          "id": "DEV_1176_QUERY_0",
+          "question": "1999年国家联盟分区赛采用什么赛制？",
+          "reference": "5战3胜制",
+          "referenceAnswers": [
+            "5战3胜制",
+            "5战3胜制",
+            "5战3胜制"
+          ],
+          "answer": "1999年国家联盟分区赛采用**五战三胜制**，由三个分区冠军与一支外卡球队两两对决，胜者晋级国家联盟冠军赛。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2343,
+          "outputTokens": 53,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3486.767300000007,
+            "sourcesMs": 902.7235999999975,
+            "totalMs": 5255.420400000003
+          }
+        },
+        {
+          "id": "DEV_1178_QUERY_2",
+          "question": "黑尾前肛鳗的体长是体高的多少倍？",
+          "reference": "20.1倍",
+          "referenceAnswers": [
+            "20.1倍",
+            "20.1倍",
+            "20.1倍"
+          ],
+          "answer": "黑尾前肛鳗的体长是体高的 **20.1 倍**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2223,
+          "outputTokens": 33,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3261.4925999999978,
+            "sourcesMs": 838.2053999999771,
+            "totalMs": 4371.300900000002
+          }
+        },
+        {
+          "id": "DEV_1572_QUERY_3",
+          "question": "半线天竺鲷的体长可达多少公分？",
+          "reference": "12公分",
+          "referenceAnswers": [
+            "12公分",
+            "12公分",
+            "12公分"
+          ],
+          "answer": "半线天竺鲷的体长可达 **12 公分**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2627,
+          "outputTokens": 29,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 2977.9107000000076,
+            "sourcesMs": 761.0350000000035,
+            "totalMs": 3910.0386
+          }
+        },
+        {
+          "id": "DEV_414_QUERY_1",
+          "question": "港汇指数的加权比重如何制定？",
+          "reference": "1999年至2000年平均贸易模式",
+          "referenceAnswers": [
+            "1999年至2000年平均贸易模式",
+            "1999年至2000年平均贸易模式",
+            "按1999年至2000年平均贸易模式所制定"
+          ],
+          "answer": "港汇指数的加权比重是按照香港在 **1999年至2000年的平均贸易模式**制定的，但香港政府没有公布详细的计算公式。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2069,
+          "outputTokens": 46,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3373.842799999984,
+            "sourcesMs": 816.8273999999801,
+            "totalMs": 4849.672799999971
+          }
+        },
+        {
+          "id": "DEV_94_QUERY_2",
+          "question": "叶乔波至1993年春季赛事结束，她共获得多少个世界冠军？",
+          "reference": "14个",
+          "referenceAnswers": [
+            "14个",
+            "14个",
+            "14个"
+          ],
+          "answer": "截至1993年春季赛事结束，叶乔波共获得 **14个世界冠军**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2890,
+          "outputTokens": 32,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3296.4680999999982,
+            "sourcesMs": 1017.0011999999988,
+            "totalMs": 4360.190399999992
+          }
+        },
+        {
+          "id": "DEV_1056_QUERY_0",
+          "question": "《抓鬼天狗帮》的作者是谁？",
+          "reference": "木下樱与东山和子",
+          "referenceAnswers": [
+            "木下樱与东山和子",
+            "木下樱与东山和子",
+            "木下樱与东山和子"
+          ],
+          "answer": "《抓鬼天狗帮》（原名《tactics》）由日本漫画家**木下樱与东山和子**合作创作。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2602,
+          "outputTokens": 44,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3117.0791999999783,
+            "sourcesMs": 846.8709999999846,
+            "totalMs": 4529.594599999982
+          }
+        },
+        {
+          "id": "DEV_175_QUERY_0",
+          "question": "古汉越语指什么？",
+          "reference": "在汉字尚未大量传入越南之前，零星传入安南口语中的汉字音。",
+          "referenceAnswers": [
+            "在汉字尚未大量传入越南之前，零星传入安南口语中的汉字音。",
+            "在汉字尚未大量传入越南之前，零星传入安南口语中的汉字音。",
+            "指在汉字尚未大量传入越南之前，零星传入安南口语中的汉字音。"
+          ],
+          "answer": "古汉越语，又称**古汉越音**（Ancient Sino-Annamite），是指在汉字尚未大量传入越南之前，零星进入安南地区口语中的汉字读音。其形成时期主要在**中唐以前**，尤其是汉朝越南内属时期。\n\n它比唐代系统传入、主要服务于科举等用途的汉越语更古老，保留了较多**六朝汉语**的音韵特征，例如能区分三等重韵、二等韵主元音为 *e*、纯四等韵没有介音等，某些特点与日本吴音相同。声调方面，它与后来的汉越语也存在差异，如部分上声、去声的对应关系相反。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2361,
+          "outputTokens": 189,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3277.882899999997,
+            "sourcesMs": 759.3178000000189,
+            "totalMs": 9321.314299999998
+          }
+        },
+        {
+          "id": "DEV_1084_QUERY_0",
+          "question": "罗素-爱因斯坦宣言最初称为什么？",
+          "reference": "《科学家要求废止战争》",
+          "referenceAnswers": [
+            "《科学家要求废止战争》",
+            "《科学家要求废止战争》",
+            "《科学家要求废止战争》"
+          ],
+          "answer": "罗素－爱因斯坦宣言最初称为《科学家要求废止战争》。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2079,
+          "outputTokens": 33,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 4562.07759999999,
+            "sourcesMs": 1021.8839999999909,
+            "totalMs": 5724.375
+          }
+        },
+        {
+          "id": "DEV_357_QUERY_0",
+          "question": "四氟化碳又被叫作为什么？",
+          "reference": "四氟甲烷、Freon-14及R 14",
+          "referenceAnswers": [
+            "四氟甲烷、Freon-14及R 14",
+            "四氟甲烷、Freon-14及R 14",
+            "四氟甲烷、Freon-14及R 14"
+          ],
+          "answer": "四氟化碳又称**四氟甲烷、Freon-14（氟利昂-14）及 R-14**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2124,
+          "outputTokens": 45,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3599.9132999999856,
+            "sourcesMs": 1221.7919999999867,
+            "totalMs": 4986.5929999999935
+          }
+        },
+        {
+          "id": "DEV_89_QUERY_2",
+          "question": "第一个使用括弧语言的是什么语言？",
+          "reference": "BCPL",
+          "referenceAnswers": [
+            "BCPL",
+            "BCPL",
+            "BCPL"
+          ],
+          "answer": "第一个使用括弧的编程语言是 **BCPL（Basic Combined Programming Language）**，由马丁·理察德于 1966 年开发。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2331,
+          "outputTokens": 47,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3434.5432000000146,
+            "sourcesMs": 785.0337,
+            "totalMs": 4876.362900000007
+          }
+        },
+        {
+          "id": "DEV_607_QUERY_0",
+          "question": "猎骄靡是谁？",
+          "reference": "中亚古国乌孙昆莫（君主之号）",
+          "referenceAnswers": [
+            "中亚古国乌孙昆莫（君主之号）",
+            "中亚古国乌孙昆莫（君主之号）",
+            "中亚古国乌孙昆莫（君主之号）"
+          ],
+          "answer": "猎骄靡是中亚古国**乌孙的昆莫（君主称号）**，为前任昆莫难兜靡之子。\n\n乌孙被敌国攻破、父亲被杀后，他被遗臣带往匈奴；传说幼年曾获狼与乌鸦相救，后来由冒顿单于收养。成年后，他统领乌孙残部，于约公元前161年击败伊犁河流域的大月氏，逐步建立起东接匈奴、西连康居和大宛、定都赤谷城的乌孙政权。军臣单于死后，他摆脱匈奴控制，使乌孙取得半独立地位。[1](#knowledge-1)\n\n汉武帝时期，猎骄靡与汉朝建立联系，并迎娶江都王刘建之女刘细君，以联汉抗匈奴。约公元前105年去世，传位给孙子军须靡。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 0.9545454545454546,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3082,
+          "outputTokens": 237,
+          "citationCount": 2,
+          "validCitations": 2,
+          "timing": {
+            "firstTextMs": 3372.743999999977,
+            "sourcesMs": 933.950199999992,
+            "totalMs": 11023.414799999999
+          }
+        },
+        {
+          "id": "DEV_254_QUERY_1",
+          "question": "大雷克雅维克的面积是如何计算的？",
+          "reference": "由其组成自治市的面积",
+          "referenceAnswers": [
+            "由其组成自治市的面积",
+            "由其组成自治市的面积",
+            "大雷克雅维克的面积是由其组成自治市的面积算出的，包括大面积的内陆，但不包括约200平方公里（77平方英里）相对较小的城市核心。"
+          ],
+          "answer": "大雷克雅维克的面积是将其所辖 **7 个自治市的行政面积相加**计算得出的。由于这些自治市包含大片内陆地区，所以统计面积也计入这些内陆区域；但约 **200 平方公里（77 平方英里）的城市核心区**不单独包含在该面积口径中。[1](#knowledge-1)",
+          "accuracy": 0.5,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3022,
+          "outputTokens": 88,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3163.9077000000107,
+            "sourcesMs": 886.4668999999994,
+            "totalMs": 5980.961500000005
+          }
+        },
+        {
+          "id": "DEV_624_QUERY_2",
+          "question": "新巴82线一天最长可服务多久？",
+          "reference": "22.5小时",
+          "referenceAnswers": [
+            "22.5小时",
+            "22.5小时",
+            "22.5小时"
+          ],
+          "answer": "新巴82线曾经每天服务长达 **22.5小时**，一度是全港服务时间最长的日间专利巴士路线。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3319,
+          "outputTokens": 45,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3497.381400000013,
+            "sourcesMs": 893.0597999999882,
+            "totalMs": 5041.487900000007
+          }
+        },
+        {
+          "id": "DEV_1109_QUERY_1",
+          "question": "香港排名第一的货柜码头营运商是什么？",
+          "reference": "香港国际货柜码头有限公司",
+          "referenceAnswers": [
+            "香港国际货柜码头有限公司",
+            "香港国际货柜码头有限公司",
+            "香港国际货柜码头有限公司"
+          ],
+          "answer": "香港排名第一的货柜码头营运商是**香港国际货柜码头有限公司**。资料称现代货箱码头是香港第二大货柜码头营运商，仅次于香港国际货柜码头有限公司。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3016,
+          "outputTokens": 62,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3338.0457999999926,
+            "sourcesMs": 1024.0334999999905,
+            "totalMs": 5356.612300000008
+          }
+        },
+        {
+          "id": "DEV_409_QUERY_0",
+          "question": "鬣齿兽科出现于什么时期？",
+          "reference": "古新世晚期",
+          "referenceAnswers": [
+            "古新世晚期",
+            "古新世晚期",
+            "古新世晚期"
+          ],
+          "answer": "鬣齿兽科出现于**古新世晚期**，并一直繁衍到中新世。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2941,
+          "outputTokens": 36,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3606.727899999998,
+            "sourcesMs": 852.2283999999927,
+            "totalMs": 4738.603699999978
+          }
+        },
+        {
+          "id": "DEV_468_QUERY_3",
+          "question": "《掌故王》主要播放在哪一段时期？",
+          "reference": "2009年3月30日至5月14日",
+          "referenceAnswers": [
+            "2009年3月30日至5月14日",
+            "2009年3月30日至5月14日",
+            "2009年3月30日至5月14日"
+          ],
+          "answer": "《掌故王》主要于 **2009年3月30日至5月14日** 播放，逢星期一至星期五晚上 **22:30至23:00** 在翡翠台及高清翡翠台播出。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2383,
+          "outputTokens": 64,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 4791.820199999987,
+            "sourcesMs": 1015.7014999999956,
+            "totalMs": 6926.6731000000145
+          }
+        },
+        {
+          "id": "DEV_1507_QUERY_3",
+          "question": "冈察洛夫据此旅途写作的游记《战舰“巴拉达”号》在哪一年出版？",
+          "reference": "1858年",
+          "referenceAnswers": [
+            "1858年",
+            "1858年",
+            "1858年"
+          ],
+          "answer": "冈察洛夫的游记《战舰“巴拉达”号》于 **1858年** 出版。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2254,
+          "outputTokens": 37,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 4236.791899999982,
+            "sourcesMs": 908.7905999999784,
+            "totalMs": 5400.412799999991
+          }
+        },
+        {
+          "id": "DEV_578_QUERY_2",
+          "question": "鹦鹉亚科主要包含哪些？",
+          "reference": "主要包含在非洲的鹦鹉及少部分在亚洲鹦鹉",
+          "referenceAnswers": [
+            "主要包含在非洲的鹦鹉及少部分在亚洲鹦鹉",
+            "主要包含在非洲的鹦鹉及少部分在亚洲鹦鹉",
+            "非洲的鹦鹉及少部分在亚洲鹦鹉。"
+          ],
+          "answer": "鹦鹉亚科主要包含分布广泛的多种鹦鹉，但**不包括吸蜜鹦鹉和凤头鹦鹉**。按照资料提到的一种未来可能采用的分类方式，鹦鹉亚科将主要包括：\n\n- **非洲的鹦鹉**\n- **少部分亚洲鹦鹉**\n\n不过，鹦鹉亚科各族之间的分类关系仍未完全确定，部分族未来可能被提升为独立亚科。[1](#knowledge-1)\n\n当前知识库资料没有提供更具体、完整的属或物种名单。",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2921,
+          "outputTokens": 210,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 9148.1446,
+            "sourcesMs": 955.8487999999779,
+            "totalMs": 13311.481
+          }
+        },
+        {
+          "id": "DEV_601_QUERY_3",
+          "question": "在政治圈里，临界量与什么有关？",
+          "reference": "可能与大多数的共识相关",
+          "referenceAnswers": [
+            "可能与大多数的共识相关",
+            "可能与大多数的共识相关",
+            "大多数的共识"
+          ],
+          "answer": "在政治圈里，临界量可能与**大多数人的共识**有关；大众共识的细微变化，可能引发政治共识的快速转变。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2368,
+          "outputTokens": 49,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3678.6211000000185,
+            "sourcesMs": 1101.7782000000007,
+            "totalMs": 5293.774400000024
+          }
+        },
+        {
+          "id": "DEV_366_QUERY_2",
+          "question": "宋子仙在什么时候向王僧辩投降？",
+          "reference": "大宝二年（551年）六月二十二日",
+          "referenceAnswers": [
+            "大宝二年（551年）六月二十二日",
+            "大宝二年（551年）六月二十二日",
+            "大宝二年（551年）六月二十二日"
+          ],
+          "answer": "宋子仙于**大宝二年（551年）六月二十二日**向王僧辩投降。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2849,
+          "outputTokens": 38,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3427.501199999999,
+            "sourcesMs": 899.2255000000005,
+            "totalMs": 4728.416200000007
+          }
+        },
+        {
+          "id": "DEV_558_QUERY_3",
+          "question": "吉尔杭阿战死后在哪些地方建立了专祠？",
+          "reference": "于殉难地方建专祠，上海亦建专祠",
+          "referenceAnswers": [
+            "于殉难地方建专祠，上海亦建专祠",
+            "于殉难地方建专祠，上海亦建专祠",
+            "殉难地方建专祠，上海亦建专祠。"
+          ],
+          "answer": "吉尔杭阿战死后，朝廷在两处为他建立专祠：\n\n1. **他的殉难之地**\n2. **上海**\n\n资料未说明殉难地专祠的更具体地址。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2453,
+          "outputTokens": 61,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 2966.2816999999923,
+            "sourcesMs": 835.0716000000248,
+            "totalMs": 5000.179600000032
+          }
+        },
+        {
+          "id": "DEV_231_QUERY_2",
+          "question": "液态火箭发动机的节流阀是用来调整什么的？",
+          "reference": "油和氧化剂进入燃烧室的量",
+          "referenceAnswers": [
+            "油和氧化剂进入燃烧室的量",
+            "油和氧化剂进入燃烧室的量",
+            "调整油和氧化剂进入燃烧室的量"
+          ],
+          "answer": "液态火箭发动机的节流阀用于调节进入燃烧室的燃料和氧化剂流量，从而控制发动机的推力输出。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2195,
+          "outputTokens": 48,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3294.4484999999986,
+            "sourcesMs": 989.9902000000002,
+            "totalMs": 4873.987199999974
+          }
+        },
+        {
+          "id": "DEV_1134_QUERY_1",
+          "question": "2008年亚足联女子亚洲杯本届赛赛一共有几轮外围赛？",
+          "reference": "两轮",
+          "referenceAnswers": [
+            "两轮",
+            "两轮",
+            "两轮"
+          ],
+          "answer": "2008年亚足联女子亚洲杯共有 **两轮外围赛**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2409,
+          "outputTokens": 28,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3309.8451999999816,
+            "sourcesMs": 774.053899999999,
+            "totalMs": 4248.9832999999635
+          }
+        },
+        {
+          "id": "DEV_1161_QUERY_3",
+          "question": "2011年香港科技大学为刘燕卿授予了什么荣誉？",
+          "reference": "国际组织科大分会的荣誉会员",
+          "referenceAnswers": [
+            "国际组织科大分会的荣誉会员",
+            "国际组织科大分会的荣誉会员",
+            "国际组织科大分会的荣誉会员"
+          ],
+          "answer": "2011年1月，香港科技大学商学院授予刘燕卿**国际组织科大分会荣誉会员**荣衔，以表扬她对所属行业、社会及教育事务的重大贡献。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3223,
+          "outputTokens": 58,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 2808.768699999957,
+            "sourcesMs": 785.1527999999817,
+            "totalMs": 4674.0846999999485
+          }
+        },
+        {
+          "id": "DEV_405_QUERY_3",
+          "question": "鬣齿兽属中最小的大约多大？",
+          "reference": "肩高只有30厘米",
+          "referenceAnswers": [
+            "肩高只有30厘米",
+            "肩高只有30厘米",
+            "30厘米"
+          ],
+          "answer": "鬣齿兽属中最小的物种，**肩高约30厘米**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 3232,
+          "outputTokens": 32,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3531.580799999996,
+            "sourcesMs": 1173.5261999999639,
+            "totalMs": 4533.151099999959
+          }
+        },
+        {
+          "id": "DEV_365_QUERY_0",
+          "question": "日月光集团是什么地方的半导体公司？",
+          "reference": "台湾",
+          "referenceAnswers": [
+            "台湾",
+            "台湾",
+            "台湾"
+          ],
+          "answer": "日月光集团（又名日月光半导体）是**台湾的半导体封装与测试制造服务公司**，总部位于**台湾高雄市楠梓区**。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2808,
+          "outputTokens": 56,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3265.8519000000088,
+            "sourcesMs": 808.1039999999921,
+            "totalMs": 5118.4361999999965
+          }
+        },
+        {
+          "id": "DEV_1867_QUERY_2",
+          "question": "张静美21岁时以哪部作品正式出道？",
+          "reference": "〈灵香园传奇〉",
+          "referenceAnswers": [
+            "〈灵香园传奇〉",
+            "〈灵香园传奇〉",
+            "〈灵香园传奇〉"
+          ],
+          "answer": "张静美21岁时以《灵香园传奇》正式出道，该作于1982年在伊士曼《小咪漫画周刊》开始连载。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2195,
+          "outputTokens": 48,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3561.2258999999613,
+            "sourcesMs": 905.8129999999655,
+            "totalMs": 5171.627999999968
+          }
+        },
+        {
+          "id": "DEV_1649_QUERY_0",
+          "question": "李昆的处女作是哪一部？",
+          "reference": "《飞虎将军》",
+          "referenceAnswers": [
+            "《飞虎将军》",
+            "《飞虎将军》",
+            "《飞虎将军》"
+          ],
+          "answer": "李昆的处女作是《飞虎将军》。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 0,
+          "modelCalls": 1,
+          "unknownUsage": 0,
+          "inputTokens": 2157,
+          "outputTokens": 25,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 3556.4454999999725,
+            "sourcesMs": 908.6092000000062,
+            "totalMs": 4337.242499999993
+          }
+        }
+      ]
+    },
+    "agentic-fixed": {
+      "summary": {
+        "sampleCount": 50,
+        "firstAttemptCompleted": 48,
+        "attempts": 52,
+        "answerAccuracy": 0.86,
+        "faithfulness": 0.8899917925212041,
+        "evidenceHit": 1,
+        "sourcesMean": 6.48,
+        "knowledgeCallsMean": 1.22,
+        "modelCalls": 111,
+        "inputTokens": 231967,
+        "outputTokens": 10034,
+        "unknownUsage": 2,
+        "validCitations": 55,
+        "citationCount": 55,
+        "firstTextP50Ms": 7814.6417000000365,
+        "totalP50Ms": 9931.463400000008,
+        "totalP95Ms": 36831.8781
+      },
+      "rows": [
+        {
+          "id": "DEV_188_QUERY_1",
+          "question": "紫堇属植物的花序有什么类型？",
+          "reference": "圆锥花序或总状花序",
+          "referenceAnswers": [
+            "圆锥花序或总状花序",
+            "圆锥花序或总状花序",
+            "圆锥花序或总状花序"
+          ],
+          "answer": "紫堇属植物的花序主要有两种类型：\n\n- **总状花序**\n- **圆锥花序**\n\n花序可生于**茎顶端或茎侧部**。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3482,
+          "outputTokens": 115,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7676.4817,
+            "sourcesMs": 5298.8473,
+            "totalMs": 9562.807200000001
+          }
+        },
+        {
+          "id": "DEV_594_QUERY_2",
+          "question": "《张居正》这部小说描写了哪些真是人物？",
+          "reference": "张居正、高拱、冯保、李贵妃、邵大侠、何心隐、游七等",
+          "referenceAnswers": [
+            "张居正、高拱、冯保、李贵妃、邵大侠、何心隐、游七等",
+            "张居正、高拱、冯保、李贵妃、邵大侠、何心隐、游七等",
+            "张居正、高拱、冯保、李贵妃、邵大侠、何心隐、游七等"
+          ],
+          "answer": "熊召政的长篇历史小说《张居正》以明代万历初年的政治为背景，描写了不少真实历史人物，主要包括：\n\n- **张居正**：明代内阁首辅、改革家，小说的中心人物。  \n- **高拱**：隆庆朝首辅，与张居正存在政治矛盾。  \n- **冯保**：司礼监太监，与张居正、李太后结成政治联盟。  \n- **李贵妃（后来的李太后）**：万历皇帝生母，是当时宫廷政治的重要人物。  \n- **万历皇帝朱翊钧**：少年即位，早年由张居正辅政。  \n- **戚继光**：明代著名军事将领，与张居正关系密切。  \n- **何心隐**：明代思想家、泰州学派人物。  \n- **邵大侠**、**游七**：史有其人的社会人物。  \n- **张敬修**：张居正之子，张居正死后在政治清算中自尽。  \n- **金学曾、魏学曾、王希烈**等明代官员。\n\n知识库资料明确列出的真实人物有张居正、高拱、冯保、李贵妃、邵大侠、何心隐和游七；资料还提到万历帝、戚继光、张敬修、金学曾、魏学曾、王希烈等人出现在小说叙事或相关评论中。[1](#knowledge-1)\n\n不过，《张居正》毕竟是**历史小说**，其中也有作者虚构的人物，例如**玉娘**；即使是真实人物，其言行、性格和具体故事也经过了文学加工，不能完全当作史实。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 0.4857142857142857,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 2,
+          "modelCalls": 3,
+          "unknownUsage": 0,
+          "inputTokens": 9347,
+          "outputTokens": 792,
+          "citationCount": 2,
+          "validCitations": 2,
+          "timing": {
+            "firstTextMs": 21591.0826,
+            "sourcesMs": 5718.190100000002,
+            "totalMs": 34993.749299999996
+          }
+        },
+        {
+          "id": "DEV_68_QUERY_0",
+          "question": "冠饰角龙类是哪种恐龙下目的一个演化支？",
+          "reference": "角龙",
+          "referenceAnswers": [
+            "角龙",
+            "角龙",
+            "角龙"
+          ],
+          "answer": "冠饰角龙类（Coronosauria）是**角龙下目**的一个演化支。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3107,
+          "outputTokens": 70,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7239.820299999999,
+            "sourcesMs": 4483.8145,
+            "totalMs": 8431.693899999998
+          }
+        },
+        {
+          "id": "DEV_523_QUERY_4",
+          "question": "在窑内烧制的花瓶为什么会变成红橙色？",
+          "reference": "氧化作用使花瓶变成红橙色",
+          "referenceAnswers": [
+            "氧化作用使花瓶变成红橙色",
+            "氧化作用使花瓶变成红橙色",
+            "氧化作用"
+          ],
+          "answer": "花瓶在窑内变成红橙色，主要与**陶土中的铁元素和窑内氧气**有关。\n\n以古希腊陶瓶为例，其黏土富含铁。烧到约 **800°C** 时，窑内氧气会使黏土中的铁发生氧化，形成呈红色的铁氧化物，因此瓶身显出红橙色。烧制后期重新打开通风口，陶坯再次氧化，也会恢复红橙色；而涂有致密精制黏土的图案不易重新氧化，所以仍保持黑色。[1](#knowledge-1)\n\n简单说就是：\n\n**富铁黏土 + 高温 + 充足氧气 → 红橙色陶器。**\n\n如果窑内缺氧、形成还原气氛，同一件陶器则可能暂时变黑，所以窑温和通风控制会显著影响最终颜色。",
+          "accuracy": 0.75,
+          "faithfulness": 0.5384615384615384,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3190,
+          "outputTokens": 291,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8095.266299999996,
+            "sourcesMs": 5442.667799999996,
+            "totalMs": 15151.3085
+          }
+        },
+        {
+          "id": "DEV_64_QUERY_0",
+          "question": "大沙地站在哪里？",
+          "reference": "黄埔区大沙地西路港湾路口西侧的地底",
+          "referenceAnswers": [
+            "黄埔区大沙地西路港湾路口西侧的地底",
+            "黄埔区大沙地西路港湾路口西侧的地底",
+            "黄埔区大沙地西路港湾路口西侧的地底"
+          ],
+          "answer": "大沙地站位于**广州市黄埔区大沙地西路与港湾路交叉口西侧地下**，是**广州地铁5号线**的车站，邻近黄埔区公安分局、大沙购物城和黄埔商业城。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3735,
+          "outputTokens": 117,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7355.315499999997,
+            "sourcesMs": 4979.241500000004,
+            "totalMs": 9603.439500000008
+          }
+        },
+        {
+          "id": "DEV_288_QUERY_0",
+          "question": "威尔特郡是什么地方的名誉郡和单一管理区？",
+          "reference": "英国英格兰西南区域",
+          "referenceAnswers": [
+            "英国英格兰西南区域",
+            "英国英格兰西南区域",
+            "英国英格兰西南区域"
+          ],
+          "answer": "威尔特郡（Wiltshire）是**英国英格兰西南部**的名誉郡和单一管理区。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3759,
+          "outputTokens": 83,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7327.4712,
+            "sourcesMs": 4488.1446,
+            "totalMs": 8685.849300000002
+          }
+        },
+        {
+          "id": "DEV_218_QUERY_0",
+          "question": "魔岩文化股份有限公司是在哪一年成立？",
+          "reference": "1992年",
+          "referenceAnswers": [
+            "1992年",
+            "1992年",
+            "1992年"
+          ],
+          "answer": "魔岩文化股份有限公司成立于 **1992年**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3068,
+          "outputTokens": 51,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 6948.465299999996,
+            "sourcesMs": 4515.840800000005,
+            "totalMs": 7816.977200000008
+          }
+        },
+        {
+          "id": "DEV_30_QUERY_0",
+          "question": "这次选举被视为对马其顿共和国什么的考验？",
+          "reference": "长期以来希望加入欧盟和北约的决心",
+          "referenceAnswers": [
+            "长期以来希望加入欧盟和北约的决心",
+            "长期以来希望加入欧盟和北约的决心",
+            "长期以来希望加入欧盟和北约的决心"
+          ],
+          "answer": "这次选举被视为对**马其顿共和国长期以来争取加入欧盟和北约的决心**的一次重要考验。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3843,
+          "outputTokens": 107,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7168.813799999989,
+            "sourcesMs": 4298.542399999991,
+            "totalMs": 8671.078099999999
+          }
+        },
+        {
+          "id": "DEV_341_QUERY_2",
+          "question": "瑞尼尔山因为什么可能引发巨大的火山泥流？",
+          "reference": "庞大的冰川",
+          "referenceAnswers": [
+            "庞大的冰川",
+            "庞大的冰川",
+            "庞大的冰川"
+          ],
+          "answer": "因为瑞尼尔山山体覆盖着**庞大的冰川和积雪**。一旦火山活动产生热量，冰雪可能迅速融化，并与火山灰、岩石碎屑混合，形成规模巨大的火山泥流，沿河谷高速下泄，尤其会威胁浦亚鲁普河谷地区。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 0.2,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3516,
+          "outputTokens": 146,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8214.910299999989,
+            "sourcesMs": 5929.662400000001,
+            "totalMs": 11135.83279999999
+          }
+        },
+        {
+          "id": "DEV_1927_QUERY_1",
+          "question": "谁成立了萤火虫工作室？",
+          "reference": "西蒙·布雷德伯里，埃里克·乌列特和大卫·莱斯特",
+          "referenceAnswers": [
+            "西蒙·布雷德伯里，埃里克·乌列特和大卫·莱斯特",
+            "西蒙·布雷德伯里，埃里克·乌列特和大卫·莱斯特",
+            "西蒙·布雷德伯里，埃里克·乌列特和大卫·莱斯特"
+          ],
+          "answer": "萤火虫工作室（Firefly Studios）由**西蒙·布雷德伯里、埃里克·乌列特和大卫·莱斯特**于 **1999年8月**共同成立。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3736,
+          "outputTokens": 104,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 6778.7675,
+            "sourcesMs": 4395.5867,
+            "totalMs": 8712.9987
+          }
+        },
+        {
+          "id": "DEV_491_QUERY_1",
+          "question": "现存的石垣是在哪一年重建的板敷橹？",
+          "reference": "1992年（平成4年）",
+          "referenceAnswers": [
+            "1992年（平成4年）",
+            "1992年（平成4年）",
+            "1992年（平成4年）"
+          ],
+          "answer": "板敷橹于 **1992年（平成4年）** 重建，位于日本长崎县大村市的玖岛城遗址。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 4273,
+          "outputTokens": 156,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 18570.814400000003,
+            "sourcesMs": 16486.4574,
+            "totalMs": 20265.9413
+          }
+        },
+        {
+          "id": "DEV_593_QUERY_0",
+          "question": "沈龙元在足球运动中最擅长的为甚是哪里？",
+          "reference": "右前卫",
+          "referenceAnswers": [
+            "右前卫",
+            "右前卫",
+            "右前卫"
+          ],
+          "answer": "沈龙元最擅长的位置是**右前卫**，也曾在比赛中客串左边后卫。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3426,
+          "outputTokens": 97,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 17569.1336,
+            "sourcesMs": 15134.406199999998,
+            "totalMs": 18831.6728
+          }
+        },
+        {
+          "id": "DEV_45_QUERY_3",
+          "question": "班杰的兴趣爱好是什么？",
+          "reference": "功夫和创意绘画以及料理和音乐",
+          "referenceAnswers": [
+            "功夫和创意绘画以及料理和音乐",
+            "功夫和创意绘画以及料理和音乐",
+            "功夫和创意绘画以及料理和音乐"
+          ],
+          "answer": "班杰的兴趣爱好包括：\n\n- **功夫**\n- **创意绘画**\n- **料理**\n- **音乐**\n\n他从8岁起学习功夫，精通跆拳道、空手道、散打、咏春、气功和太极等多种武术。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3092,
+          "outputTokens": 120,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7610.637400000007,
+            "sourcesMs": 4577.523300000001,
+            "totalMs": 10082.856300000014
+          }
+        },
+        {
+          "id": "DEV_11_QUERY_2",
+          "question": "徐晓飞现在效力于哪个球队？",
+          "reference": "日本四国（地区）联赛球队",
+          "referenceAnswers": [
+            "日本四国（地区）联赛球队",
+            "日本四国（地区）联赛球队",
+            "日本四国（地区）联赛球队"
+          ],
+          "answer": "知识库资料仅显示：徐晓飞于2012年复出，加盟日本四国地区联赛的一支球队，但具体队名在资料中缺失。[1](#knowledge-1)\n\n因此，依据当前知识库无法确认他如今效力的具体球队；而且该信息较旧，不能代表其当前状态。",
+          "accuracy": 0.25,
+          "faithfulness": 0.6666666666666666,
+          "evidenceHit": 1,
+          "sourceCount": 12,
+          "knowledgeCalls": 3,
+          "modelCalls": 4,
+          "unknownUsage": 0,
+          "inputTokens": 17834,
+          "outputTokens": 741,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 34645.98020000002,
+            "sourcesMs": 5296.245800000004,
+            "totalMs": 36831.8781
+          }
+        },
+        {
+          "id": "DEV_1087_QUERY_2",
+          "question": "19世纪华裔美国留辫子吊眼睛、卷曲长指甲侦探之一形象出自于他的哪部作品？",
+          "reference": "《傅满洲》",
+          "referenceAnswers": [
+            "《傅满洲》",
+            "《傅满洲》",
+            "《傅满洲》"
+          ],
+          "answer": "这一形象是**傅满洲**，由彼得·塞勒斯在电影 **《傅满洲的邪恶阴谋》**（*The Fiendish Plot of Dr. Fu Manchu*，1980）中扮演；知识库资料确认他曾饰演留辫子、吊眼睛、留卷曲长指甲的傅满洲形象。[1](#knowledge-1)",
+          "accuracy": 0.5,
+          "faithfulness": 0.4,
+          "evidenceHit": 1,
+          "sourceCount": 13,
+          "knowledgeCalls": 3,
+          "modelCalls": 4,
+          "unknownUsage": 0,
+          "inputTokens": 17584,
+          "outputTokens": 834,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 36161.85700000002,
+            "sourcesMs": 9889.453399999999,
+            "totalMs": 39232.56410000002
+          }
+        },
+        {
+          "id": "DEV_104_QUERY_0",
+          "question": "上海轨道交通17号线在2010年改名为什么？",
+          "reference": "上海轨道交通20号线",
+          "referenceAnswers": [
+            "上海轨道交通20号线",
+            "上海轨道交通20号线",
+            "上海轨道交通20号线"
+          ],
+          "answer": "上海轨道交通原规划的 **17号线** 在编号调整后改为 **20号线**（编号 L3）。严格来说，资料记载调整发生在 **2011年起**，并非2010年；该线路后来又改称 **嘉闵线**。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2655,
+          "outputTokens": 214,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 10211.216599999985,
+            "sourcesMs": 4849.906099999993,
+            "totalMs": 12276.65419999999
+          }
+        },
+        {
+          "id": "DEV_412_QUERY_2",
+          "question": "诺丁汉郡的第一大镇是什么？",
+          "reference": "诺定咸",
+          "referenceAnswers": [
+            "诺定咸",
+            "诺定咸",
+            "曼斯菲尔德"
+          ],
+          "answer": "诺丁汉郡的第一大镇是**曼斯菲尔德（Mansfield）**。[1](#knowledge-1)",
+          "accuracy": 0,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3793,
+          "outputTokens": 87,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7155.40830000001,
+            "sourcesMs": 4623.279600000009,
+            "totalMs": 8310.09150000001
+          }
+        },
+        {
+          "id": "DEV_1536_QUERY_0",
+          "question": "侏罗纪海岸位于哪个海峡？",
+          "reference": "英吉利海峡",
+          "referenceAnswers": [
+            "英吉利海峡",
+            "英吉利海峡",
+            "英吉利海峡"
+          ],
+          "answer": "侏罗纪海岸位于英国南部的**英吉利海峡**沿岸。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3137,
+          "outputTokens": 83,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8196.591000000015,
+            "sourcesMs": 5212.363699999987,
+            "totalMs": 9209.289099999995
+          }
+        },
+        {
+          "id": "DEV_37_QUERY_3",
+          "question": "普朗特培养了哪些国际知名的力学家？",
+          "reference": "除近代力学另一奠基人冯·卡门外，还有、A．Ｌ．纳戴、威廉·普拉格等。",
+          "referenceAnswers": [
+            "除近代力学另一奠基人冯·卡门外，还有、A．Ｌ．纳戴、威廉·普拉格等。",
+            "除近代力学另一奠基人冯·卡门外，还有、A．Ｌ．纳戴、威廉·普拉格等。",
+            "除近代力学另一奠基人冯·卡门外，还有、A．Ｌ．纳戴、威廉·普拉格等。"
+          ],
+          "answer": "普朗特培养和指导过许多国际知名力学家。知识库中明确列出的包括：\n\n- **西奥多·冯·卡门**：近代力学与航空航天科学的重要奠基人之一；其博士论文于1910年在普朗特指导下完成。\n- **A. L. 纳戴（Arpád L. Nadai）**：著名应用力学、塑性力学专家。\n- **威廉·普拉格（William Prager）**：著名应用数学家和塑性力学家。\n- **陆士嘉**：中国流体力学家，是普朗特的关门弟子，也是他唯一的女学生和唯一的中国学生。[1](#knowledge-1)\n\n此外，**铁木辛柯**等著名力学家也曾跟随普朗特开展研究工作，但严格来说不一定都属于他的正式学生。[1](#knowledge-1)\n\n需要说明的是，知识库原文有部分姓名缺失，因此以上是资料中能够明确确认的名单，并非完整名录。",
+          "accuracy": 0.5,
+          "faithfulness": 0.6470588235294118,
+          "evidenceHit": 1,
+          "sourceCount": 10,
+          "knowledgeCalls": 3,
+          "modelCalls": 4,
+          "unknownUsage": 0,
+          "inputTokens": 20207,
+          "outputTokens": 616,
+          "citationCount": 2,
+          "validCitations": 2,
+          "timing": {
+            "firstTextMs": 28528.722100000014,
+            "sourcesMs": 7034.803300000029,
+            "totalMs": 36258.09420000005
+          }
+        },
+        {
+          "id": "DEV_1_QUERY_3",
+          "question": "戏曲锣鼓所运用的敲击乐器主要有什么类型？",
+          "reference": "鼓、锣、钹和板",
+          "referenceAnswers": [
+            "鼓、锣、钹和板",
+            "鼓、锣、钹和板",
+            "鼓、锣、钹和板"
+          ],
+          "answer": "戏曲锣鼓所用的敲击乐器主要分为四类：[1](#knowledge-1)\n\n1. **鼓类**：单皮鼓（板鼓）、大鼓、堂鼓、怀鼓、花盆鼓等。  \n2. **锣类**：大锣、小锣、钲锣、云锣等。  \n3. **钹类**：铙钹、大钹、小钹、水钹、碰钟等。  \n4. **板类（节拍类）**：檀板、木鱼、梆子等。",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2884,
+          "outputTokens": 172,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 5635.549300000013,
+            "sourcesMs": 3700.354900000035,
+            "totalMs": 9991.431500000006
+          }
+        },
+        {
+          "id": "DEV_543_QUERY_0",
+          "question": "《三遂平妖传》的全称是什么？",
+          "reference": "《北宋三遂平妖传》",
+          "referenceAnswers": [
+            "《北宋三遂平妖传》",
+            "《北宋三遂平妖传》",
+            "《北宋三遂平妖传》"
+          ],
+          "answer": "《三遂平妖传》的全称是 **《北宋三遂平妖传》**，又名《新平妖传》。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2629,
+          "outputTokens": 76,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 6982.476699999999,
+            "sourcesMs": 4813.542199999967,
+            "totalMs": 9368.926199999987
+          }
+        },
+        {
+          "id": "DEV_606_QUERY_2",
+          "question": "钝头鹦嘴鱼喜欢在什么地方生活？",
+          "reference": "偏爱生存于岩礁底质，尤其是圆石斜坡",
+          "referenceAnswers": [
+            "偏爱生存于岩礁底质，尤其是圆石斜坡",
+            "偏爱生存于岩礁底质，尤其是圆石斜坡",
+            "岩礁底质，尤其是圆石斜坡。"
+          ],
+          "answer": "钝头鹦嘴鱼偏爱生活在**岩礁底质海域**，尤其喜欢**布满圆石的斜坡**，常成群洄游于较陡峭的礁岸附近。其栖息水深通常为 **1～35米**。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3544,
+          "outputTokens": 127,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7693.0072999999975,
+            "sourcesMs": 5328.286199999973,
+            "totalMs": 10172.42749999999
+          }
+        },
+        {
+          "id": "DEV_1176_QUERY_0",
+          "question": "1999年国家联盟分区赛采用什么赛制？",
+          "reference": "5战3胜制",
+          "referenceAnswers": [
+            "5战3胜制",
+            "5战3胜制",
+            "5战3胜制"
+          ],
+          "answer": "1999年国家联盟分区赛采用**五战三胜制**。\n\n参赛队伍包括国家联盟三个分区冠军和一支外卡球队，四队两两对决；率先赢得三场的球队晋级国家联盟冠军赛。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3289,
+          "outputTokens": 140,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8228.882900000026,
+            "sourcesMs": 5343.245999999985,
+            "totalMs": 10467.36440000002
+          }
+        },
+        {
+          "id": "DEV_1178_QUERY_2",
+          "question": "黑尾前肛鳗的体长是体高的多少倍？",
+          "reference": "20.1倍",
+          "referenceAnswers": [
+            "20.1倍",
+            "20.1倍",
+            "20.1倍"
+          ],
+          "answer": "黑尾前肛鳗的**体长约为体高的 20.1 倍**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2759,
+          "outputTokens": 82,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7574.160399999993,
+            "sourcesMs": 5110.986999999965,
+            "totalMs": 8681.951899999985
+          }
+        },
+        {
+          "id": "DEV_1572_QUERY_3",
+          "question": "半线天竺鲷的体长可达多少公分？",
+          "reference": "12公分",
+          "referenceAnswers": [
+            "12公分",
+            "12公分",
+            "12公分"
+          ],
+          "answer": "半线天竺鲷的体长可达 **12 公分**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3149,
+          "outputTokens": 63,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7028.542499999981,
+            "sourcesMs": 4795.9571,
+            "totalMs": 8040.223899999983
+          }
+        },
+        {
+          "id": "DEV_414_QUERY_1",
+          "question": "港汇指数的加权比重如何制定？",
+          "reference": "1999年至2000年平均贸易模式",
+          "referenceAnswers": [
+            "1999年至2000年平均贸易模式",
+            "1999年至2000年平均贸易模式",
+            "按1999年至2000年平均贸易模式所制定"
+          ],
+          "answer": "港汇指数（即**港元实际汇兑指数**）的权重主要按照香港与各主要贸易伙伴在**1999至2000年的平均贸易模式**制定；贸易关系越重要，其货币在指数中的影响通常越大。该指数反映港元兑主要贸易伙伴货币的名义有效汇率加权平均变动，但香港政府并未公布详细的权重计算公式。[1](#knowledge-1)\n\n需要注意：\n\n- 自 **2012年1月3日**起，旧系列已由新系列取代；\n- 新系列包含 **15种货币**；\n- 以 **2010年1月＝100** 为基期。[1](#knowledge-1)\n\n因此，公开资料可以说明其属于按贸易模式制定的货币篮子指数，但无法据此精确复算每种货币的具体加权比重。",
+          "accuracy": 0.75,
+          "faithfulness": 0.8,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2938,
+          "outputTokens": 377,
+          "citationCount": 2,
+          "validCitations": 2,
+          "timing": {
+            "firstTextMs": 12557.352199999965,
+            "sourcesMs": 5869.0472999999765,
+            "totalMs": 18604.550099999993
+          }
+        },
+        {
+          "id": "DEV_94_QUERY_2",
+          "question": "叶乔波至1993年春季赛事结束，她共获得多少个世界冠军？",
+          "reference": "14个",
+          "referenceAnswers": [
+            "14个",
+            "14个",
+            "14个"
+          ],
+          "answer": "至1993年春季赛事结束，叶乔波共获得 **14个世界冠军**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3399,
+          "outputTokens": 81,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7764.093300000008,
+            "sourcesMs": 5432.630100000009,
+            "totalMs": 8828.060899999982
+          }
+        },
+        {
+          "id": "DEV_1056_QUERY_0",
+          "question": "《抓鬼天狗帮》的作者是谁？",
+          "reference": "木下樱与东山和子",
+          "referenceAnswers": [
+            "木下樱与东山和子",
+            "木下樱与东山和子",
+            "木下樱与东山和子"
+          ],
+          "answer": "《抓鬼天狗帮》（原名《tactics》）的作者是两位日本漫画家：**木下樱**与**东山和子**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3132,
+          "outputTokens": 96,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7046.216599999985,
+            "sourcesMs": 4799.858999999997,
+            "totalMs": 8653.213099999994
+          }
+        },
+        {
+          "id": "DEV_175_QUERY_0",
+          "question": "古汉越语指什么？",
+          "reference": "在汉字尚未大量传入越南之前，零星传入安南口语中的汉字音。",
+          "referenceAnswers": [
+            "在汉字尚未大量传入越南之前，零星传入安南口语中的汉字音。",
+            "在汉字尚未大量传入越南之前，零星传入安南口语中的汉字音。",
+            "指在汉字尚未大量传入越南之前，零星传入安南口语中的汉字音。"
+          ],
+          "answer": "**古汉越语**，又称**古汉越音**（Ancient Sino-Annamite），是指在汉字及其系统读音尚未大规模传入越南以前，零星进入古代越南语口语的早期汉语借词及其读音。\n\n其传入时间主要在**中唐以前**，尤其与汉代越南内属时期有关。它保留了较多六朝汉语的语音特点，比后来主要在唐代形成的系统性**汉越语（汉越音）**更古老。[1](#knowledge-1)\n\n可以简单区分为：\n\n- **古汉越语**：较早传入，常已深度融入越南语，读音变化不完全符合后来汉越音的规则。\n- **汉越语／汉越音**：主要以唐代中古汉语音系为基础，形成了较系统的汉字越南读音。\n\n因此，“古汉越语”并不是一种独立语言，严格来说是**越南语中较早的一层汉语借词或汉字音层次**。例如，研究者会通过某个越南词的声母、韵母和声调，判断它属于古汉越层，还是后来形成的汉越层。",
+          "accuracy": 0.75,
+          "faithfulness": 0.5333333333333333,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3027,
+          "outputTokens": 337,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 6887.627300000051,
+            "sourcesMs": 4683.7596000000485,
+            "totalMs": 16226.9522
+          }
+        },
+        {
+          "id": "DEV_1084_QUERY_0",
+          "question": "罗素-爱因斯坦宣言最初称为什么？",
+          "reference": "《科学家要求废止战争》",
+          "referenceAnswers": [
+            "《科学家要求废止战争》",
+            "《科学家要求废止战争》",
+            "《科学家要求废止战争》"
+          ],
+          "answer": "《罗素－爱因斯坦宣言》最初称为**《科学家要求废止战争》**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3174,
+          "outputTokens": 73,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 9817.459899999958,
+            "sourcesMs": 4360.556699999957,
+            "totalMs": 11114.642499999958
+          }
+        },
+        {
+          "id": "DEV_357_QUERY_0",
+          "question": "四氟化碳又被叫作为什么？",
+          "reference": "四氟甲烷、Freon-14及R 14",
+          "referenceAnswers": [
+            "四氟甲烷、Freon-14及R 14",
+            "四氟甲烷、Freon-14及R 14",
+            "四氟甲烷、Freon-14及R 14"
+          ],
+          "answer": "四氟化碳又称**四氟甲烷**，也叫 **Freon-14（氟利昂-14）**或 **R-14**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2952,
+          "outputTokens": 80,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8578.4718,
+            "sourcesMs": 3980.2950999999885,
+            "totalMs": 10422.826899999985
+          }
+        },
+        {
+          "id": "DEV_89_QUERY_2",
+          "question": "第一个使用括弧语言的是什么语言？",
+          "reference": "BCPL",
+          "referenceAnswers": [
+            "BCPL",
+            "BCPL",
+            "BCPL"
+          ],
+          "answer": "第一个使用括弧的程序设计语言是 **BCPL（Basic Combined Programming Language，基本组合程序语言）**，由马丁·理察德（Martin Richards）于 1966 年开发。后来 C 语言也继承了这种括弧语法风格。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 0.75,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2616,
+          "outputTokens": 134,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 6787.65399999998,
+            "sourcesMs": 4391.703899999964,
+            "totalMs": 9135.768099999987
+          }
+        },
+        {
+          "id": "DEV_607_QUERY_0",
+          "question": "猎骄靡是谁？",
+          "reference": "中亚古国乌孙昆莫（君主之号）",
+          "referenceAnswers": [
+            "中亚古国乌孙昆莫（君主之号）",
+            "中亚古国乌孙昆莫（君主之号）",
+            "中亚古国乌孙昆莫（君主之号）"
+          ],
+          "answer": "**猎骄靡**（约前2世纪—前105年）是古代中亚国家**乌孙**的重要君主，“昆莫”是乌孙君主的称号。\n\n他是乌孙王难兜靡之子。幼年时乌孙被敌国攻破、父亲被杀，他被遗臣带到匈奴，传说曾得到狼和乌鸦救助，后来由匈奴单于收养。成年后，他率乌孙部众西迁，于约公元前161年击败伊犁河流域的大月氏，逐渐建立起强盛的乌孙国，定都赤谷城。[1](#knowledge-1)\n\n猎骄靡早期依附匈奴，后来取得相对独立地位。汉武帝时期，张骞出使乌孙，推动汉朝与乌孙结盟抗击匈奴。猎骄靡向汉朝求婚，汉武帝便将宗室女**刘细君**封为公主，嫁给他。约公元前105年，猎骄靡去世，由其孙军须靡继位。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 0.9545454545454546,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2814,
+          "outputTokens": 318,
+          "citationCount": 2,
+          "validCitations": 2,
+          "timing": {
+            "firstTextMs": 7635.37559999997,
+            "sourcesMs": 4598.777400000021,
+            "totalMs": 16243.182700000005
+          }
+        },
+        {
+          "id": "DEV_254_QUERY_1",
+          "question": "大雷克雅维克的面积是如何计算的？",
+          "reference": "由其组成自治市的面积",
+          "referenceAnswers": [
+            "由其组成自治市的面积",
+            "由其组成自治市的面积",
+            "大雷克雅维克的面积是由其组成自治市的面积算出的，包括大面积的内陆，但不包括约200平方公里（77平方英里）相对较小的城市核心。"
+          ],
+          "answer": "大雷克雅维克的面积采用的是**行政区面积加总法**：\n\n> 大雷克雅维克面积 ＝ 雷克雅维克市面积 ＋ 周围六个自治市的面积\n\n因此，它统计的是七个自治市完整行政辖区的总面积，而不是只沿连续建成区或城区边缘测量。部分自治市辖有大片人口稀少的内陆，所以计算结果会明显大于约 **200 平方公里的城市核心区**。[1](#knowledge-1)\n\n换言之，“大雷克雅维克面积”是**首都地区的行政范围面积**；若讨论实际城市建成区，则应采用另一种、更小的空间口径。",
+          "accuracy": 0.75,
+          "faithfulness": 0.6666666666666666,
+          "evidenceHit": 1,
+          "sourceCount": 9,
+          "knowledgeCalls": 3,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 8562,
+          "outputTokens": 619,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 22345.323900000018,
+            "sourcesMs": 8860.768299999996,
+            "totalMs": 27124.749899999995
+          }
+        },
+        {
+          "id": "DEV_624_QUERY_2",
+          "question": "新巴82线一天最长可服务多久？",
+          "reference": "22.5小时",
+          "referenceAnswers": [
+            "22.5小时",
+            "22.5小时",
+            "22.5小时"
+          ],
+          "answer": "新巴82线一天最长可服务 **22.5小时**，并曾是全香港服务时间最长的日间专利巴士路线。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3533,
+          "outputTokens": 122,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8255.00469999999,
+            "sourcesMs": 5713.013399999996,
+            "totalMs": 9712.586899999995
+          }
+        },
+        {
+          "id": "DEV_1109_QUERY_1",
+          "question": "香港排名第一的货柜码头营运商是什么？",
+          "reference": "香港国际货柜码头有限公司",
+          "referenceAnswers": [
+            "香港国际货柜码头有限公司",
+            "香港国际货柜码头有限公司",
+            "香港国际货柜码头有限公司"
+          ],
+          "answer": "香港排名第一的货柜码头营运商是**香港国际货柜码头有限公司（HIT）**；现代货箱码头有限公司则排名第二。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3741,
+          "outputTokens": 97,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 9623.166499999992,
+            "sourcesMs": 7244.954900000012,
+            "totalMs": 11176.179699999979
+          }
+        },
+        {
+          "id": "DEV_409_QUERY_0",
+          "question": "鬣齿兽科出现于什么时期？",
+          "reference": "古新世晚期",
+          "referenceAnswers": [
+            "古新世晚期",
+            "古新世晚期",
+            "古新世晚期"
+          ],
+          "answer": "鬣齿兽科最早出现于**古新世晚期**，并一直繁衍至**中新世**。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3459,
+          "outputTokens": 75,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 6973.867200000037,
+            "sourcesMs": 4580.255500000028,
+            "totalMs": 8253.225000000035
+          }
+        },
+        {
+          "id": "DEV_468_QUERY_3",
+          "question": "《掌故王》主要播放在哪一段时期？",
+          "reference": "2009年3月30日至5月14日",
+          "referenceAnswers": [
+            "2009年3月30日至5月14日",
+            "2009年3月30日至5月14日",
+            "2009年3月30日至5月14日"
+          ],
+          "answer": "《掌故王》主要于**2009年3月30日至5月14日**播出，逢星期一至星期五晚上 **22:30—23:00** 在翡翠台及高清翡翠台播放；翌日凌晨 **03:00—03:30** 于高清翡翠台重播。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3053,
+          "outputTokens": 134,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8940.489599999972,
+            "sourcesMs": 6157.338600000017,
+            "totalMs": 11599.905999999959
+          }
+        },
+        {
+          "id": "DEV_1507_QUERY_3",
+          "question": "冈察洛夫据此旅途写作的游记《战舰“巴拉达”号》在哪一年出版？",
+          "reference": "1858年",
+          "referenceAnswers": [
+            "1858年",
+            "1858年",
+            "1858年"
+          ],
+          "answer": "冈察洛夫的游记《战舰“巴拉达”号》于 **1858年** 出版。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3010,
+          "outputTokens": 95,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8201.128099999973,
+            "sourcesMs": 5222.043799999985,
+            "totalMs": 9403.238899999997
+          }
+        },
+        {
+          "id": "DEV_578_QUERY_2",
+          "question": "鹦鹉亚科主要包含哪些？",
+          "reference": "主要包含在非洲的鹦鹉及少部分在亚洲鹦鹉",
+          "referenceAnswers": [
+            "主要包含在非洲的鹦鹉及少部分在亚洲鹦鹉",
+            "主要包含在非洲的鹦鹉及少部分在亚洲鹦鹉",
+            "非洲的鹦鹉及少部分在亚洲鹦鹉。"
+          ],
+          "answer": "鹦鹉亚科主要包含分布广泛的“典型鹦鹉”。按知识库所述的分类观点，其核心成员以**非洲鹦鹉**及**少部分亚洲鹦鹉**为主；**吸蜜鹦鹉和凤头鹦鹉不属于该亚科**。[1](#knowledge-1)\n\n需要注意的是，鹦鹉亚科内部各族的系统关系尚未完全确定，不同分类体系可能会把其中一些族提升为独立亚科，因此具体成员范围会有所变化。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 0.8571428571428571,
+          "evidenceHit": 1,
+          "sourceCount": 10,
+          "knowledgeCalls": 3,
+          "modelCalls": 4,
+          "unknownUsage": 0,
+          "inputTokens": 17516,
+          "outputTokens": 941,
+          "citationCount": 2,
+          "validCitations": 2,
+          "timing": {
+            "firstTextMs": 40338.02139999997,
+            "sourcesMs": 4868.143999999971,
+            "totalMs": 44351.73739999998
+          }
+        },
+        {
+          "id": "DEV_601_QUERY_3",
+          "question": "在政治圈里，临界量与什么有关？",
+          "reference": "可能与大多数的共识相关",
+          "referenceAnswers": [
+            "可能与大多数的共识相关",
+            "可能与大多数的共识相关",
+            "大多数的共识"
+          ],
+          "answer": "在政治圈里，**临界量可能与大多数人的共识有关**。当大众共识出现细微变化时，政治共识可能随之迅速转变，因为政治争论及其影响力往往与多数意见密切相关。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2970,
+          "outputTokens": 129,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7704.763500000001,
+            "sourcesMs": 4940.848400000017,
+            "totalMs": 9931.463400000008
+          }
+        },
+        {
+          "id": "DEV_366_QUERY_2",
+          "question": "宋子仙在什么时候向王僧辩投降？",
+          "reference": "大宝二年（551年）六月二十二日",
+          "referenceAnswers": [
+            "大宝二年（551年）六月二十二日",
+            "大宝二年（551年）六月二十二日",
+            "大宝二年（551年）六月二十二日"
+          ],
+          "answer": "宋子仙于**南朝梁大宝二年（551年）六月二十二日**，因困窘粮尽，向王僧辩投降，表示愿献出郢州城，只求获准返回建康。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3546,
+          "outputTokens": 112,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 9416.304799999925,
+            "sourcesMs": 5545.442500000005,
+            "totalMs": 11605.79859999998
+          }
+        },
+        {
+          "id": "DEV_558_QUERY_3",
+          "question": "吉尔杭阿战死后在哪些地方建立了专祠？",
+          "reference": "于殉难地方建专祠，上海亦建专祠",
+          "referenceAnswers": [
+            "于殉难地方建专祠，上海亦建专祠",
+            "于殉难地方建专祠，上海亦建专祠",
+            "殉难地方建专祠，上海亦建专祠。"
+          ],
+          "answer": "吉尔杭阿战死后，清廷在两处为他建立专祠：\n\n1. **殉难之地**，即镇江附近的**高资烟墩山一带**；\n2. **上海**。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3387,
+          "outputTokens": 110,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7384.156100000022,
+            "sourcesMs": 4645.462199999951,
+            "totalMs": 9297.68869999994
+          }
+        },
+        {
+          "id": "DEV_231_QUERY_2",
+          "question": "液态火箭发动机的节流阀是用来调整什么的？",
+          "reference": "油和氧化剂进入燃烧室的量",
+          "referenceAnswers": [
+            "油和氧化剂进入燃烧室的量",
+            "油和氧化剂进入燃烧室的量",
+            "调整油和氧化剂进入燃烧室的量"
+          ],
+          "answer": "液态火箭发动机的节流阀主要用来调节**燃料和氧化剂进入燃烧室的流量**，从而改变燃烧室压力，进一步控制发动机的**推力大小**。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 0.5,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3079,
+          "outputTokens": 100,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 9425.218200000003,
+            "sourcesMs": 6258.957999999984,
+            "totalMs": 11531.690900000045
+          }
+        },
+        {
+          "id": "DEV_1134_QUERY_1",
+          "question": "2008年亚足联女子亚洲杯本届赛赛一共有几轮外围赛？",
+          "reference": "两轮",
+          "referenceAnswers": [
+            "两轮",
+            "两轮",
+            "两轮"
+          ],
+          "answer": "2008年亚足联女子亚洲杯一共有 **两轮外围赛**，之后进入决赛周。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2863,
+          "outputTokens": 89,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8210.89029999997,
+            "sourcesMs": 5213.8421999999555,
+            "totalMs": 9355.842500000028
+          }
+        },
+        {
+          "id": "DEV_1161_QUERY_3",
+          "question": "2011年香港科技大学为刘燕卿授予了什么荣誉？",
+          "reference": "国际组织科大分会的荣誉会员",
+          "referenceAnswers": [
+            "国际组织科大分会的荣誉会员",
+            "国际组织科大分会的荣誉会员",
+            "国际组织科大分会的荣誉会员"
+          ],
+          "answer": "2011年1月，香港科技大学商学院授予刘燕卿**国际组织科大分会荣誉会员**称号，以表扬她对行业、社会及教育事务的重大贡献。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2362,
+          "outputTokens": 89,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7814.6417000000365,
+            "sourcesMs": 5265.845500000054,
+            "totalMs": 9811.94160000002
+          }
+        },
+        {
+          "id": "DEV_405_QUERY_3",
+          "question": "鬣齿兽属中最小的大约多大？",
+          "reference": "肩高只有30厘米",
+          "referenceAnswers": [
+            "肩高只有30厘米",
+            "肩高只有30厘米",
+            "30厘米"
+          ],
+          "answer": "鬣齿兽属中最小的物种，**肩高大约只有30厘米**，体型约相当于一只小型犬。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 0.5,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3773,
+          "outputTokens": 101,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 12284.908999999985,
+            "sourcesMs": 9123.210500000045,
+            "totalMs": 13802.859999999986
+          }
+        },
+        {
+          "id": "DEV_365_QUERY_0",
+          "question": "日月光集团是什么地方的半导体公司？",
+          "reference": "台湾",
+          "referenceAnswers": [
+            "台湾",
+            "台湾",
+            "台湾"
+          ],
+          "answer": "日月光集团（ASE）是**中国台湾的半导体公司**，全球总部位于**台湾高雄市楠梓区**。公司主要从事半导体**封装与测试（封测）**服务。[1](#knowledge-1)",
+          "accuracy": 0.75,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 3023,
+          "outputTokens": 100,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 6604.274299999932,
+            "sourcesMs": 4267.113000000012,
+            "totalMs": 8759.625
+          }
+        },
+        {
+          "id": "DEV_1867_QUERY_2",
+          "question": "张静美21岁时以哪部作品正式出道？",
+          "reference": "〈灵香园传奇〉",
+          "referenceAnswers": [
+            "〈灵香园传奇〉",
+            "〈灵香园传奇〉",
+            "〈灵香园传奇〉"
+          ],
+          "answer": "张静美21岁时，以漫画《灵香园传奇》在伊士曼《小咪漫画周刊》开始连载，正式出道。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2523,
+          "outputTokens": 74,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 7415.827500000014,
+            "sourcesMs": 4599.009300000034,
+            "totalMs": 8829.757600000012
+          }
+        },
+        {
+          "id": "DEV_1649_QUERY_0",
+          "question": "李昆的处女作是哪一部？",
+          "reference": "《飞虎将军》",
+          "referenceAnswers": [
+            "《飞虎将军》",
+            "《飞虎将军》",
+            "《飞虎将军》"
+          ],
+          "answer": "李昆的处女作是电影《飞虎将军》。[1](#knowledge-1)",
+          "accuracy": 1,
+          "faithfulness": 1,
+          "evidenceHit": 1,
+          "sourceCount": 6,
+          "knowledgeCalls": 1,
+          "modelCalls": 2,
+          "unknownUsage": 0,
+          "inputTokens": 2477,
+          "outputTokens": 67,
+          "citationCount": 1,
+          "validCitations": 1,
+          "timing": {
+            "firstTextMs": 8112.464599999948,
+            "sourcesMs": 4507.604599999962,
+            "totalMs": 8911.903799999971
+          }
+        }
+      ]
+    }
+  },
+  "comparison": {
+    "accuracyDelta": -0.025,
+    "accuracyDeltaCI95": [
+      -0.07,
+      0.015
+    ],
+    "faithfulnessDelta": -0.0915991165697048,
+    "faithfulnessDeltaCI95": [
+      -0.14208263305322127,
+      -0.04705009696186168
+    ],
+    "improved": 3,
+    "tied": 42,
+    "worse": 5
+  },
+  "retrievalBudget": {
+    "limitCny": 10,
+    "accountedCny": 1.9906645000000003,
+    "requests": 428,
+    "unresolved": 0,
+    "halted": false,
+    "pricesCnyPerMillion": {
+      "qwen3.7-text-embedding": {
+        "input": 0.5,
+        "output": 0
+      },
+      "qwen3.7-text-rerank": {
+        "input": 0.5,
+        "output": 0
+      },
+      "gpt-5.6-sol": {
+        "input": 0.75,
+        "output": 3
+      },
+      "gpt-6-astra": {
+        "input": 1.875,
+        "output": 7.5
+      }
+    }
+  }
+}

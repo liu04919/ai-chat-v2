@@ -3,9 +3,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Budget } from "./budget";
-import { readUsage } from "./meter";
+import { readUsage, validateEvalTools, startMeter } from "./meter";
 
 describe("shared evaluation budget", () => {
+  it("Agentic 评测只允许知识库函数，不开放联网、生图或远程会话", () => {
+    const tools = [{ type: "function", name: "search_knowledge" }];
+    expect(() => validateEvalTools({ tools }, true)).not.toThrow();
+    expect(() => validateEvalTools({ tools })).toThrow("EVAL_DISALLOWED_TOOL");
+    for (const tool of [{ type: "web_search" }, { type: "image_generation" }, { type: "function", name: "send_email" }]) {
+      expect(() => validateEvalTools({ tools: [tool] }, true)).toThrow("EVAL_DISALLOWED_TOOL");
+    }
+    expect(() => validateEvalTools({ previous_response_id: "r" }, true)).toThrow("EVAL_STATEFUL_INPUT_FORBIDDEN");
+  });
+  it("不能把付费远程渠道误标为订阅渠道跳过预算", async () => {
+    await expect(startMeter({} as Budget, { LLM_BASE_URL: "https://api.example.com/v1" }, {
+      subscriptionLog: "unused", allowKnowledgeTool: true,
+    })).rejects.toThrow("SUBSCRIPTION_REQUIRES_LOCAL_PROXY");
+  });
   it("persists unsettled reservations across restarts and refuses overspend", () => {
     const dir = mkdtempSync(join(tmpdir(), "rag-budget-test-"));
     try {

@@ -3,12 +3,14 @@ import type {
   ConversationShareSnapshotDto,
   MessageDto,
 } from "@ai-chat/contracts";
-import { Brain, FileText, Wrench } from "lucide-react";
+import { FileText } from "lucide-react";
 import Image from "next/image";
 import { KnowledgeSources } from "@/components/knowledge/knowledge-sources";
 import { MessageMarkdown } from "@/components/chat/messages/message-markdown";
 
 import { ShareMessageMarkdown } from "./share-message-markdown";
+import { splitMessageDisplay } from "@/components/chat/messages/message-display";
+import { MessageProcess } from "@/components/chat/messages/message-process";
 
 function attachmentUrl(token: string, attachmentId: string) {
   return `/api/shares/${encodeURIComponent(token)}/attachments/${encodeURIComponent(attachmentId)}`;
@@ -65,7 +67,8 @@ function SharedMessage({
   token: string;
 }>) {
   const sources = message.parts.flatMap((p) => p.type === "knowledge-sources" ? p.sources : []);
-  const content = message.parts.map((part, index) => {
+  const { processParts, contentParts } = splitMessageDisplay(message.parts);
+  const content = contentParts.map((part, index) => {
     switch (part.type) {
       case "knowledge-sources":
         return <KnowledgeSources key={part.id} sources={part.sources} />;
@@ -77,18 +80,6 @@ function SharedMessage({
             text={part.text}
           />
         );
-      case "reasoning":
-        return (
-          <details className="mb-3 text-muted-foreground" key={part.id}>
-            <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium">
-              <Brain className="size-4" aria-hidden="true" />
-              思考过程
-            </summary>
-            <div className="mt-2 border-l pl-4 text-sm leading-6">
-              <ShareMessageMarkdown text={part.text} />
-            </div>
-          </details>
-        );
       case "attachment": {
         const attachment = attachments.get(part.attachmentId);
         return attachment ? (
@@ -97,19 +88,6 @@ function SharedMessage({
           </div>
         ) : null;
       }
-      case "tool-call":
-        return (
-          <div className="my-2 flex w-fit items-center gap-2 rounded-xl border bg-muted/50 px-3 py-2 text-xs text-muted-foreground" key={part.id}>
-            <Wrench className="size-4" aria-hidden="true" />
-            <span>{part.toolName}</span>
-          </div>
-        );
-      case "tool-result":
-        return (
-          <p className="my-2 text-xs text-muted-foreground" key={part.id}>
-            {part.isError ? "工具执行失败" : "工具执行完成"}
-          </p>
-        );
     }
   });
 
@@ -121,6 +99,10 @@ function SharedMessage({
     </article>
   ) : (
     <article className="min-w-0 space-y-3 text-sm leading-7 sm:text-base sm:leading-8">
+      <MessageProcess
+        parts={processParts}
+        renderReasoning={(text) => <ShareMessageMarkdown text={text} />}
+      />
       {content}
     </article>
   );

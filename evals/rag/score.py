@@ -17,7 +17,10 @@ import httpx
 from ragas.llms.base import InstructorBaseRagasLLM
 from ragas.metrics.collections import Faithfulness, AnswerAccuracy
 
-ROOT = Path(__file__).resolve().parent / "artifacts" / "cmrc2018"
+_variant = os.environ.get("RAG_EVAL_VARIANT")
+if _variant not in (None, "traditional", "agentic", "agentic-fixed"):
+    raise ValueError("INVALID_EVAL_VARIANT")
+ROOT = Path(__file__).resolve().parent / "artifacts" / ("agentic-v1/" + _variant if _variant else "cmrc2018")
 
 
 class ResponsesJudge(InstructorBaseRagasLLM):
@@ -32,7 +35,7 @@ class ResponsesJudge(InstructorBaseRagasLLM):
 
     async def agenerate(self, prompt, response_model):
         stream = await self.client.responses.create(
-            model=self.model, input=prompt, store=False, stream=True,
+            model=self.model, input=[{"role": "user", "content": [{"type": "input_text", "text": prompt}]}], store=False, stream=True,
             reasoning={"effort": "low"}, max_output_tokens=8192,
             text={"format": {"type": "json_schema", "name": response_model.__name__,
                              "schema": response_model.model_json_schema(), "strict": False}},
@@ -79,7 +82,10 @@ def append(name, value):
 
 
 async def main(split, judge):
-    runtime = read("runtime.json")
+    runtime_variant = os.environ.get("RAG_EVAL_JUDGE_VARIANT")
+    if runtime_variant and (_variant is None or runtime_variant not in ("traditional", "agentic", "agentic-fixed")):
+        raise ValueError("INVALID_JUDGE_VARIANT")
+    runtime = json.loads((ROOT.parent / runtime_variant / "runtime.json").read_text(encoding="utf-8")) if runtime_variant else read("runtime.json")
     if not runtime["meterUrl"].startswith("http://127.0.0.1:"):
         raise ValueError("LOCAL_BUDGET_METER_REQUIRED")
     manifest = read("manifest.json")
@@ -150,6 +156,20 @@ async def main(split, judge):
             except Exception as error:
                 # 继续其余题，但整轮返回失败，不发布缺题的平均分。
                 failure = {"id": row["id"], "judge": judge, "errorType": type(error).__name__}
+                status = getattr(error, "status_code", None)
+                if isinstance(status, int):
+                    failure["httpStatus"] = status
+                body = getattr(error, "body", None)
+                if isinstance(body, dict):
+                    code = body.get("code")
+                    if isinstance(code, str) and re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", code):
+                        failure["upstreamCode"] = code
+                # 不记录完整异常消息；上游有时会把请求或凭证拼进错误正文。
+                message = str(error).lower()
+                failure["hints"] = [marker for marker in ["concurrent", "concurrency", "rate limit", "overloaded", "quota"]
+                                    if marker in message]
+                failure["locations"] = [f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"
+                                        for frame in traceback.extract_tb(error.__traceback__)[-4:]]
                 append(f"{split}-judge-failures.jsonl", failure)
                 failures.append(failure)
                 print(json.dumps(failure), flush=True)

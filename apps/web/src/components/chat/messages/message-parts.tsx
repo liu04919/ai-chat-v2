@@ -2,11 +2,12 @@ import type {
   AssistantMessageViewPartsDto,
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
-import { Brain, Wrench } from "lucide-react";
 
 import { MessageAttachment } from "./message-attachment";
 import { MessageMarkdown } from "./message-markdown";
 import { KnowledgeSources } from "@/components/knowledge/knowledge-sources";
+import { splitMessageDisplay } from "./message-display";
+import { MessageProcess } from "./message-process";
 
 type MessagePartsDto = UserMessagePartsDto | AssistantMessageViewPartsDto;
 
@@ -24,7 +25,8 @@ export function MessageParts({
   onReasoningToggle?: (partId: string, open: boolean) => void;
 }>) {
   const sources = parts.flatMap((p) => p.type === "knowledge-sources" ? p.sources : []);
-  return parts.map((part, index) => {
+  const { processParts, contentParts } = splitMessageDisplay(parts);
+  const content = contentParts.map((part, index) => {
     switch (part.type) {
       case "knowledge-sources":
         return <KnowledgeSources key={part.id} sources={part.sources} />;
@@ -35,25 +37,6 @@ export function MessageParts({
             text={part.text}
             sources={sources}
           />
-        );
-      case "reasoning":
-        return (
-          <details
-            className="mb-3 text-muted-foreground"
-            open={isStreaming || expandedReasoningIds?.has(part.id) || undefined}
-            onToggle={onReasoningToggle
-              ? (event) => onReasoningToggle(part.id, event.currentTarget.open)
-              : undefined}
-            key={part.id}
-          >
-            <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium">
-              <Brain className="size-4" aria-hidden="true" />
-              思考过程
-            </summary>
-            <div className="mt-2 border-l pl-4 text-sm leading-6">
-              <MessageMarkdown text={part.text} />
-            </div>
-          </details>
         );
       case "attachment":
         return (
@@ -67,22 +50,18 @@ export function MessageParts({
             />
           </div>
         );
-      case "tool-call":
-        return (
-          <div
-            className="my-2 flex w-fit items-center gap-2 rounded-xl border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
-            key={part.id}
-          >
-            <Wrench className="size-4" aria-hidden="true" />
-            <span>{part.toolName}</span>
-          </div>
-        );
-      case "tool-result":
-        return (
-          <p className="my-2 text-xs text-muted-foreground" key={part.id}>
-            {part.isError ? "工具执行失败" : "工具执行完成"}
-          </p>
-        );
     }
   });
+  return (
+    <>
+      <MessageProcess
+        parts={processParts}
+        isStreaming={isStreaming}
+        expandedReasoningIds={expandedReasoningIds}
+        onReasoningToggle={onReasoningToggle}
+        renderReasoning={(text) => <MessageMarkdown text={text} />}
+      />
+      {content}
+    </>
+  );
 }

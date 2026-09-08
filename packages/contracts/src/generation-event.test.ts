@@ -4,8 +4,23 @@ import {
   generationEventCursorSchema,
   generationEventSchema,
 } from "./generation-event";
+import { knowledgeSourcesPartSchema } from "./knowledge";
 
 describe("generationEventSchema", () => {
+  it.each([6, 7, 18, 19])("来源快照与 SSE 对 %i 条来源使用相同上限", (count) => {
+    const sources = Array.from({ length: count }, (_, index) => ({
+      // 第 19 项沿用有效编号，确保测到的是列表长度限制。
+      number: Math.min(index + 1, 18), chunkId: `chunk-${index}`,
+      documentId: "doc", originalName: "资料", page: 1, content: "原文",
+    }));
+    expect(knowledgeSourcesPartSchema.safeParse({
+      id: "sources", type: "knowledge-sources", sources,
+    }).success).toBe(count <= 18);
+    expect(generationEventSchema.safeParse({
+      generationId: "generation_123", partId: "sources", type: "knowledge.sources", sources,
+    }).success).toBe(count <= 18);
+  });
+
   it.each([
     { type: "generation.started", generationId: "generation_123" },
     {

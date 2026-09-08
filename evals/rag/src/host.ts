@@ -1,6 +1,6 @@
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, openSync, closeSync, unlinkSync } from "node:fs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseEnv } from "node:util";
@@ -9,16 +9,15 @@ import IORedis from "ioredis";
 import { evaluationDatabaseUrl } from "../../retrieval/src/support";
 import { Budget } from "./budget";
 import { startMeter } from "./meter";
+import { root, repo, codeRoot, datasetRoot, comparisonRoot, variant } from "./paths";
 
-const repo = fileURLToPath(new URL("../../../", import.meta.url));
-const root = join(repo, "evals/rag/artifacts/cmrc2018");
 const children: ChildProcess[] = [];
 const logHandles: number[] = [];
 const webUrl = "http://localhost:3301";
 
 async function main() {
   if (!existsSync(join(root, "manifest.json"))) throw new Error("PREPARE_DATA_FIRST");
-  const lockPath = join(root, "host.lock");
+  const lockPath = join(datasetRoot, "host.lock");
   const lock = openSync(lockPath, "wx");
   const business = { ...parseEnv(readFileSync(join(repo, "apps/web/.env.local"), "utf8")), ...process.env };
   const dbUrl = new URL(business.DATABASE_URL!);
@@ -41,8 +40,11 @@ async function main() {
       await admin.client.unsafe('CREATE DATABASE "ai_chat_eval_cmrc2018"');
   } finally { await admin.close(); }
   await migrateDatabase({ databaseUrl: dbUrl.toString(), migrationsFolder: join(repo, "packages/db/drizzle") });
-  const budget = new Budget(join(root, "usage.jsonl"));
-  const meter = await startMeter(budget, business);
+  const budget = new Budget(join(variant ? comparisonRoot : root, "usage.jsonl"), variant ? 10 : 20);
+  const meter = await startMeter(budget, business, variant ? {
+    subscriptionLog: join(root, "subscription-usage.jsonl"),
+    allowKnowledgeTool: variant === "agentic" || variant === "agentic-fixed",
+  } : undefined);
   const secretPath = join(root, "auth-secret.txt");
   const authSecret = existsSync(secretPath) ? readFileSync(secretPath, "utf8") : randomUUID() + randomUUID();
   if (!existsSync(secretPath)) writeFileSync(secretPath, authSecret);
@@ -76,9 +78,9 @@ async function main() {
   }
   process.on("SIGINT", () => void shutdown());
   process.on("SIGTERM", () => void shutdown());
-  start("web", [join(repo, "apps/web/node_modules/next/dist/bin/next"), "dev", "--port", "3301"], join(repo, "apps/web"));
-  start("worker", ["--import", pathToFileURL(join(repo, "node_modules/tsx/dist/loader.mjs")).href, "--use-env-proxy", join(repo, "apps/worker/src/index.ts")], repo);
-  writeFileSync(join(root, "runtime.json"), JSON.stringify({ webUrl, meterUrl: meter.url, meterToken: meter.token, pid: process.pid, database: dbUrl.pathname, redisDatabase: 14, outputTokenCap: 8192 }, null, 2));
-  console.log("RAG eval host: localhost:3301; isolated DB / Redis 14; cumulative budget <= CNY 20");
+  start("web", [join(codeRoot, "apps/web/node_modules/next/dist/bin/next"), "dev", "--port", "3301"], join(codeRoot, "apps/web"));
+  start("worker", ["--import", pathToFileURL(join(codeRoot, "node_modules/tsx/dist/loader.mjs")).href, "--use-env-proxy", join(codeRoot, "apps/worker/src/index.ts")], codeRoot);
+  writeFileSync(join(root, "runtime.json"), JSON.stringify({ webUrl, meterUrl: meter.url, meterToken: meter.token, pid: process.pid, database: dbUrl.pathname, redisDatabase: 14, outputTokenCap: 8192, variant, codeRoot }, null, 2));
+  console.log(`RAG eval host: localhost:3301; isolated DB / Redis 14; ${variant ?? "legacy"}; CNY limit ${budget.limit}`);
 }
 main().catch(() => { console.error("EVAL_HOST_START_FAILED"); process.exitCode = 1; });
