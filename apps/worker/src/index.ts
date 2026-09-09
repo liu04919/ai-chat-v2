@@ -11,11 +11,11 @@ import { createR2ObjectStorage } from "@ai-chat/storage";
 
 import { createBullMqGenerationWorker } from "./generation/bullmq-generation-worker";
 import { executeGeneration } from "./generation/execute-generation";
-import { createCatApiChatModel } from "./llm/cat-api-chat-model";
+import { createOpenAIResponsesChatModel } from "./llm/openai-responses-chat-model";
 import { createHistorySummarizer } from "./context/history-summarizer";
 import { createChatContextPreparer } from "./context/prepare-chat-context";
 import { createAttachmentTokenCounter } from "./context/attachment-token-counts";
-import { createCatApiImageModel } from "./llm/cat-api-image-model";
+import { createOpenAIImageModel } from "./llm/openai-image-model";
 import type { ImageModel } from "./llm/image-model";
 import { createGenerationToolResolver } from "./tools";
 import { createKnowledgeWorker } from "./knowledge/queue";
@@ -50,7 +50,7 @@ const chatConfig = {
   apiKey: requireEnvironment("LLM_API_KEY"),
   modelId: requireEnvironment("LLM_MODEL"),
 };
-const chatModel = createCatApiChatModel(chatConfig);
+const chatModel = createOpenAIResponsesChatModel(chatConfig);
 const prepareContext = createChatContextPreparer({
   summarizer: createHistorySummarizer(chatConfig),
   countAttachments: createAttachmentTokenCounter({
@@ -66,7 +66,7 @@ const toolResolver = createGenerationToolResolver({
 // 图片渠道使用独立凭证；尚未配置时只让图片任务明确失败，不影响 Chat。
 const imageModel: ImageModel = {
   generate(request) {
-    return createCatApiImageModel({
+    return createOpenAIImageModel({
       baseUrl: requireEnvironment("IMAGE_BASE_URL"),
       apiKey: requireEnvironment("IMAGE_API_KEY"),
       modelId: requireEnvironment("IMAGE_MODEL"),

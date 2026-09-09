@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createCatApiImageModel } from "./cat-api-image-model";
+import { createOpenAIImageModel } from "./openai-image-model";
 
 const pngBase64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=";
@@ -10,10 +10,10 @@ function imageResponse(): Response {
   return Response.json({ data: [{ b64_json: pngBase64 }] });
 }
 
-describe("CatAPI Image Adapter", () => {
+describe("OpenAI Images Image Adapter", () => {
   it("无参考图时调用文生图端点，并返回解码后的图片", async () => {
     let capturedRequest: Request | undefined;
-    const model = createCatApiImageModel({
+    const model = createOpenAIImageModel({
       baseUrl: "https://maomiapi.com/v1/",
       apiKey: "test-api-key",
       modelId: "gpt-image-2",
@@ -42,7 +42,7 @@ describe("CatAPI Image Adapter", () => {
 
   it("有一张参考图时调用 multipart 编辑端点", async () => {
     let capturedRequest: Request | undefined;
-    const model = createCatApiImageModel({
+    const model = createOpenAIImageModel({
       baseUrl: "https://maomiapi.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-image-2",
@@ -77,9 +77,9 @@ describe("CatAPI Image Adapter", () => {
     );
   });
 
-  it("把 CatAPI 的错误响应交给上层处理", async () => {
+  it("把 OpenAI Images 的错误响应交给上层处理", async () => {
     let requestCount = 0;
-    const model = createCatApiImageModel({
+    const model = createOpenAIImageModel({
       baseUrl: "https://maomiapi.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-image-2",

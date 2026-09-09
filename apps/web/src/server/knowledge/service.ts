@@ -7,6 +7,7 @@ import {
 } from "@ai-chat/contracts";
 import { createKnowledgeRepository } from "@ai-chat/db";
 import type { ObjectStorage } from "@ai-chat/storage";
+import { KnowledgeServiceError } from "./errors";
 
 type Repository = ReturnType<typeof createKnowledgeRepository>;
 export type KnowledgeServiceDependencies = {
@@ -94,13 +95,13 @@ export async function completeKnowledgeUpload(
 
   // 不信任前端的“上传成功”；以 R2 中实际对象的元信息为准。
   const object = await storage.headObject(document.objectKey);
-  if (!object) throw new Error("KNOWLEDGE_UPLOAD_NOT_FOUND");
+  if (!object) throw new KnowledgeServiceError("KNOWLEDGE_UPLOAD_NOT_FOUND");
   if (
     object.sizeBytes !== document.sizeBytes ||
     object.contentType?.split(";")[0]?.trim().toLowerCase() !==
       document.mediaType
   )
-    throw new Error("KNOWLEDGE_METADATA_MISMATCH");
+    throw new KnowledgeServiceError("KNOWLEDGE_METADATA_MISMATCH");
 
   const confirmed = await repository.confirmUpload(ownerId, baseId, documentId);
   if (!confirmed) {
@@ -112,7 +113,7 @@ export async function completeKnowledgeUpload(
     await dependencies.enqueue(documentId);
   } catch {
     await repository.fail(documentId, "ENQUEUE_FAILED", "pending");
-    throw new Error("KNOWLEDGE_UPLOAD_FAILED");
+    throw new KnowledgeServiceError("KNOWLEDGE_UPLOAD_FAILED");
   }
   return toKnowledgeDocument(confirmed);
 }
@@ -128,11 +129,11 @@ export async function deleteKnowledgeDocument(
     baseId,
     documentId,
   );
-  if (!document) throw new Error("KNOWLEDGE_NOT_FOUND");
+  if (!document) throw new KnowledgeServiceError("KNOWLEDGE_NOT_FOUND");
   try {
     await dependencies.storage.deleteObject(document.objectKey);
   } catch {
-    throw new Error("KNOWLEDGE_OBJECT_DELETE_FAILED");
+    throw new KnowledgeServiceError("KNOWLEDGE_OBJECT_DELETE_FAILED");
   }
   return { documentId };
 }

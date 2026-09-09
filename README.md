@@ -14,6 +14,7 @@ packages/db         Drizzle schema、PostgreSQL 查询与事务、迁移
 packages/storage    Web/Worker 共享的薄 R2 对象存储边界
 packages/event-store Web/Worker 共享的 Redis GenerationEvent 日志边界
 packages/mcp        Web/Worker 共享的服务端 MCP Registry、Client 与工具目录
+packages/model-context 数据库/Worker 共用的模型历史投影与 token 计数
 ```
 
 `packages/db/src` 按业务职责组织：`conversations/` 管会话、分享和摘要读写，`generations/` 管生成任务的数据库事务，`knowledge/` 管知识库持久化与检索 SQL。配套测试与实现放在一起；表定义仍集中在 `schema/`，对外入口保持 `@ai-chat/db` 和 `@ai-chat/db/schema`。
@@ -21,6 +22,8 @@ packages/mcp        Web/Worker 共享的服务端 MCP Registry、Client 与工�
 `apps/web/src/server` 是 Web 侧的业务编排：`conversations/` 管会话读取、修改和分享，`generations/` 管创建、重新生成、取消、入队及 SSE，`knowledge/` 管知识库文件流程、HTTP 错误和入库队列。附件和 MCP 目前各保留为 `attachments.ts`、`mcp-tools.ts`；`object-storage.ts` 初始化附件、分享和知识库共用的 R2 客户端。测试与实现放在一起，调用方直接引用具体文件，不设统一转发入口。这里组织数据库、队列和对象存储的调用，SQL 与事务仍由 `packages/db` 负责。
 
 `apps/web/src/lib` 按运行职责组织：`client/` 放浏览器请求、响应校验和客户端缓存辅助函数，`auth/` 放浏览器认证客户端、登录后跳转和跨标签页账户同步；依赖数据库和请求头的认证实例、会话读取放在 `server/auth/`。`conversation-title.ts` 是前后端共用的标题函数，`utils.ts` 保留 UI 使用的 `cn()`；两者保持单文件。认证的客户端与服务端分别引用具体文件，不设混合导出入口。
+
+知识库 HTTP 错误按显式类型和 `code` 映射，不比较异常文案：数据库的 `KnowledgeNotFoundError` 只表达资源不存在或不可访问，Web 的 `KnowledgeServiceError` 表达上传、确认与清理等业务失败；HTTP 状态映射集中在 `server/knowledge/http.ts`，浏览器仍只收到既有错误码。
 
 ## 本地运行
 
@@ -77,7 +80,7 @@ pnpm db:migrate
 
 无匹配返回 `no_matches`，不推断整库为空；检索故障返回去敏的工具错误，模型可在剩余次数内重查或说明限制；不存在静默切回普通聊天的后备分支。停止信号传给模型、Embedding 和 Rerank，停止后不追加新引用。证据不足的说明与引用正确性目前仍依赖模型遵守指令，尚未做答案支持度验证，不能据此声称一定不幻觉。
 
-阅读入口：`generation/execute-chat-generation.ts` 管生命周期、统一消费工具输出 → `tools/generation-tool-resolver.ts` 根据本轮选择及服务端上下文统一装配 Web Search、MCP 和知识库工具，提供附加指令、可用工具列表和引用读取出口 → `tools/knowledge-search-tool.ts` 管 query、次数和引用编号 → `knowledge/chat-knowledge-retriever.ts` 适配共用检索服务。`llm/cat-api-chat-model.ts` 调用 SDK Agent 并转换流事件。传统版评测结果只适用于该 Git 基线，不能当作 Agentic 成绩。
+阅读入口：`generation/execute-chat-generation.ts` 管生命周期、统一消费工具输出 → `tools/generation-tool-resolver.ts` 根据本轮选择及服务端上下文统一装配 Web Search、MCP 和知识库工具，提供附加指令、可用工具列表和引用读取出口 → `tools/knowledge-search-tool.ts` 管 query、次数和引用编号 → `knowledge/chat-knowledge-retriever.ts` 适配共用检索服务。`llm/openai-responses-chat-model.ts` 调用 SDK Agent 并转换流事件。传统版评测结果只适用于该 Git 基线，不能当作 Agentic 成绩。
 
 ### 本地验证知识库
 
@@ -171,7 +174,7 @@ Chat 在 Worker 内处理长历史，沿用 `LLM_MODEL` 配置的 Sol / Response
 
 登录、注册和退出成功后刷新整个文档，并用不含账户资料的随机标记通知其他标签页。受保护页面收到通知后先卸载消息和引用弹窗、断开 SSE、清空查询缓存与流式投影，再重新校验登录状态。重新聚焦、恢复网络时也向服务端核验账户，后退缓存恢复时重建文档；同账户聚焦不清理草稿。公开分享页不受此账户边界影响。
 
-Sidebar 支持按用户置顶和删除会话。置顶会话独立成组，并按最近置顶时间排列；置顶操作不会改变会话的消息活跃时间。删除会话会级联清理 PostgreSQL 中的消息与 Generation，通知仍在运行的 Worker 停止，并清理消息引用的 R2 附件对象。
+Sidebar 支持按用户置顶和删除会话。置顶会话独立成组，并按最近置顶时间排列；置顶操作不会改变会话的消息活跃时间。删除会话会级联清理 PostgreSQL 中的消息与 Generation，通知仍在运行的 Worker 停止，并清理消息引用的 R2 附件对象。外部清理（包括客户端初始化）失败只记录服务端日志，不把已经提交的删除报成失败，也不阻断其他清理项。
 
 会话菜单支持创建和停止公开分享。创建时把当前已持久化的可见消息、附件元数据与标题写入独立的 `conversation_shares` 不可变快照；已有分享再次创建会返回原链接，不会随之后的聊天或重命名变化。存在 Active Generation 时拒绝创建。`/share/:token` 由 Server Component 直接查询并渲染，不依赖 Redis、BullMQ、SSE 或登录态；分享附件仍保存在私有 R2，由公开附件路由在校验 token 与快照引用后代理读取。停止分享会删除快照，使页面和附件入口失效。
 
@@ -188,6 +191,8 @@ pnpm test:r2
 ```
 
 `pnpm check` 依次执行 ESLint、TypeScript、单元测试、Docker PostgreSQL/Redis 集成测试和 Next.js production build。图片执行测试使用假模型和内存对象存储，不产生模型调用费用。`pnpm test:r2` 使用本地 R2 配置执行会自动清理测试对象的外部集成测试，不包含在默认检查中。
+
+`apps/worker/src/llm/openai-responses-chat-model.integration.test.ts` 是单独的真实聊天渠道冒烟测试，只有显式设置 `LLM_LIVE_TEST=1` 才会调用配置的模型，不包含在默认检查中。Chat/Image Adapter 以协议命名，换兼容渠道只改相应服务端配置，不保留旧供应商别名。
 
 ## 图标来源
 

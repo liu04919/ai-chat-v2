@@ -75,4 +75,4 @@ export {
 } from "./tool-preferences";
 export * from "./schema/index";
 export { saveConversationSummary, type ConversationSummaryRecord, type SaveConversationSummaryInput } from "./conversations/summary";
-export { createKnowledgeRepository, validateKnowledgeVector, type KnowledgeHit } from "./knowledge/repository";
+export { createKnowledgeRepository, KnowledgeNotFoundError, validateKnowledgeVector, type KnowledgeHit } from "./knowledge/repository";

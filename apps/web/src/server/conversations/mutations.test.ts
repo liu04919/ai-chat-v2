@@ -2,7 +2,10 @@ import {
   deleteConversationRecordForOwner,
   setConversationPinnedForOwner,
 } from "@ai-chat/db";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { getObjectStorage } from "../object-storage";
+import { getGenerationCancellationInfrastructure } from "../generations/cancellation-infrastructure";
 
 import {
   ConversationMutationError,
@@ -25,8 +28,10 @@ const deleteRecord = vi.mocked(deleteConversationRecordForOwner);
 const setPinned = vi.mocked(setConversationPinnedForOwner);
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+  vi.spyOn(console, "error").mockImplementation(() => {});
 });
+afterEach(() => vi.restoreAllMocks());
 
 describe("Conversation mutation services", () => {
   it("返回置顶后的安全 Conversation DTO", async () => {
@@ -71,6 +76,68 @@ describe("Conversation mutation services", () => {
     expect(publish).toHaveBeenCalledOnce();
     expect(publish).toHaveBeenCalledWith("running");
     expect(deleteObject).toHaveBeenCalledTimes(2);
+  });
+
+  it("R2 初始化失败不改变已删除结果，也不妨碍通知 Worker", async () => {
+    const failure = new Error("R2 configuration missing");
+    vi.mocked(getObjectStorage).mockImplementation(() => { throw failure; });
+    const publish = vi.fn(async () => undefined);
+    deleteRecord.mockResolvedValue({
+      conversationId: "c1",
+      activeGenerations: [{ id: "running", status: "running" }],
+      attachmentObjectKeys: ["attachments/a"],
+    });
+
+    await expect(deleteConversationForOwner("owner", "c1", {
+      cancellationPublisher: { publish },
+    })).resolves.toEqual({ conversationId: "c1" });
+    expect(publish).toHaveBeenCalledWith("running");
+    expect(console.error).toHaveBeenCalledWith("删除 Conversation 后清理外部资源失败", failure);
+  });
+
+  it("取消通知初始化失败仍清理附件并返回删除成功", async () => {
+    const failure = new Error("Redis configuration missing");
+    vi.mocked(getGenerationCancellationInfrastructure).mockImplementation(() => { throw failure; });
+    const deleteObject = vi.fn(async () => undefined);
+    deleteRecord.mockResolvedValue({
+      conversationId: "c1",
+      activeGenerations: [{ id: "running", status: "running" }],
+      attachmentObjectKeys: ["attachments/a", "attachments/b"],
+    });
+
+    await expect(deleteConversationForOwner("owner", "c1", {
+      storage: { deleteObject },
+    })).resolves.toEqual({ conversationId: "c1" });
+    expect(deleteObject).toHaveBeenCalledTimes(2);
+    expect(console.error).toHaveBeenCalledWith("删除 Conversation 后清理外部资源失败", failure);
+  });
+
+  it("清理的同步异常和异步失败都被隔离，其余对象继续清理", async () => {
+    const publish = vi.fn().mockRejectedValue(new Error("publish failed"));
+    const deleteObject = vi.fn((key: string) => {
+      if (key === "attachments/a") throw new Error("synchronous cleanup failure");
+      return Promise.resolve();
+    });
+    deleteRecord.mockResolvedValue({
+      conversationId: "c1",
+      activeGenerations: [{ id: "running", status: "running" }],
+      attachmentObjectKeys: ["attachments/a", "attachments/b"],
+    });
+
+    await expect(deleteConversationForOwner("owner", "c1", {
+      cancellationPublisher: { publish }, storage: { deleteObject },
+    })).resolves.toEqual({ conversationId: "c1" });
+    expect(deleteObject).toHaveBeenCalledWith("attachments/b");
+    expect(console.error).toHaveBeenCalledTimes(2);
+  });
+
+  it("没有运行任务或附件时不初始化清理依赖", async () => {
+    deleteRecord.mockResolvedValue({
+      conversationId: "c1", activeGenerations: [], attachmentObjectKeys: [],
+    });
+    await expect(deleteConversationForOwner("owner", "c1")).resolves.toEqual({ conversationId: "c1" });
+    expect(getObjectStorage).not.toHaveBeenCalled();
+    expect(getGenerationCancellationInfrastructure).not.toHaveBeenCalled();
   });
 
   it("不存在或不属于当前用户时统一表现为 404", async () => {

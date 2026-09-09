@@ -5,11 +5,15 @@ import { getObjectStorage } from "@/server/object-storage";
 import { deleteKnowledgeBase, deleteKnowledgeDocument } from "@/server/knowledge/service";
 import { DELETE as deleteBase } from "./route";
 import { DELETE as deleteDocument } from "./documents/[documentId]/route";
+import { KnowledgeServiceError } from "../../../../server/knowledge/errors";
 
 vi.mock("@/server/auth/session", () => ({ getCurrentSession: vi.fn() }));
 // Vitest 不解析 Next 的路径别名；这里仍复用真实的鉴权和错误映射。
 vi.mock("@/server/knowledge/http", () => import("../../../../server/knowledge/http"));
-vi.mock("@ai-chat/db", () => ({ createKnowledgeRepository: vi.fn(() => ({})) }));
+vi.mock("@ai-chat/db", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@ai-chat/db")>(),
+  createKnowledgeRepository: vi.fn(() => ({})),
+}));
 vi.mock("@/server/object-storage", () => ({ getObjectStorage: vi.fn(() => ({})) }));
 vi.mock("@/server/knowledge/service", () => ({ deleteKnowledgeBase: vi.fn(), deleteKnowledgeDocument: vi.fn() }));
 
@@ -57,7 +61,7 @@ describe("知识库删除 API 协议", () => {
   });
 
   it("对象清理失败保留原来的 503 和错误码", async () => {
-    removeDocument.mockRejectedValue(new Error("KNOWLEDGE_OBJECT_DELETE_FAILED"));
+    removeDocument.mockRejectedValue(new KnowledgeServiceError("KNOWLEDGE_OBJECT_DELETE_FAILED"));
     const response = await deleteDocument(request(), context);
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ code: "KNOWLEDGE_OBJECT_DELETE_FAILED" });

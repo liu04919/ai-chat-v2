@@ -15,7 +15,7 @@ import {
   countRequestOverhead,
 } from "../context/token-budget";
 
-export type CatApiChatModelConfig = {
+export type OpenAIResponsesChatModelConfig = {
   baseUrl: string;
   apiKey: string;
   modelId: string;
@@ -28,8 +28,8 @@ function toError(error: unknown, fallbackMessage: string): Error {
     : new Error(fallbackMessage, { cause: error });
 }
 
-export function createCatApiChatModel(
-  config: CatApiChatModelConfig,
+export function createOpenAIResponsesChatModel(
+  config: OpenAIResponsesChatModelConfig,
 ): ChatModel {
   const provider = createOpenAI({
     apiKey: config.apiKey,
@@ -137,9 +137,9 @@ export function createCatApiChatModel(
             yield { type: "finish", reason: part.finishReason };
             break;
           case "error":
-            throw toError(part.error, "CatAPI 流式响应失败");
+            throw toError(part.error, "OpenAI Responses 流式响应失败");
           case "abort":
-            throw new Error(part.reason ?? "CatAPI 流式响应已取消");
+            throw new Error(part.reason ?? "OpenAI Responses 流式响应已取消");
           default:
             break;
         }

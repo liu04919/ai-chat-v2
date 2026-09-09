@@ -16,6 +16,16 @@ import {
   knowledgeDocuments,
 } from "../schema/knowledge";
 
+/** 数据层只表达资源不可访问，不依赖 Web 的 HTTP 状态码。 */
+export class KnowledgeNotFoundError extends Error {
+  readonly code = "KNOWLEDGE_NOT_FOUND";
+
+  constructor() {
+    super("KNOWLEDGE_NOT_FOUND");
+    this.name = "KnowledgeNotFoundError";
+  }
+}
+
 export function validateKnowledgeVector(vector: number[]) {
   if (
     vector.length !== KNOWLEDGE_DIMENSIONS ||
@@ -41,7 +51,7 @@ export function createKnowledgeRepository(db = getDatabase()) {
       .where(
         and(eq(knowledgeBases.id, baseId), eq(knowledgeBases.ownerId, ownerId)),
       );
-    if (!base) throw new Error("KNOWLEDGE_NOT_FOUND");
+    if (!base) throw new KnowledgeNotFoundError();
     return base;
   }
   return {
@@ -75,7 +85,7 @@ export function createKnowledgeRepository(db = getDatabase()) {
             ),
           )
           .for("update");
-        if (!base) throw new Error("KNOWLEDGE_NOT_FOUND");
+        if (!base) throw new KnowledgeNotFoundError();
         const documents = await tx
           .delete(knowledgeDocuments)
           .where(eq(knowledgeDocuments.knowledgeBaseId, baseId))
@@ -132,7 +142,7 @@ export function createKnowledgeRepository(db = getDatabase()) {
             eq(knowledgeDocuments.knowledgeBaseId, baseId),
           ),
         );
-      if (!document) throw new Error("KNOWLEDGE_NOT_FOUND");
+      if (!document) throw new KnowledgeNotFoundError();
       return document;
     },
     async confirmUpload(ownerId: string, baseId: string, documentId: string) {
@@ -221,7 +231,11 @@ export function createKnowledgeRepository(db = getDatabase()) {
         return true;
       });
     },
-    async deleteDocument(ownerId: string, baseId: string, documentId: string) {
+    async deleteDocument(
+      ownerId: string,
+      baseId: string,
+      documentId: string,
+    ): Promise<typeof knowledgeDocuments.$inferSelect | undefined> {
       await requireOwner(ownerId, baseId);
       const [document] = await db
         .delete(knowledgeDocuments)

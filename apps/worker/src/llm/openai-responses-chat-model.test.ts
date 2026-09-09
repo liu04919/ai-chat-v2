@@ -3,7 +3,7 @@ import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ChatModelMessage, ChatModelStreamPart } from "./chat-model";
-import { createCatApiChatModel } from "./cat-api-chat-model";
+import { createOpenAIResponsesChatModel } from "./openai-responses-chat-model";
 import { createKnowledgeSearchTool } from "../tools/knowledge-search-tool";
 
 function sseEvent(value: unknown): string {
@@ -197,10 +197,10 @@ function createFinalAnswerStream(): string {
   ].join("");
 }
 
-describe("CatAPI Chat Adapter", () => {
+describe("OpenAI Responses Chat Adapter", () => {
   it("历史摘要放在原始消息前，作为背景而非高优先级指令", async () => {
     const requests: Request[] = [];
-    const model = createCatApiChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
+    const model = createOpenAIResponsesChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
       fetch: async (input, init) => { requests.push(new Request(input, init));
         return new Response(createFinalAnswerStream(), { headers: { "content-type": "text/event-stream" } }); },
     });
@@ -217,7 +217,7 @@ describe("CatAPI Chat Adapter", () => {
 
   it("本轮工具结果超预算时不发起下一次模型请求，也不偷偷截断工具结果", async () => {
     const requests: Request[] = [];
-    const model = createCatApiChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
+    const model = createOpenAIResponsesChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
       fetch: async (input, init) => { requests.push(new Request(input, init));
         return new Response(createToolCallStream(), { headers: { "content-type": "text/event-stream" } }); },
     });
@@ -234,7 +234,7 @@ describe("CatAPI Chat Adapter", () => {
   });
   it("发送本轮 RAG 指令，但不将旧引用原文重复发送给模型", async () => {
     const requests: Request[] = [];
-    const model = createCatApiChatModel({
+    const model = createOpenAIResponsesChatModel({
       baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model",
       fetch: async (input, init) => {
         requests.push(new Request(input, init));
@@ -268,7 +268,7 @@ describe("CatAPI Chat Adapter", () => {
     const requests: Request[] = [];
     const retrieve = vi.fn(async ({ query }: { query: string }) => [{ number: 1, chunkId: query, documentId: "d", originalName: "资料", page: 1, content: `evidence ${query}` }]);
     const search = createKnowledgeSearchTool({ ownerId: "o", baseId: "b", signal: new AbortController().signal, retrieve });
-    const model = createCatApiChatModel({
+    const model = createOpenAIResponsesChatModel({
       baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
       fetch: async (input, init) => {
         requests.push(new Request(input, init));
@@ -295,7 +295,7 @@ describe("CatAPI Chat Adapter", () => {
   it("第八个模型步骤禁用工具，保留最后一次回答机会", async () => {
     const requests: Request[] = [];
     const execute = vi.fn(async () => ({ ok: true }));
-    const model = createCatApiChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
+    const model = createOpenAIResponsesChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
       fetch: async (input, init) => {
         requests.push(new Request(input, init));
         const n = requests.length;
@@ -328,7 +328,7 @@ describe("CatAPI Chat Adapter", () => {
     const original = structuredClone(history);
     const requests: Request[] = [];
     const execute = vi.fn();
-    const model = createCatApiChatModel({
+    const model = createOpenAIResponsesChatModel({
       baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model",
       fetch: async (input, init) => {
         requests.push(new Request(input, init));
@@ -365,7 +365,7 @@ describe("CatAPI Chat Adapter", () => {
 
   it("工具执行中停止，只有 Tool Call 的历史也能继续下一轮", async () => {
     const controller = new AbortController();
-    const model = createCatApiChatModel({
+    const model = createOpenAIResponsesChatModel({
       baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model",
       fetch: async () => new Response(createToolCallStream(), { headers: { "content-type": "text/event-stream" } }),
     });
@@ -392,7 +392,7 @@ describe("CatAPI Chat Adapter", () => {
     }
     expect(history.parts).toHaveLength(1);
     const fetch = vi.fn(async () => new Response(createFinalAnswerStream(), { headers: { "content-type": "text/event-stream" } }));
-    const next = createCatApiChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model", fetch });
+    const next = createOpenAIResponsesChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model", fetch });
     const parts: ChatModelStreamPart[] = [];
     for await (const part of next.stream({
       messages: [history, { role: "user", parts: [{ type: "text", text: "继续" }] }], reasoningEffort: "low",
@@ -403,7 +403,7 @@ describe("CatAPI Chat Adapter", () => {
 
   it("使用 Responses API，并把 SDK stream part 映射为内部协议", async () => {
     let capturedRequest: Request | undefined;
-    const model = createCatApiChatModel({
+    const model = createOpenAIResponsesChatModel({
       baseUrl: "https://maomiapi.com/v1/",
       apiKey: "test-api-key",
       modelId: "gpt-5.6-sol",
@@ -514,7 +514,7 @@ describe("CatAPI Chat Adapter", () => {
   });
 
   it("把 SDK stream error 抛给 Worker 编排层", async () => {
-    const model = createCatApiChatModel({
+    const model = createOpenAIResponsesChatModel({
       baseUrl: "https://maomiapi.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-5.6-sol",
@@ -551,7 +551,7 @@ describe("CatAPI Chat Adapter", () => {
       query,
       results: [{ title: "Redis", url: "https://redis.io/" }],
     }));
-    const model = createCatApiChatModel({
+    const model = createOpenAIResponsesChatModel({
       baseUrl: "https://maomiapi.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-5.6-sol",
@@ -632,7 +632,7 @@ describe("CatAPI Chat Adapter", () => {
 
   it("下一轮会把已落库的 Tool Call 与 Tool Result 重建进上下文", async () => {
     let capturedRequest: Request | undefined;
-    const model = createCatApiChatModel({
+    const model = createOpenAIResponsesChatModel({
       baseUrl: "https://maomiapi.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-5.6-sol",

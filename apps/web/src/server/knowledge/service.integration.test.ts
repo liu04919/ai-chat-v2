@@ -6,6 +6,7 @@ import {
   closeApplicationDatabase,
   createDatabase,
   createKnowledgeRepository,
+  KnowledgeNotFoundError,
   createGenerationCommandRecord,
   createRegenerationCommandRecord,
   createConversationShareRecordForOwner,
@@ -34,6 +35,7 @@ import {
   type KnowledgeServiceDependencies,
 } from "./service";
 import { getConversationForOwner } from "../conversations/reader";
+import { KnowledgeServiceError } from "./errors";
 
 const databaseUrl = loadIntegrationTestEnvironment();
 process.env.DATABASE_URL = databaseUrl;
@@ -750,8 +752,8 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
     expect(
       (await repository.listBases(ownerId)).some((b) => b.id === foreign.id),
     ).toBe(false);
-    await expect(repository.listDocuments(ownerId, foreign.id)).rejects.toThrow(
-      "KNOWLEDGE_NOT_FOUND",
+    await expect(repository.listDocuments(ownerId, foreign.id)).rejects.toBeInstanceOf(
+      KnowledgeNotFoundError,
     );
     await expect(
       uploadKnowledgeDocument(
@@ -760,7 +762,7 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
         new File(["x"], "x.txt"),
         dependencies,
       ),
-    ).rejects.toThrow("KNOWLEDGE_NOT_FOUND");
+    ).rejects.toBeInstanceOf(KnowledgeNotFoundError);
     const bad = command(foreign.id);
     expect((await createGenerationCommandRecord(bad, database.db)).kind).toBe(
       "knowledge_not_found",
@@ -800,7 +802,9 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
           throw new Error("redis unavailable");
         },
       }),
-    ).rejects.toThrow("KNOWLEDGE_UPLOAD_FAILED");
+    ).rejects.toEqual(expect.objectContaining<Partial<KnowledgeServiceError>>({
+      name: "KnowledgeServiceError", code: "KNOWLEDGE_UPLOAD_FAILED",
+    }));
     const docs = await repository.listDocuments(ownerId, base.id);
     expect(docs).toHaveLength(1);
     expect(docs[0]?.status).toBe("failed");

@@ -98,9 +98,9 @@ Web 与 Worker 位于同一 workspace，但拥有独立运行生命周期。是�
 
 Message 是永久业务记录，不使用 AI SDK 的 `UIMessage` 作为领域类型。
 
-Message 按角色约束 Parts：User Message 只允许 `text | attachment`；Assistant Message 使用有序 Parts，允许 `reasoning | text | attachment | tool-call | tool-result`。数组顺序就是唯一内容顺序，必须保留 `reasoning → tool-call → tool-result → reasoning → text` 等交替结构；不得把所有 reasoning 和 text 分别聚合后再拼接。Assistant Part 使用稳定 `id`，Tool call/result 通过 `toolCallId` 关联。PostgreSQL 中的服务端 Assistant Parts 保留完整 Tool `input/output` 以重建模型上下文；面向浏览器的 Message DTO 是显式安全投影，不包含这两个字段。
+Message 按角色约束 Parts：User Message 只允许 `text | attachment`；Assistant Message 使用有序 Parts，允许 `reasoning | text | attachment | tool-call | tool-result | knowledge-sources`。持久化数组保留 `reasoning → tool-call → tool-result → reasoning → text` 等原始交替顺序，不为了界面布局改写记录。Assistant Part 使用稳定 `id`，Tool call/result 通过 `toolCallId` 关联。PostgreSQL 中的服务端 Assistant Parts 保留完整 Tool `input/output`；面向浏览器的 Message DTO 是显式安全投影，不包含这两个字段。浏览器可将思考与工具过程归入回答顶部的同一折叠区域，这是展示投影，不是存储顺序。
 
-用户能够看见并引用的 Assistant 内容必须进入后续 Context Builder。系统只回放持久化的可见历史：reasoning 与最终 text 都作为普通 Assistant 历史文本投影给模型，不保存或依赖 Provider 私有推理状态。
+浏览器可见历史不等于模型输入。`packages/model-context` 统一负责历史投影与 token 计数：保留普通回答，跳过 reasoning 展示、旧知识库引用原文以及成对的 `search_knowledge` 调用/结果；其他工具保留调用/结果，缺失结果时补充“结果未知”，不自动重试。系统不保存或依赖 Provider 私有推理状态。原始持久化 Parts 不因投影或摘要而修改，仍供网页、分享与历史分页展示。
 
 Message 与 Attachment 的关系唯一记录在 `Message.parts` 中；第一版不增加 `message_attachment` 关系表，也不把 MessagePart 拆成 `image | file`。具体类型由 Attachment 元数据决定。
 
@@ -160,12 +160,13 @@ text.delta       # 携带 partId
 reasoning.delta  # 携带 partId；上游实际提供时才有
 tool.call         # 携带 partId、toolCallId 与 toolName
 tool.result       # 携带 partId、toolCallId 与 isError
+knowledge.sources # 服务端裁剪并累计的本轮引用快照
 generation.completed
 generation.failed
 generation.cancelled
 ```
 
-Tool 事件只向浏览器表达已经实际发生的调用、完成或失败状态，顺序与 Assistant Message Parts 一致；原始 Tool `input/output` 不进入 Redis GenerationEvent 或 SSE。若以后展示引用或结果卡片，必须新增经过裁剪的展示 DTO，不能直接复用模型读取的原始结果。来源引用尚无真实调用方，当前不增加 `source.added`。
+Tool 事件只向浏览器表达已经实际发生的调用、完成或失败状态，顺序与 Assistant Message Parts 一致；原始 Tool `input/output` 不进入 Redis GenerationEvent 或 SSE。知识库引用通过单独的 `knowledge.sources` 展示 DTO 发送，包含编号、来源位置与原文片段，不包含向量、内部评分、对象 key 或签名 URL；不能直接复用模型读取的原始工具结果。多次检索更新同一份累计引用快照，不增加第二套来源事件协议。
 
 Redis Stream 和 SSE 传输同一个 GenerationEvent，不再定义第二套 SSE 业务协议。Redis Stream ID 默认直接作为 SSE `id` 和恢复 cursor；只有出现明确需求并经开发者确认后才能增加映射层。
 
@@ -241,7 +242,7 @@ AI SDK 的 finish/error 只是 Worker 内部执行结果，不能直接等同公
 
 ### AI SDK
 
-AI SDK Core 只存在于 LLM Execution 边界，用于模型协议适配、streaming、tool calling 和多步 tool loop。禁止让 AI SDK UI 类型、`useChat`、`UIMessageStream` 或 SDK stream protocol 成为系统的领域模型和应用协议。
+AI SDK 的模型调用与工具循环位于 Worker 执行边界，用于模型协议适配、streaming、tool calling 和多步 tool loop。`packages/model-context` 可使用 SDK 的 `ModelMessage` 类型定义内部投影，供数据库预计算与 Worker 共用，但不执行模型调用。禁止让 AI SDK UI 类型、`useChat`、`UIMessageStream` 或 SDK stream protocol 成为系统的领域模型和应用协议。
 
 ```text
 AI SDK stream
@@ -251,37 +252,26 @@ AI SDK stream
 
 Adapter 必须小而明确，并有 contract tests。实现 AI SDK 功能时先核对项目实际安装版本的 bundled docs 和 source，不凭模型记忆使用 API。
 
-当前模型配置：
+模型接入按协议命名，不绑定某一家中转供应商：
 
-| 配置              | 当前值                         |
-| ----------------- | ------------------------------ |
-| Chat Model        | GPT-5.6 Sol                    |
-| Provider          | CatAPI OpenAI-compatible relay |
-| Base URL          | `https://maomiapi.com/v1`      |
-| Provider model ID | `gpt-5.6-sol`                  |
-| Image Model       | GPT Image 2                    |
-| Image model ID    | `gpt-image-2`                  |
+| 管线 | Adapter | 服务端配置 |
+| --- | --- | --- |
+| Chat | `openai-responses-chat-model.ts` | `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` |
+| Image | `openai-image-model.ts` | `IMAGE_BASE_URL`、`IMAGE_API_KEY`、`IMAGE_MODEL` |
+
+本地 Chat 使用 Codex Proxy，模型为 `gpt-5.6-sol`；Image 使用独立渠道。实际启动配置见 README 与各 runtime 的 `.env.example`。协议兼容不代表所有渠道能力相同，换渠道后仍需验证流式、工具、文件等实际能力；本地开发地址不能直接当作部署地址。
 
 密钥只通过服务端环境变量注入，不写入仓库、浏览器 bundle、日志或文档。
 
-### CatAPI 已验证能力与约束
+### 模型协议与上下文约束
 
-当前正式聊天链路只使用 CatAPI 的 `/v1/responses`，不同时维护 Chat Completions 与 Responses 两套业务实现。实际接口验证已经确认：
+正式 Chat 链路只使用 OpenAI Responses 兼容协议，不同时维护 Chat Completions 与 Responses 两套业务实现。Adapter 使用 SDK 的 `ToolLoopAgent` 管理多步调用，向应用层转换文本、思考、工具与终态事件，不手写通用 Agent engine。
 
-- `input_image + R2 presigned URL` 可以让 `gpt-5.6-sol` 正确读取图片内容
-- `input_file + PDF R2 presigned URL` 可以正确读取多页 PDF
-- Responses 的文件输入可以使用流式输出
-- 补充兼容性验证已覆盖 Chat Completions 的 base64/URL 图片与 base64 PDF，以及 Responses 的文本、base64/URL 图片和 PDF；这些只作为网关能力证据，不作为正式 Adapter 路线
+Provider 按无状态服务使用：每次 Generation 都从本地持久化记录组装摘要和保留的原始历史，并为仍需使用的 Attachment 签发短期 URL。请求设置 `store: false`，不依赖 `previous_response_id`、供应商保存的 Conversation 或私有推理状态；公开 reasoning 只用于展示，不进入下一轮模型历史或摘要。
 
-CatAPI 的 `previous_response_id` 已分别使用纯文本和文件上下文验证，均不能可靠延续上一轮内容。因此 Provider 必须按无状态服务使用：每次 Generation 都由 Context Builder 重新组装需要的历史消息，并把仍需使用的 Attachment 重新转换为短期 presigned URL 后发送。不得依赖 CatAPI 保存 Conversation、文件上下文或执行状态。
+第三方 file ID 不能成为 Attachment 主键或资产事实来源。聊天附件继续使用模型原生图片/PDF 输入，不因上游失败静默切换成自研文本解析 fallback。PDF 解析用于知识入库和本地 token 估算，不能把估算用途误认为向模型注入了解析全文。
 
-系统不保存或重放 Provider 私有推理状态。CatAPI 返回给用户的可见 reasoning 与最终 text 都按原顺序持久化为 Assistant Message Parts，并在后续 Generation 中作为普通 Assistant 历史文本重新发送；用户可见历史就是模型可见历史。
-
-第三方返回的 file ID 即使以后使用，也只能作为可丢弃缓存，不能成为 Attachment 主键或资产事实来源。当前不建设 PDF Parser、`attachment_content`、chunk 或 embedding fallback；未经过实际验证的文件类型应明确拒绝，不能静默切换到自研解析链路。
-
-CatAPI 的 `gpt-image-2` 已分别验证 `/v1/images/generations` 文生图和 `/v1/images/edits` 单参考图编辑，两条链路均返回可正确解码的 `b64_json` PNG，指令遵循和参考图保真满足当前产品需求。图片 Worker 必须把返回的 base64 解码并写入自有 R2，再以 ready Attachment 进入消息历史；不得持久化 base64 或依赖第三方临时资产。
-
-该渠道当前不能完整遵守图片尺寸参数：请求 `1024x1024` 时实际两次返回 `1536x1024`。在重新验证前，产品不向用户暴露尺寸、比例和质量选择器，也不假设返回尺寸等于请求尺寸。Image API 是非流式完成模型，前端通过自有 Generation 状态展示处理中与最终结果。
+Image Adapter 使用 `/images/generations` 文生图和 `/images/edits` 单参考图编辑。Worker 把生成字节写入自有 R2，再以 ready Attachment 进入消息历史；不得持久化 base64 或依赖第三方临时资产。产品不暴露尺寸、比例和质量选择器，也不假设所有兼容渠道都遵守相同图片参数。Image API 非流式，前端通过自有 Generation 状态展示处理中与最终结果。
 
 ### Tool 与 MCP
 
@@ -289,9 +279,9 @@ LLM Tools 必须能由 Worker 独立执行。当前不支持浏览器执行 Tool
 
 Tool Registry 负责本地 Tool、联网搜索与 Model Context Protocol（MCP）工具的统一暴露；协议编排优先使用 AI SDK 已有能力，不自研通用 Tool Calling engine。
 
-Tool 的原始输入与结果属于服务端模型上下文：AI SDK 多步循环把结果交回模型，Worker 在终态持久化完整 Tool Parts，后续 Context Builder 再从 PostgreSQL 重建。浏览器只接收 Tool 生命周期投影，不接收原始参数和返回值。
+Tool 的原始输入与结果属于服务端模型上下文：AI SDK 在当前多步循环中把结果交回模型，Worker 在终态持久化完整 Tool Parts。后续 Generation 使用共享历史投影重建上下文，其中旧知识库调用/结果会成对排除，避免关库或换库后继续注入旧原文。浏览器只接收 Tool 生命周期与经过裁剪的引用投影，不接收原始参数和返回值。
 
-Generation 持久化本次 Tool 选择：`webSearch` 表示是否注入本地 `web_search`，`mcpToolIds` 保存选中的稳定 MCP 工具 ID。Worker 根据选择解析可执行 ToolSet；启用了 Tavily 或 MCP 工具却缺少相应服务端配置时必须明确失败，不能静默忽略用户选择。
+Generation 持久化本次 Tool 选择：`webSearch` 表示是否注入本地 `web_search`，`mcpToolIds` 保存选中的稳定 MCP 工具 ID，`knowledgeBaseId` 决定是否注册 `search_knowledge`。Worker 使用同一个 Tool Resolver 装配 ToolSet；选择了工具却缺少相应服务端配置时必须明确失败，不能静默忽略用户选择。选库是授权本轮使用该库，不代表发送前强制执行检索。
 
 网站只连接独立部署的远程 Streamable HTTP MCP Server，不在 Web/Worker 中通过 `command`、`npx` 或 stdio 为用户启动本地子进程。MCP Server 保留来源命名空间，工具目录使用稳定的 `serverId.toolName` 标识；连接 URL、Bearer Token 与第三方 AK 只存在于服务端配置，不进入浏览器、Message 或 Generation 数据。
 
@@ -303,17 +293,17 @@ MCP 目录是 Sidebar 下的独立工具页，不塞进 Composer 的狭窄弹窗
 
 ### Retrieval 与知识入库
 
-Chat 上层只依赖 Retrieval abstraction。Pinecone 是可替换的基础设施 Adapter，不得把其类型、filter DSL 或 SDK 对象泄漏到 Chat、Generation 和 Tool 主链。
+检索采用单 PostgreSQL：`pgvector` 提供向量召回，`pg_textsearch + zhparser` 提供中文 BM25，两路共用同一套 chunk，RRF 融合后 Rerank。SQL 位于 `packages/db`，Worker 的检索服务负责 embedding、融合与精排；Chat 主流程通过知识库工具使用它，不直接处理 SQL 或检索分数。
 
-系统主动检索和模型自主 Knowledge Search Tool 是两种触发方式，可以共享 Retrieval 服务，但不能混为一个隐式流程。
+业务只保留 Agentic RAG。模型通过 `search_knowledge` 决定是否检索、改写 query 或补充检索，工具闭包绑定服务端 owner 与知识库，模型不能指定其他账户或知识库。传统固定预检索与直接注入上下文的编排保存在 Git 基线中，不在业务代码中保留模式开关或旧链路兜底。
 
-文档解析、切块、embedding 和向量写入属于独立 Knowledge Ingestion job，不在聊天请求中顺手执行。
+文档解析、切块、embedding 和向量写入属于独立 Knowledge Ingestion job，不在聊天请求中顺手执行。知识库独立于会话，使用知识库、文档和 chunk 三层记录，原文件保存在私有 R2。上传同样走浏览器 presigned PUT 直传，由服务端核验对象后入队。删除文档或知识库阻止后续检索，已有回答和分享中的引用快照保留。检索参数、消融与问答评测在隔离评测数据库中验证，评测代码不进入业务数据库包。
 
 ### Attachment 与 Context Builder
 
 Generation 只依赖 attachment ID。文件存储、模型原生 file ID、转文本和图片输入策略由 Attachment/File 边界决定，不泄漏 provider-specific 结构。
 
-用户上传的图片和文件，以及需要永久保留的模型生成图片，统一抽象为 Attachment。所有二进制内容存入私有 Cloudflare R2 Bucket；PostgreSQL 只保存对象 key、原始文件名、MIME、大小、所有者、上传状态和业务关联，不保存二进制、base64、永久签名 URL 或完整文件文本。
+聊天上传的图片和文件，以及需要永久保留的模型生成图片，统一抽象为 Attachment。二进制内容存入私有 Cloudflare R2 Bucket；PostgreSQL 的 Attachment 只保存对象 key、文件元数据、归属、状态、业务关联与派生 token 计数，不保存二进制、base64、签名 URL 或文件全文。知识库使用独立文档记录，其 chunk 正文与向量按检索需要保存在 PostgreSQL，不混入聊天 Attachment。
 
 当前只实现一个薄的对象存储边界、一个真实 R2 实现和测试所需 Fake；不提前创建 Aliyun、S3、R2、Local 或 MinIO 等多套实现，也不建设通用 ProviderCapabilities 框架。
 
@@ -330,11 +320,15 @@ Browser 请求上传意图
 
 只有归属当前用户且状态为 `ready` 的 Attachment 才能进入 Message。R2 Bucket 保持私有；读取文件时由服务端完成 ownership 校验，并按调用方需要生成短期 presigned GET URL。数据库和消息历史始终保存稳定的 attachment ID/object key，不保存临时 URL。
 
-Context Builder 通过 Attachment 边界解析文件。当前已验证的 CatAPI Responses 路线可以从 R2 presigned URL 原生读取图片和 PDF，因此聊天主链优先传递原文件，不重复建设一套文档解析真相；其他格式只有经过真实接口验证后才开放。模型供应商返回的临时图片若需进入历史，必须先下载到自有 R2，再创建 ready Attachment。
+Context Builder 通过 Attachment 边界处理文件：先完成实际内容计数与历史保留范围选择，再为保留的图片/PDF 签发短期 URL，使用 Responses 原生文件输入。其他聊天附件格式只有经过实际验证后才开放。需要进入历史的模型图片必须先保存到自有 R2，再创建 ready Attachment。
 
 浏览器直传所需 R2 CORS 只允许实际 Web origin 和必要的 `PUT`/`Content-Type`；不开放公共 Bucket。当前不提前建设分片上传、病毒扫描、多云存储、失败对账或自动清理系统。
 
-Context Builder 在每次 Generation 中统一组合 Summary、近期 Messages、Retrieval 结果和 Attachments。Summary 必须记录 coverage watermark，例如 `throughSequence`，避免重复或遗漏上下文。Token Budget 属于当前模型运行配置，不使用全局固定常量假设所有模型。
+Context Builder 在每次 Generation 中组合 Summary、近期 Messages 和 Attachments；工具定义先参与计数，检索结果在模型调用工具后由 SDK 交回，不做固定预检索。Token Budget 集中在 Worker 的 `context/token-budget.ts`，是当前 Sol 渠道的工程预算，不是服务商最大窗口或所有模型的通用容量。
+
+历史摘要记录版本与覆盖到的消息 ID/sequence，只覆盖较早的完整 user 轮次，不改写原消息，至少保留最近一个历史轮次与当前问题。摘要属于低可信度派生背景，不提升为系统指令。消息定稿时预计算文本/协议 token，附件按实际内容估算并保存版本与 ETag；数据库和 Worker 共用 `packages/model-context` 的投影与计数规则。常规请求读取派生计数，规则变化时刷新，当前工具循环只对新增输出补算。
+
+摘要模型调用在数据库事务外运行，使用主模型相同配置但独立请求，不执行工具。8k 是可见摘要软目标，压缩后总输入目标为触发量的 30%；具体预算与有限重试规则见 README。完整草稿允许轻微超长，精简失败可使用已有完整草稿，但最终仍须满足总输入安全预算。用户取消不重试，半成品不保存，不增加质量评测或无上限重试流程。
 
 ## 8. 前端状态与流式性能
 
@@ -366,11 +360,11 @@ Regenerate 只针对最后一条 Assistant Message，并创建新的 Generation�
 
 取消请求先写入 PostgreSQL，再通过 Redis Pub/Sub 唤醒 Worker；PostgreSQL 标记负责可靠判定，Pub/Sub 只负责快速中断。`queued` Generation 可由 API 直接置为 `cancelled`；`running` Generation 在 Worker 完成 partial 落库前仍保持 active，避免下一条用户消息越过尚未提交的上下文。
 
-Worker 收到请求后用 `AbortSignal` 停止模型流，把内存中按原顺序聚合的可见 parts 与 `cancelled` 状态在同一 PostgreSQL transaction 中提交；reasoning-only partial 合法，没有可见 part 时不创建空 Assistant Message。durable transaction 成功后才能发布 `generation.cancelled`。后续 Context Builder 把该 partial 当作普通 Assistant 历史重新发送。
+Worker 收到请求后用 `AbortSignal` 停止模型流，把内存中按原顺序聚合的可见 parts 与 `cancelled` 状态在同一 PostgreSQL transaction 中提交；reasoning-only partial 合法，没有可见 part 时不创建空 Assistant Message。durable transaction 成功后才能发布 `generation.cancelled`。后续 Context Builder 对 partial 使用同一套历史投影：不回放 reasoning，其他工具缺少结果时明确标为未知，不假定成功、不自动重做。
 
 ### Delete Conversation
 
-删除采用 Owner 鉴权后的硬删除：PostgreSQL 在同一事务中删除 Conversation、级联 Message/Generation/ConversationShare，并删除当前消息或分享快照引用的 Attachment 记录。事务同时返回正在运行的 Generation 与 R2 object key；提交后通知 Worker 中止模型流，并尽力清理对应 R2 对象。即使外部通知或对象清理失败，已删除的 Conversation 也不能被 Worker 重新写回。
+删除采用 Owner 鉴权后的硬删除：PostgreSQL 在同一事务中删除 Conversation、级联 Message/Generation/ConversationShare/Summary，并删除当前消息或分享快照引用的 Attachment 记录。事务同时返回正在运行的 Generation 与 R2 object key；提交后通知 Worker 中止模型流，并尽力清理对应 R2 对象。清理客户端初始化、同步调用与异步请求都在失败隔离范围内；清理失败记录在服务端，不把已提交的删除伪装为失败，也不妨碍其他清理项。已删除的 Conversation 不能被 Worker 重新写回。
 
 ### Pin Conversation
 
@@ -389,13 +383,13 @@ Conversation 使用可空 `pinnedAt` 表达置顶状态和置顶先后顺序。�
 
 ### 多 Tab
 
-数据库的单 Active Generation 约束是最终仲裁。其他 Tab 通过 Chat Detail 获取当前 Generation 并订阅同一 SSE 链路，不另建浏览器间一致性协议。
+数据库的单 Active Generation 约束是最终仲裁。其他 Tab 通过 Chat Detail 获取当前 Generation 并订阅同一 SSE 链路，不另建浏览器间生成状态同步协议。账户切换单独处理：登录/退出广播不含账户资料的失效标记，其他标签页先卸载受保护页面、关闭 SSE、清空缓存和流式状态，再重新校验会话；不能继续展示或操作旧账户消息与引用弹窗。
 
 ### Image
 
 Chat 与 Image 共享账户、Conversation 外壳和基础设施，但拥有独立业务管线。图片生成不得作为 Chat Worker 中不断扩张的条件分支。
 
-Image 管线使用 CatAPI `gpt-image-2`：无参考图调用 `/v1/images/generations`，一张参考图调用 multipart `/v1/images/edits`。第一版只允许一张参考图片，不接受 PDF 作为 Image 模式输入。
+Image 管线通过独立配置的 OpenAI Images 兼容服务调用 `gpt-image-2`：无参考图调用 `/images/generations`，一张参考图调用 multipart `/images/edits`。只允许一张参考图片，不接受 PDF 作为 Image 模式输入。
 
 Chat/Image 各自构建上下文。Image Context Builder 将本轮之前的有序可见文字与本轮指令组成 prompt；本轮上传图优先，否则延续最近一张 Assistant 生成图，不默认携带所有历史图片。参考图从自有 R2 读取，不依赖供应商保存上下文。
 
@@ -463,30 +457,25 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 12. 同一 Conversation 最多一个 Active Generation
 13. 新草稿由客户端生成稳定的 `conversationId` 与 `userMessageId`，前者支撑乐观进入会话，后者执行最小幂等与明确冲突语义
 14. terminal event 必须晚于 PostgreSQL durable state
-15. AI SDK 只位于 LLM 执行防腐层
+15. AI SDK 模型调用位于 Worker 执行边界；内部 ModelMessage 投影与计数可共享，不替代自有 wire contract
 16. Worker 执行 Tool，当前不做浏览器 Tool 和 Human-in-the-loop
-17. Retrieval 隔离 Pinecone，Knowledge Ingestion 独立运行
+17. PostgreSQL 混合检索与精排复用同一套 chunk；Knowledge Ingestion 独立运行，业务仅保留工具驱动的 Agentic RAG
 18. 服务端 coalescing 与客户端按帧渲染同时保留
-19. Regenerate 成功后才替换旧回答
+19. Regenerate 命令成立时删除旧回答，生成失败也不恢复旧回答
 20. Share 使用独立不可变快照
 21. Chat 与 Image 使用独立业务管线
 22. 同源 HttpOnly Session Cookie 是主认证边界
 23. 当前不建设基础设施故障自动恢复系统
 24. 使用本文确认的 UI、表单、状态、数据、Markdown 与容器技术栈，但版本和局部配置按实际代码决定
 25. 图片与文件统一使用 Attachment；二进制存入私有 Cloudflare R2，PostgreSQL 与 Message 只保存稳定引用和元数据
-26. CatAPI 按无状态 Provider 使用；每次 Generation 重组上下文并重新签名所需 Attachment，不依赖 `previous_response_id` 或第三方 file ID
+26. 模型服务按无状态 Provider 使用；每次 Generation 重组上下文并重新签名所需 Attachment，不依赖 `previous_response_id` 或第三方 file ID
 
 ## 14. 尚未拍板的问题
 
 这些问题在真实代码需要它们时讨论，不预先排期：
 
-1. ORM/DB layer
-2. delta coalescing 的时间与大小阈值
-3. BullMQ concurrency
-4. Chunk Strategy、召回参数与评测集；RAG 已选 PostgreSQL（pgvector + pg_textsearch + zhparser），两路共用同一套 chunk，RRF 融合后 Rerank。先做固定检索，再用同一评测集比较 Agentic RAG。
-5. Tool input/output 的脱敏、截断与前端展示细节
-6. reasoning 的最终视觉展示形态
-7. 最终部署拓扑
+1. 最终部署拓扑与部署环境的服务配置
+2. 新数据或真实负载下是否需要继续调整检索参数、coalescing 阈值与 Worker 并发；当前已有默认实现，不再视为未完成架构
 
 ## 15. 协作规则
 

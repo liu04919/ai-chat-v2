@@ -3,7 +3,7 @@ import {
   type OpenAILanguageModelResponsesOptions,
 } from "@ai-sdk/openai";
 import { APICallError, StreamProviderError, streamText } from "ai";
-import type { CatApiChatModelConfig } from "../llm/cat-api-chat-model";
+import type { OpenAIResponsesChatModelConfig } from "../llm/openai-responses-chat-model";
 import { CHAT_CONTEXT_POLICY, countTextTokens } from "./token-budget";
 
 export const SUMMARY_PROMPT_VERSION = 2;
@@ -50,7 +50,7 @@ function canRetry(error: unknown): boolean {
 }
 
 export function createHistorySummarizer(
-  config: CatApiChatModelConfig,
+  config: OpenAIResponsesChatModelConfig,
 ): HistorySummarizer {
   const provider = createOpenAI({
     apiKey: config.apiKey,

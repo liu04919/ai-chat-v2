@@ -6,15 +6,15 @@ import { generateImage } from "ai";
 
 import type { ImageModel } from "./image-model";
 
-export type CatApiImageModelConfig = {
+export type OpenAIImageModelConfig = {
   baseUrl: string;
   apiKey: string;
   modelId: string;
   fetch?: OpenAIProviderSettings["fetch"];
 };
 
-export function createCatApiImageModel(
-  config: CatApiImageModelConfig,
+export function createOpenAIImageModel(
+  config: OpenAIImageModelConfig,
 ): ImageModel {
   const provider = createOpenAI({
     apiKey: config.apiKey,

@@ -59,20 +59,18 @@ export async function deleteConversationForOwner(
   const runningGenerationIds = deleted.activeGenerations.flatMap(
     (generation) => generation.status === "running" ? [generation.id] : [],
   );
-  const cancellationPublisher = runningGenerationIds.length > 0
-    ? dependencies.cancellationPublisher ??
-      getGenerationCancellationInfrastructure().cancellationPublisher
-    : null;
-  const storage = deleted.attachmentObjectKeys.length > 0
-    ? dependencies.storage ?? getObjectStorage()
-    : null;
+  // 初始化也放在异步清理任务内：配置缺失、同步抛错和网络失败都不能改变已提交的删除结果。
+  // 每项独立执行，一个依赖失败不妨碍通知 Worker 或清理其余对象。
   const cleanupResults = await Promise.allSettled([
-    ...runningGenerationIds.map((generationId) =>
-      cancellationPublisher!.publish(generationId),
-    ),
-    ...deleted.attachmentObjectKeys.map((objectKey) =>
-      storage!.deleteObject(objectKey),
-    ),
+    ...runningGenerationIds.map(async (generationId) => {
+      const publisher = dependencies.cancellationPublisher ??
+        getGenerationCancellationInfrastructure().cancellationPublisher;
+      await publisher.publish(generationId);
+    }),
+    ...deleted.attachmentObjectKeys.map(async (objectKey) => {
+      const storage = dependencies.storage ?? getObjectStorage();
+      await storage.deleteObject(objectKey);
+    }),
   ]);
 
   for (const result of cleanupResults) {
