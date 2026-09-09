@@ -18,6 +18,7 @@ import { ingestKnowledge } from "../../../worker/src/knowledge/ingest";
 import { retrieveKnowledge } from "../../../worker/src/knowledge/retrieve";
 import type { ChatKnowledgeRetriever } from "../../../worker/src/knowledge/chat-knowledge-retriever";
 import { createGenerationToolResolver } from "../../../worker/src/tools/generation-tool-resolver";
+import { createChatContextPreparer } from "../../../worker/src/context/prepare-chat-context";
 import { createMcpServerRegistry } from "@ai-chat/mcp";
 import {
   executeGeneration,
@@ -199,6 +200,9 @@ function execution(knowledgeRetriever: ChatKnowledgeRetriever = retrieve) {
   const events: GenerationEventDto[] = [];
   let notifyCancel = () => {};
   const deps: ExecuteGenerationDependencies = {
+    prepareContext: createChatContextPreparer({ summarizer: {
+      modelId: "fake", summarize: async () => { throw new Error("短 RAG 测试不应调用摘要模型"); },
+    } }),
     toolResolver: createGenerationToolResolver({
       registry: createMcpServerRegistry([]),
       knowledgeRetriever,

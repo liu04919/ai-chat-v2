@@ -1,5 +1,6 @@
 import {
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -59,6 +60,16 @@ describe("R2 object storage", () => {
       ContentLength: 3,
     });
     expect(options).toEqual({ abortSignal: signal });
+  });
+
+  it("HEAD 读取 ETag，GET 用 If-Match 约束为同一对象版本", async () => {
+    const send = vi.spyOn(S3Client.prototype, "send").mockImplementation(async () => ({ ETag: '"v1"', ContentLength: 100, ContentType: "image/png", Body: { transformToByteArray: async () => new Uint8Array([1]) } }));
+    const signal = new AbortController().signal;
+    expect(await storage.headObject("a.png", signal)).toEqual({ etag: '"v1"', sizeBytes: 100, contentType: "image/png" });
+    expect(send.mock.calls[0]![0]).toBeInstanceOf(HeadObjectCommand);
+    expect(send.mock.calls[0]![1]).toEqual({ abortSignal: signal });
+    await storage.readObject("a.png", signal, '"v1"');
+    expect(send.mock.calls[1]![0].input).toMatchObject({ IfMatch: '"v1"', Key: "a.png" });
   });
 
   it("读取缺少响应体及网络异常时明确失败", async () => {

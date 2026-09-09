@@ -12,6 +12,9 @@ import { createR2ObjectStorage } from "@ai-chat/storage";
 import { createBullMqGenerationWorker } from "./generation/bullmq-generation-worker";
 import { executeGeneration } from "./generation/execute-generation";
 import { createCatApiChatModel } from "./llm/cat-api-chat-model";
+import { createHistorySummarizer } from "./context/history-summarizer";
+import { createChatContextPreparer } from "./context/prepare-chat-context";
+import { createAttachmentTokenCounter } from "./context/attachment-token-counts";
 import { createCatApiImageModel } from "./llm/cat-api-image-model";
 import type { ImageModel } from "./llm/image-model";
 import { createGenerationToolResolver } from "./tools";
@@ -42,10 +45,18 @@ const objectStorage = createR2ObjectStorage({
   accessKeyId: requireEnvironment("R2_ACCESS_KEY_ID"),
   secretAccessKey: requireEnvironment("R2_SECRET_ACCESS_KEY"),
 });
-const chatModel = createCatApiChatModel({
+const chatConfig = {
   baseUrl: requireEnvironment("LLM_BASE_URL"),
   apiKey: requireEnvironment("LLM_API_KEY"),
   modelId: requireEnvironment("LLM_MODEL"),
+};
+const chatModel = createCatApiChatModel(chatConfig);
+const prepareContext = createChatContextPreparer({
+  summarizer: createHistorySummarizer(chatConfig),
+  countAttachments: createAttachmentTokenCounter({
+    storage: objectStorage,
+    modelId: chatConfig.modelId,
+  }),
 });
 const toolResolver = createGenerationToolResolver({
   registry: createConfiguredMcpServerRegistry(process.env),
@@ -67,6 +78,7 @@ const worker = createBullMqGenerationWorker({
   processGeneration: (generationId) =>
     executeGeneration(generationId, {
       chatModel,
+      prepareContext,
       imageModel,
       cancellationSubscriber,
       eventWriter,

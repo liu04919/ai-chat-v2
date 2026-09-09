@@ -14,12 +14,14 @@
     "@ai-chat/db": "workspace:*",
     "@ai-chat/event-store": "workspace:*",
     "@ai-chat/mcp": "workspace:*",
+    "@ai-chat/model-context": "workspace:*",
     "@ai-chat/storage": "workspace:*",
     "@ai-sdk/openai": "^4.0.50",
     "@langchain/textsplitters": "1.0.1",
     "ai": "^7.0.83",
     "bullmq": "^6.3.1",
     "ioredis": "^6.0.0",
+    "image-size": "2.0.2",
     "pdf-parse": "2.4.5",
     "zod": "4.4.3"
   }

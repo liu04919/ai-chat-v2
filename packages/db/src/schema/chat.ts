@@ -5,6 +5,7 @@ import type {
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
 import { sql } from "drizzle-orm";
+import type { MessageTokenCount } from "@ai-chat/model-context";
 import {
   boolean,
   check,
@@ -74,6 +75,8 @@ export const messages = pgTable(
       .$type<UserMessagePartsDto | AssistantMessagePartsDto>()
       .notNull(),
     sequence: integer("sequence").notNull(),
+    // 派生缓存，不进入浏览器 DTO；图片生成消息不参与聊天历史预算。
+    contextTokenCount: jsonb("context_token_count").$type<MessageTokenCount>(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),

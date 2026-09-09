@@ -198,6 +198,40 @@ function createFinalAnswerStream(): string {
 }
 
 describe("CatAPI Chat Adapter", () => {
+  it("历史摘要放在原始消息前，作为背景而非高优先级指令", async () => {
+    const requests: Request[] = [];
+    const model = createCatApiChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
+      fetch: async (input, init) => { requests.push(new Request(input, init));
+        return new Response(createFinalAnswerStream(), { headers: { "content-type": "text/event-stream" } }); },
+    });
+    for await (const part of model.stream({ historySummary: "历史里明确要求保留原消息", instructions: "本轮系统规则", reasoningEffort: "low",
+      messages: [{ role: "user", parts: [{ type: "text", text: "现在的问题" }] }],
+    })) void part;
+    const body = await requests[0]!.json() as { input: Array<{ role?: string }>; max_output_tokens: number };
+    const summaryIndex = body.input.findIndex((message: unknown) => JSON.stringify(message).includes("历史里明确要求"));
+    const questionIndex = body.input.findIndex((message: unknown) => JSON.stringify(message).includes("现在的问题"));
+    expect(body.input[summaryIndex].role).toBe("user");
+    expect(summaryIndex).toBeLessThan(questionIndex);
+    expect(body.max_output_tokens).toBe(16000);
+  });
+
+  it("本轮工具结果超预算时不发起下一次模型请求，也不偷偷截断工具结果", async () => {
+    const requests: Request[] = [];
+    const model = createCatApiChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",
+      fetch: async (input, init) => { requests.push(new Request(input, init));
+        return new Response(createToolCallStream(), { headers: { "content-type": "text/event-stream" } }); },
+    });
+    const output = "tool evidence ".repeat(125000);
+    const execute = vi.fn(async () => ({ output }));
+    const run = async () => {
+      for await (const part of model.stream({ reasoningEffort: "low", messages: [{ role: "user", parts: [{ type: "text", text: "搜索" }] }],
+        tools: { web_search: tool({ inputSchema: z.object({ query: z.string() }), execute }) },
+      })) void part;
+    };
+    await expect(run()).rejects.toThrow("CHAT_CONTEXT_TOO_LARGE");
+    expect(requests).toHaveLength(1);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
   it("发送本轮 RAG 指令，但不将旧引用原文重复发送给模型", async () => {
     const requests: Request[] = [];
     const model = createCatApiChatModel({
@@ -323,7 +357,7 @@ describe("CatAPI Chat Adapter", () => {
         .toMatchObject({ code: "TOOL_RESULT_UNAVAILABLE" });
     }
     expect(JSON.stringify(body.input)).toContain("已经生成的部分回答");
-    expect(JSON.stringify(body.input)).toContain("正在查询");
+    expect(JSON.stringify(body.input)).not.toContain("正在查询");
     expect(parts).toContainEqual({ type: "text", partId: "message_final", delta: "查询完成。" });
     expect(execute).not.toHaveBeenCalled();
     expect(history).toEqual(original);
@@ -384,6 +418,8 @@ describe("CatAPI Chat Adapter", () => {
     const parts: ChatModelStreamPart[] = [];
 
     for await (const part of model.stream({
+      // 生产链路由 Context Preparer 提供包含附件的计数。
+      contextInputTokens: 5000,
       messages: [
         {
           role: "user",
@@ -462,15 +498,6 @@ describe("CatAPI Chat Adapter", () => {
           {
             type: "input_file",
             file_url: "https://files.example/report.pdf?signature=pdf",
-          },
-        ],
-      },
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "output_text",
-            text: "[上一轮展示给用户的思考摘要]\n先检查附件类型",
           },
         ],
       },

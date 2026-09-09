@@ -3,6 +3,7 @@ import type {
   GenerationStatusDto,
 } from "@ai-chat/contracts";
 import { assistantMessagePartsSchema } from "@ai-chat/contracts";
+import { countStoredMessage } from "@ai-chat/model-context";
 import { and, eq, max } from "drizzle-orm";
 
 import { getDatabase } from "./client";
@@ -157,6 +158,10 @@ export async function cancelGenerationExecution(
   if (input.assistantMessageId) {
     assertNonEmpty(input.assistantMessageId, "assistantMessageId");
   }
+  // 使用最终保存的部分输出投影计数，未完成工具会按“结果未知”配对。
+  const contextTokenCount = assistantParts.length && !assistantParts.some(part => part.type === "attachment")
+    ? countStoredMessage({ role: "assistant", parts: assistantParts })
+    : null;
 
   return database.transaction(async (transaction) => {
     if (!await lockGenerationConversation(transaction, input.generationId)) return false;
@@ -195,6 +200,7 @@ export async function cancelGenerationExecution(
         conversationId: generation.conversationId,
         role: "assistant",
         parts: assistantParts,
+        contextTokenCount,
         sequence: nextSequence,
         createdAt: input.now,
       });

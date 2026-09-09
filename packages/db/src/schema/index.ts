@@ -18,3 +18,4 @@ export {
 export { conversationShares } from "./conversation-share";
 export { userToolPreferences } from "./tool-preference";
 export * from "./knowledge";
+export { conversationSummaries } from "./conversation-summary";

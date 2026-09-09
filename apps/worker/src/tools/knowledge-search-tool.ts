@@ -5,7 +5,7 @@ import {
   type KnowledgeSourceDto,
 } from "@ai-chat/contracts";
 import type { ChatKnowledgeRetriever } from "../knowledge/chat-knowledge-retriever";
-import { KNOWLEDGE_SEARCH_TOOL_NAME } from "./tool-names";
+import { KNOWLEDGE_SEARCH_TOOL_NAME } from "@ai-chat/model-context";
 
 // 三次是当前成本/上下文保护上限，不是评测得到的最优次数。
 export const MAX_KNOWLEDGE_SEARCHES = 3;

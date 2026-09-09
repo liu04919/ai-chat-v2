@@ -6,6 +6,7 @@ import type {
   UserMessagePartsDto,
 } from "@ai-chat/contracts";
 import { userMessagePartsSchema } from "@ai-chat/contracts";
+import { countStoredMessage } from "@ai-chat/model-context";
 import {
   and,
   asc,
@@ -208,6 +209,8 @@ export async function createGenerationCommandRecord(
     return resolveExistingCommand(existing, input);
   }
 
+  const contextTokenCount = countStoredMessage({ role: "user", parts: input.parts });
+
   try {
     return await database.transaction(async (transaction) => {
       let conversation: {
@@ -376,6 +379,7 @@ export async function createGenerationCommandRecord(
         conversationId: conversation.id,
         role: "user",
         parts: input.parts,
+        contextTokenCount,
         sequence: nextSequence,
         createdAt: input.now,
       });

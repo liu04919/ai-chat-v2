@@ -3,19 +3,17 @@ import {
   type OpenAILanguageModelResponsesOptions,
   type OpenAIProviderSettings,
 } from "@ai-sdk/openai";
-import type { AssistantMessagePartDto } from "@ai-chat/contracts";
-import {
-  isStepCount,
-  ToolLoopAgent,
-  type ModelMessage,
-} from "ai";
+import { isStepCount, ToolLoopAgent } from "ai";
 
-import type {
-  ChatModel,
-  ChatModelMessage,
-  ChatModelStreamPart,
-} from "./chat-model";
-import { KNOWLEDGE_SEARCH_TOOL_NAME, toRuntimeHistoryToolName } from "../tools/tool-names";
+import type { ChatModel, ChatModelStreamPart } from "./chat-model";
+import { toModelMessages } from "@ai-chat/model-context";
+import { summaryMessage } from "../context/history-projection";
+import {
+  assertInputBudget,
+  CHAT_CONTEXT_POLICY,
+  countModelMessages,
+  countRequestOverhead,
+} from "../context/token-budget";
 
 export type CatApiChatModelConfig = {
   baseUrl: string;
@@ -23,153 +21,6 @@ export type CatApiChatModelConfig = {
   modelId: string;
   fetch?: OpenAIProviderSettings["fetch"];
 };
-
-function reasoningHistoryLabel(text: string): string {
-  return `[上一轮展示给用户的思考摘要]\n${text}`;
-}
-
-function assistantHistoryLabel(text: string): string {
-  return `[上一轮助手输出]\n${text}`;
-}
-
-type AssistantContentPart = Extract<
-  Extract<ModelMessage, { role: "assistant" }>["content"],
-  readonly unknown[]
->[number];
-
-function toToolResultOutput(
-  output: Extract<
-    AssistantMessagePartDto,
-    { type: "tool-result" }
-  >["output"],
-  isError: boolean,
-) {
-  return isError
-    ? ({ type: "error-json", value: output } as const)
-    : ({ type: "json", value: output } as const);
-}
-
-function toAssistantModelMessages(
-  message: Extract<ChatModelMessage, { role: "assistant" }>,
-): ModelMessage[] {
-  const messages: ModelMessage[] = [];
-  let content: AssistantContentPart[] = [];
-  const toolNames = new Map<string, string>();
-  const pendingToolCalls = new Map<string, string>();
-  const knowledgeCalls = new Set(message.parts.flatMap((p) =>
-    p.type === "tool-call" && p.toolName === KNOWLEDGE_SEARCH_TOOL_NAME ? [p.toolCallId] : [],
-  ));
-
-  function flushAssistant(): void {
-    if (content.length === 0) {
-      return;
-    }
-
-    messages.push({ role: "assistant", content });
-    content = [];
-  }
-
-  for (const part of message.parts) {
-    switch (part.type) {
-      case "knowledge-sources":
-        // 历史不重复注入原文；本轮需要资料时由工具重新检索。
-        break;
-      case "reasoning":
-        content.push({ type: "text", text: reasoningHistoryLabel(part.text) });
-        break;
-      case "text":
-        content.push({ type: "text", text: assistantHistoryLabel(part.text) });
-        break;
-      case "attachment":
-        throw new Error("Chat Model 暂不支持 Assistant Attachment 历史");
-      case "tool-call":
-        if (knowledgeCalls.has(part.toolCallId)) break;
-        toolNames.set(
-          part.toolCallId,
-          toRuntimeHistoryToolName(part.toolName),
-        );
-        pendingToolCalls.set(part.toolCallId, toRuntimeHistoryToolName(part.toolName));
-        content.push({
-          type: "tool-call",
-          toolCallId: part.toolCallId,
-          toolName: toRuntimeHistoryToolName(part.toolName),
-          input: part.input,
-        });
-        break;
-      case "tool-result": {
-        // 成对移除旧知识库调用/结果，防止关库或换库后仍借旧原文作答。
-        if (knowledgeCalls.has(part.toolCallId)) break;
-        const toolName = toolNames.get(part.toolCallId);
-        if (!toolName) {
-          throw new Error(
-            `Assistant Tool Result ${part.toolCallId} 缺少对应的 Tool Call`,
-          );
-        }
-
-        flushAssistant();
-        pendingToolCalls.delete(part.toolCallId);
-        messages.push({
-          role: "tool",
-          content: [
-            {
-              type: "tool-result",
-              toolCallId: part.toolCallId,
-              toolName,
-              output: toToolResultOutput(part.output, part.isError),
-            },
-          ],
-        });
-        break;
-      }
-    }
-  }
-
-  flushAssistant();
-  // 停止生成可能只保存了调用。仅修复发送给模型的历史，不改落库内容，
-  // 也不推断工具是否已产生副作用，更不能自动重试这个调用。
-  if (pendingToolCalls.size > 0) {
-    messages.push({
-      role: "tool",
-      content: [...pendingToolCalls].map(([toolCallId, toolName]) => ({
-        type: "tool-result" as const,
-        toolCallId,
-        toolName,
-        output: {
-          type: "error-json" as const,
-          value: {
-            code: "TOOL_RESULT_UNAVAILABLE",
-            message: "上一轮工具调用未记录到结果（生成可能已被停止）。执行结果未知，请勿假定调用成功。",
-          },
-        },
-      })),
-    });
-  }
-  return messages;
-}
-
-function toModelMessages(message: ChatModelMessage): ModelMessage[] {
-  if (message.role === "assistant") {
-    return toAssistantModelMessages(message);
-  }
-
-  return [
-    {
-      role: "user",
-      content: message.parts.map((part) => {
-        if (part.type === "text") {
-          return part;
-        }
-
-        return {
-          type: "file" as const,
-          data: new URL(part.url),
-          mediaType: part.mediaType,
-          ...(part.filename ? { filename: part.filename } : {}),
-        };
-      }),
-    },
-  ];
-}
 
 function toError(error: unknown, fallbackMessage: string): Error {
   return error instanceof Error
@@ -189,17 +40,35 @@ export function createCatApiChatModel(
 
   return {
     async *stream(request): AsyncIterable<ChatModelStreamPart> {
+      const initialMessages = [
+        ...(request.historySummary
+          ? [summaryMessage(request.historySummary)]
+          : []),
+        ...request.messages.flatMap(toModelMessages),
+      ];
+      const initialTokens =
+        request.contextInputTokens ??
+        (await countRequestOverhead(request.instructions, request.tools)) +
+          countModelMessages(initialMessages);
       const agent = new ToolLoopAgent({
         model,
         instructions: request.instructions,
         maxRetries: 0,
+        maxOutputTokens: CHAT_CONTEXT_POLICY.maxOutputTokens,
         tools: request.tools,
         stopWhen: isStepCount(request.tools ? 8 : 1),
-        prepareStep: ({ stepNumber }) => ({
-          activeTools: stepNumber >= 7 ? [] : request.activeTools?.(),
-          // 给最后一步留出回答机会，不能在工具刚完成时直接截断整个循环。
-          ...(stepNumber >= 7 ? { toolChoice: "none" as const } : {}),
-        }),
+        prepareStep: ({ stepNumber, responseMessages }) => {
+          request.abortSignal?.throwIfAborted();
+          // 历史已在准备阶段计数；只计算本轮新增的助手/工具消息，避免反复编码长历史。
+          assertInputBudget(
+            initialTokens + countModelMessages(responseMessages),
+          );
+          return {
+            activeTools: stepNumber >= 7 ? [] : request.activeTools?.(),
+            // 给最后一步留出回答机会，不能在工具刚完成时直接截断整个循环。
+            ...(stepNumber >= 7 ? { toolChoice: "none" as const } : {}),
+          };
+        },
         providerOptions: {
           openai: {
             forceReasoning: true,
@@ -210,7 +79,7 @@ export function createCatApiChatModel(
         },
       });
       const result = await agent.stream({
-        messages: request.messages.flatMap(toModelMessages),
+        messages: initialMessages,
         abortSignal: request.abortSignal,
       });
 
@@ -261,7 +130,9 @@ export function createCatApiChatModel(
             break;
           case "finish":
             if (part.finishReason === "tool-calls") {
-              throw new Error("MODEL_TOOL_STEP_LIMIT: 工具循环结束，但模型尚未完成回答");
+              throw new Error(
+                "MODEL_TOOL_STEP_LIMIT: 工具循环结束，但模型尚未完成回答",
+              );
             }
             yield { type: "finish", reason: part.finishReason };
             break;

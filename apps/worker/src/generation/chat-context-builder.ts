@@ -20,50 +20,61 @@ export async function buildChatModelRequest(
   }
 
   const attachmentParts = new Map<string, ChatModelUserPart>();
-
-  await Promise.all(
-    execution.attachments.map(async (attachment) => {
-      if (attachment.status !== "ready") {
-        throw new Error(`Attachment ${attachment.id} 尚未 ready`);
-      }
-
-      attachmentParts.set(attachment.id, {
-        type: "file",
-        url: await storage.createDownloadUrl(
-          attachment.objectKey,
-          MODEL_ATTACHMENT_URL_TTL_SECONDS,
-        ),
-        mediaType: attachment.mediaType,
-        filename: attachment.originalName,
-      });
-    }),
+  const neededAttachments = new Set(
+    execution.messages.flatMap((message) =>
+      message.parts.flatMap((part) =>
+        part.type === "attachment" ? [part.attachmentId] : [],
+      ),
+    ),
   );
 
-  const modelMessages: ChatModelMessage[] = execution.messages.map((message) => {
-    if (message.role === "assistant") {
-      return {
-        role: "assistant",
-        parts: message.parts,
-      };
-    }
-
-    return {
-      role: "user",
-      parts: message.parts.map((part) => {
-        if (part.type === "text") {
-          return part;
+  await Promise.all(
+    execution.attachments
+      .filter((attachment) => neededAttachments.has(attachment.id))
+      .map(async (attachment) => {
+        if (attachment.status !== "ready") {
+          throw new Error(`Attachment ${attachment.id} 尚未 ready`);
         }
 
-        const attachment = attachmentParts.get(part.attachmentId);
-
-        if (!attachment) {
-          throw new Error(`找不到 Attachment ${part.attachmentId}`);
-        }
-
-        return attachment;
+        attachmentParts.set(attachment.id, {
+          type: "file",
+          url: await storage.createDownloadUrl(
+            attachment.objectKey,
+            MODEL_ATTACHMENT_URL_TTL_SECONDS,
+          ),
+          mediaType: attachment.mediaType,
+          filename: attachment.originalName,
+        });
       }),
-    };
-  });
+  );
+
+  const modelMessages: ChatModelMessage[] = execution.messages.map(
+    (message) => {
+      if (message.role === "assistant") {
+        return {
+          role: "assistant",
+          parts: message.parts,
+        };
+      }
+
+      return {
+        role: "user",
+        parts: message.parts.map((part) => {
+          if (part.type === "text") {
+            return part;
+          }
+
+          const attachment = attachmentParts.get(part.attachmentId);
+
+          if (!attachment) {
+            throw new Error(`找不到 Attachment ${part.attachmentId}`);
+          }
+
+          return attachment;
+        }),
+      };
+    },
+  );
 
   return {
     messages: modelMessages,

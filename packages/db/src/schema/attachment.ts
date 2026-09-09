@@ -3,10 +3,12 @@ import type {
   AttachmentStatusDto,
 } from "@ai-chat/contracts";
 import { sql } from "drizzle-orm";
+import type { AttachmentTokenCount } from "@ai-chat/model-context";
 import {
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -37,6 +39,7 @@ export const attachments = pgTable(
     originalName: text("original_name").notNull(),
     mediaType: text("media_type").$type<AttachmentMediaType>().notNull(),
     sizeBytes: integer("size_bytes").notNull(),
+    contextTokenCount: jsonb("context_token_count").$type<AttachmentTokenCount>(),
     status: attachmentStatus("status").default("pending").notNull(),
     readyAt: timestamp("ready_at", { mode: "date", withTimezone: true }),
     linkedAt: timestamp("linked_at", { mode: "date", withTimezone: true }),

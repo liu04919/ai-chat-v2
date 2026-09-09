@@ -1,19 +1,17 @@
 {
-  "name": "@ai-chat/db",
+  "name": "@ai-chat/model-context",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./schema": "./src/schema/index.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-chat/model-context": "workspace:*",
     "@ai-chat/contracts": "workspace:*",
-    "drizzle-orm": "0.45.2",
-    "postgres": "3.4.9"
+    "ai": "^7.0.83",
+    "js-tiktoken": "1.0.21"
   }
 }

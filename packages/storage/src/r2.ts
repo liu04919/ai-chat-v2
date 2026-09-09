@@ -30,14 +30,15 @@ export type UploadInstruction = {
 export type StoredObjectMetadata = {
   contentType: string | null;
   sizeBytes: number | null;
+  etag?: string | null;
 };
 
 export interface ObjectStorage {
   createUploadUrl(input: CreateObjectUploadUrlInput): Promise<UploadInstruction>;
   createDownloadUrl(objectKey: string, expiresInSeconds: number): Promise<string>;
-  headObject(objectKey: string): Promise<StoredObjectMetadata | null>;
+  headObject(objectKey: string, abortSignal?: AbortSignal): Promise<StoredObjectMetadata | null>;
   deleteObject(objectKey: string): Promise<void>;
-  readObject(objectKey: string, abortSignal?: AbortSignal): Promise<Uint8Array>;
+  readObject(objectKey: string, abortSignal?: AbortSignal, ifMatch?: string): Promise<Uint8Array>;
   writeObject(input: {
     objectKey: string;
     data: Uint8Array;
@@ -61,9 +62,9 @@ export function createR2ObjectStorage(
   });
 
   return {
-    async readObject(objectKey, abortSignal) {
+    async readObject(objectKey, abortSignal, ifMatch) {
       const result = await client.send(
-        new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+        new GetObjectCommand({ Bucket: config.bucket, Key: objectKey, IfMatch: ifMatch }),
         { abortSignal },
       );
 
@@ -112,18 +113,20 @@ export function createR2ObjectStorage(
       );
     },
 
-    async headObject(objectKey) {
+    async headObject(objectKey, abortSignal) {
       try {
         const result = await client.send(
           new HeadObjectCommand({
             Bucket: config.bucket,
             Key: objectKey,
           }),
+          { abortSignal },
         );
 
         return {
           contentType: result.ContentType ?? null,
           sizeBytes: result.ContentLength ?? null,
+          etag: result.ETag ?? null,
         };
       } catch (error) {
         if (

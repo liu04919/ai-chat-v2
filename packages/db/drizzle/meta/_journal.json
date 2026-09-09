@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1788351492526,
-      "tag": "0000_oval_weapon_omega",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1788407646924,
-      "tag": "0001_breezy_tenebrous",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1788436373246,
-      "tag": "0002_mighty_vision",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1788446460663,
-      "tag": "0003_rapid_weapon_omega",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1788615575010,
-      "tag": "0004_skinny_zodiak",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1788695652876,
-      "tag": "0005_jittery_toad",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1788753220877,
-      "tag": "0006_famous_wallop",
+      "when": 1788879374454,
+      "tag": "0000_baseline",
       "breakpoints": true
     }
   ]

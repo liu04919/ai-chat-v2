@@ -67,10 +67,12 @@ export {
   type GenerationRecord,
 } from "./generation-reader";
 export { migrateDatabase } from "./migration";
+export { saveMessageTokenCounts, saveAttachmentTokenCount } from "./context-token-counts";
 export { completeImageGenerationExecution } from "./image-generation-execution";
 export {
   getMcpToolPreferencesForUser,
   saveMcpToolPreferencesForUser,
 } from "./tool-preferences";
 export * from "./schema/index";
+export { saveConversationSummary, type ConversationSummaryRecord, type SaveConversationSummaryInput } from "./conversation-summary";
 export { createKnowledgeRepository, validateKnowledgeVector, type KnowledgeHit } from "./knowledge";

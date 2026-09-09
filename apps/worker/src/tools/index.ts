@@ -9,7 +9,7 @@ export {
   parseMcpToolId,
   toMcpRuntimeToolName,
   toRuntimeHistoryToolName,
-} from "./tool-names";
+} from "@ai-chat/model-context";
 export {
   createTavilyWebSearchTool,
   type TavilyWebSearchToolOptions,

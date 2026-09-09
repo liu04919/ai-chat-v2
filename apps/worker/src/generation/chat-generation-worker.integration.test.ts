@@ -1,4 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { createChatContextPreparer } from "../context/prepare-chat-context";
+import {
+  ATTACHMENT_TOKEN_VERSION,
+  createAttachmentTokenCounter,
+} from "../context/attachment-token-counts";
 import { existsSync } from "node:fs";
 import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
@@ -191,6 +196,34 @@ const worker = createBullMqGenerationWorker({
   processGeneration: (generationId) =>
     executeGeneration(generationId, {
       chatModel: fakeChatModel,
+      prepareContext: createChatContextPreparer({
+        countAttachments: createAttachmentTokenCounter({
+          modelId: "gpt-5.6-sol",
+          storage: {
+            headObject: async () => ({
+              etag: '"fixture-v1"',
+              sizeBytes: 100,
+              contentType: "application/pdf",
+            }),
+            readObject: async () => new Uint8Array([1]),
+          },
+          // 此处验证缓存落库与主链连通；真实 PDF 解析由附件计数单测覆盖。
+          inspect: async () => ({
+            version: ATTACHMENT_TOKEN_VERSION,
+            etag: null,
+            kind: "pdf",
+            pages: 1,
+            textTokens: 20,
+            tokens: 3020,
+          }),
+        }),
+        summarizer: {
+          modelId: "fake",
+          summarize: async () => {
+            throw new Error("短会话不应调用摘要模型");
+          },
+        },
+      }),
       imageModel: {
         generate: async () => {
           throw new Error("Chat 不能进入 Image Model");
@@ -457,6 +490,14 @@ describe("Chat Generation Worker 主链", () => {
       ],
     });
     expect(createDownloadUrl).toHaveBeenCalledWith(objectKey, 900);
+    const [cachedAttachment] = await database.client`
+      SELECT context_token_count FROM attachments WHERE id = ${attachmentId}
+    `;
+    expect(cachedAttachment?.context_token_count).toMatchObject({
+      version: ATTACHMENT_TOKEN_VERSION,
+      etag: '"fixture-v1"',
+      tokens: 3020,
+    });
     expect(
       (await eventReader.read({ generationId })).map((entry) => entry.event),
     ).toEqual([

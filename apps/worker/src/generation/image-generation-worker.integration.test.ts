@@ -108,6 +108,7 @@ function fixture() {
     return { data: png, mediaType: "image/png" };
   });
   const dependencies: ExecuteGenerationDependencies = {
+    prepareContext: async () => { throw new Error("Image 不应执行历史摘要"); },
     chatModel: {
       stream() {
         throw new Error("Image 不应进入 Chat Model");

@@ -156,6 +156,9 @@ importers:
       '@ai-chat/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
+      '@ai-chat/model-context':
+        specifier: workspace:*
+        version: link:../../packages/model-context
       '@ai-chat/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -171,6 +174,9 @@ importers:
       bullmq:
         specifier: ^6.3.1
         version: 6.3.1(ioredis@6.0.0)
+      image-size:
+        specifier: 2.0.2
+        version: 2.0.2
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0
@@ -215,6 +221,9 @@ importers:
       '@ai-chat/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ai-chat/model-context':
+        specifier: workspace:*
+        version: link:../model-context
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(kysely@0.29.5)(postgres@3.4.9)
@@ -236,6 +245,18 @@ importers:
       '@ai-sdk/mcp':
         specifier: 2.0.39
         version: 2.0.39(zod@4.4.3)
+
+  packages/model-context:
+    dependencies:
+      '@ai-chat/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      ai:
+        specifier: ^7.0.83
+        version: 7.0.83(zod@4.4.3)
+      js-tiktoken:
+        specifier: 1.0.21
+        version: 1.0.21
 
   packages/storage:
     dependencies:
@@ -3476,6 +3497,11 @@ packages:
   ignore@7.0.6:
     resolution: {integrity: sha512-BAg6QkE8W+TuQLrrw0Ugr7HegXduRuuj8/ti2kSOc+jz1dmx8/WNcjr6XGnq5YpDWxFwwaavqD0+jIUOKelTsw==}
     engines: {node: '>= 4'}
+
+  image-size@2.0.2:
+    resolution: {integrity: sha512-IRqXKlaXwgSMAMtpNzZa1ZAe8m+Sa1770Dhk8VkSsP9LS+iHD62Zd8FQKs8fbPiagBE7BzoFX23cxFnwshpV6w==}
+    engines: {node: '>=16.x'}
+    hasBin: true
 
   immer@11.1.18:
     resolution: {integrity: sha512-EQyQtLiYW029lyoczMl/Hh4Xu7cDecSc58JRYpHyL4tIAu3eqd1yJzQX04d2BZHDkzFFvm6qJEJWOtfDSWAXbQ==}
@@ -7989,6 +8015,8 @@ snapshots:
   ignore@5.3.2: {}
 
   ignore@7.0.6: {}
+
+  image-size@2.0.2: {}
 
   immer@11.1.18: {}
 

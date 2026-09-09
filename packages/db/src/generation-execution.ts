@@ -10,13 +10,20 @@ import {
   assistantMessagePartsSchema,
   userMessagePartsSchema,
 } from "@ai-chat/contracts";
-import { and, asc, eq, inArray, isNull, max } from "drizzle-orm";
+import {
+  countStoredMessage,
+  type MessageTokenCount,
+  type AttachmentTokenCount,
+} from "@ai-chat/model-context";
+import { and, asc, eq, gt, inArray, isNull, max } from "drizzle-orm";
 
 import { getDatabase } from "./client";
+import type { ConversationSummaryRecord } from "./conversation-summary";
 import { lockGenerationConversation } from "./generation-conversation-lock";
 import {
   attachments,
   conversations,
+  conversationSummaries,
   generations,
   messages,
 } from "./schema/index";
@@ -26,6 +33,7 @@ type Database = ReturnType<typeof getDatabase>;
 type GenerationExecutionMessageBase = {
   id: string;
   sequence: number;
+  contextTokenCount?: MessageTokenCount | null;
 };
 
 export type GenerationExecutionMessageRecord =
@@ -44,6 +52,7 @@ export type GenerationExecutionAttachmentRecord = {
   originalName: string;
   mediaType: AttachmentMediaType;
   status: AttachmentStatusDto;
+  contextTokenCount?: AttachmentTokenCount | null;
 };
 
 export type ClaimedGenerationExecution = {
@@ -57,6 +66,7 @@ export type ClaimedGenerationExecution = {
   knowledgeBaseId?: string | null;
   messages: GenerationExecutionMessageRecord[];
   attachments: GenerationExecutionAttachmentRecord[];
+  summary: ConversationSummaryRecord | null;
 };
 
 export type ClaimGenerationExecutionResult =
@@ -123,15 +133,26 @@ export async function claimGenerationExecution(
       throw new Error("Generation 对应的 Conversation 不存在");
     }
 
+    // 摘要和未覆盖原文在同一次领取事务中读取，不能把两个版本的边界混在一起。
+    const [summary] = conversation.mode === "chat"
+      ? await transaction
+          .select()
+          .from(conversationSummaries)
+          .where(eq(conversationSummaries.conversationId, claimed.conversationId))
+      : [];
     const rawMessageRecords = await transaction
       .select({
         id: messages.id,
         role: messages.role,
         parts: messages.parts,
         sequence: messages.sequence,
+        contextTokenCount: messages.contextTokenCount,
       })
       .from(messages)
-      .where(eq(messages.conversationId, claimed.conversationId))
+      .where(and(
+        eq(messages.conversationId, claimed.conversationId),
+        summary ? gt(messages.sequence, summary.coveredThroughSequence) : undefined,
+      ))
       .orderBy(asc(messages.sequence));
     const messageRecords: GenerationExecutionMessageRecord[] =
       rawMessageRecords
@@ -142,12 +163,14 @@ export async function claimGenerationExecution(
                 role: "user",
                 parts: userMessagePartsSchema.parse(message.parts),
                 sequence: message.sequence,
+                contextTokenCount: message.contextTokenCount,
               }
             : {
                 id: message.id,
                 role: "assistant",
                 parts: assistantMessagePartsSchema.parse(message.parts),
                 sequence: message.sequence,
+                contextTokenCount: message.contextTokenCount,
               },
         );
     const attachmentIds = [
@@ -169,6 +192,7 @@ export async function claimGenerationExecution(
               originalName: attachments.originalName,
               mediaType: attachments.mediaType,
               status: attachments.status,
+              contextTokenCount: attachments.contextTokenCount,
             })
             .from(attachments)
             .where(
@@ -194,6 +218,7 @@ export async function claimGenerationExecution(
         },
         messages: messageRecords,
         attachments: attachmentRecords,
+        summary: summary ?? null,
       },
     };
   });
@@ -214,6 +239,10 @@ export async function completeGenerationExecution(
   const assistantParts = assistantMessagePartsSchema.parse(
     input.assistantParts,
   );
+  const contextTokenCount = countStoredMessage({
+    role: "assistant",
+    parts: assistantParts,
+  });
 
   if (
     !assistantParts.some(
@@ -256,6 +285,7 @@ export async function completeGenerationExecution(
       conversationId: generation.conversationId,
       role: "assistant",
       parts: assistantParts,
+      contextTokenCount,
       sequence: nextSequence,
       createdAt: input.now,
     });

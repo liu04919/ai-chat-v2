@@ -1,26 +1,13 @@
-import type {
-  AssistantMessagePartsDto,
-  ReasoningEffortDto,
-} from "@ai-chat/contracts";
+import type { ReasoningEffortDto } from "@ai-chat/contracts";
+import type { ChatModelMessage } from "@ai-chat/model-context";
+export type { ChatModelMessage, ChatModelUserPart } from "@ai-chat/model-context";
 import type { ToolSet } from "ai";
 
-export type ChatModelUserPart =
-  | { type: "text"; text: string }
-  | {
-      type: "file";
-      url: string;
-      mediaType: string;
-      filename?: string;
-    };
-
-export type ChatModelMessage =
-  | { role: "user"; parts: ChatModelUserPart[] }
-  | {
-      role: "assistant";
-      parts: AssistantMessagePartsDto;
-    };
-
 export type ChatModelRequest = {
+  /** Worker 已计算的初始总输入；模型工具循环只追加本轮新输出的成本。 */
+  contextInputTokens?: number;
+  /** 派生历史背景，不作为 system instructions；原消息仍完整保存在数据库。 */
+  historySummary?: string | null;
   instructions?: string;
   messages: ChatModelMessage[];
   reasoningEffort: ReasoningEffortDto;

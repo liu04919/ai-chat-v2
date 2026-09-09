@@ -15,6 +15,7 @@ import {
 } from "@ai-chat/db";
 
 import type { ChatModel } from "../llm/chat-model";
+import type { ChatContextPreparer } from "../context/prepare-chat-context";
 import type {
   GenerationToolResolver,
   ResolvedGenerationTools,
@@ -30,6 +31,7 @@ const CHAT_GENERATION_FAILED = "CHAT_GENERATION_FAILED";
 
 export type ExecuteChatGenerationDependencies = {
   chatModel: ChatModel;
+  prepareContext: ChatContextPreparer;
   cancellationSubscriber: GenerationCancellationSubscriber;
   eventWriter: GenerationEventWriter;
   objectStorage: Pick<ObjectStorage, "createDownloadUrl">;
@@ -154,26 +156,43 @@ export async function executeChatGeneration(
       generationId,
     });
 
-    // 准备阶段只组装模型请求；引用保存与展示交给同一个回答收集器。
-    const request = await buildChatModelRequest(
-      execution,
-      dependencies.objectStorage,
-    );
+    // 先取得工具定义再计数；这里只建立工具连接，并不会执行工具。
     if (dependencies.toolResolver) {
       resolvedTools = await dependencies.toolResolver.resolve(execution.tools, {
         ownerId: execution.ownerId,
         knowledgeBaseId: execution.knowledgeBaseId ?? null,
         signal: abortController.signal,
       });
-      request.tools = resolvedTools.tools;
-      request.instructions = resolvedTools.instructions;
-      request.activeTools = resolvedTools.activeTools;
     } else if (
-      execution.tools.webSearch || execution.tools.mcpToolIds.length > 0 || execution.knowledgeBaseId
+      execution.tools.webSearch ||
+      execution.tools.mcpToolIds.length > 0 ||
+      execution.knowledgeBaseId
     ) {
       throw new Error("Generation 选择了 Tool，但 Worker 未配置 Tool Resolver");
     }
-    // 所有工具只在模型调用时执行；准备阶段不检索、不创建临时资料消息。
+    const context = await dependencies.prepareContext({
+      execution,
+      instructions: resolvedTools?.instructions,
+      tools: resolvedTools?.tools,
+      signal: abortController.signal,
+    });
+    // 确定保留范围后才签附件 URL，避免为已压缩历史生成即将过期的地址。
+    const request = await buildChatModelRequest(
+      context.execution,
+      dependencies.objectStorage,
+    );
+    request.historySummary = context.summary;
+    request.contextInputTokens = context.inputTokens;
+    request.tools = resolvedTools?.tools;
+    request.instructions = resolvedTools?.instructions;
+    request.activeTools = resolvedTools?.activeTools;
+    console.info("Chat context prepared", {
+      generationId,
+      status: context.status,
+      inputTokens: context.inputTokens,
+      targetReached: context.targetReached,
+      summaryVersion: context.execution.summary?.version ?? null,
+    });
     abortController.signal.throwIfAborted();
     request.abortSignal = abortController.signal;
 

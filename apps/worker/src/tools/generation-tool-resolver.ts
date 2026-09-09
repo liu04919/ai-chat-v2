@@ -9,7 +9,7 @@ import {
   createMcpToolId,
   parseMcpToolId,
   toMcpRuntimeToolName,
-} from "./tool-names";
+} from "@ai-chat/model-context";
 import { createTavilyWebSearchTool } from "./web-search-tool";
 import type { ChatKnowledgeRetriever } from "../knowledge/chat-knowledge-retriever";
 import {

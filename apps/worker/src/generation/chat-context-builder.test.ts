@@ -5,6 +5,7 @@ import type { ClaimedGenerationExecution } from "@ai-chat/db";
 import { buildChatModelRequest } from "./chat-context-builder";
 
 const execution: ClaimedGenerationExecution = {
+  summary: null,
   id: "generation_123",
   userMessageId: "message_3",
   conversationId: "conversation_123",

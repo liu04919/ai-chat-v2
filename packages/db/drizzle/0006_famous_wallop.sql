@@ -1,1 +1,0 @@
-ALTER TYPE "public"."knowledge_status" ADD VALUE 'uploading' BEFORE 'pending';
