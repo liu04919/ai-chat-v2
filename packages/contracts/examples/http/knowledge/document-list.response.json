@@ -1,0 +1,14 @@
+{
+  "documents": [
+    {
+      "id": "knowledge_document_example",
+      "originalName": "数据库笔记.md",
+      "mediaType": "text/markdown",
+      "sizeBytes": 1024,
+      "status": "ready",
+      "chunkCount": 2,
+      "errorCode": null,
+      "createdAt": "2026-09-09T00:01:00.000Z"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   AttachmentServiceError,
   readAttachmentForOwner,

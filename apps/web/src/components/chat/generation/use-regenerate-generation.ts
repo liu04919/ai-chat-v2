@@ -11,8 +11,8 @@ import {
 import {
   conversationDetailQueryKey,
   conversationListQueryKey,
-} from "../../../lib/conversations-client";
-import { regenerateGeneration } from "../../../lib/generations-client";
+} from "../../../lib/client/conversations";
+import { regenerateGeneration } from "../../../lib/client/generations";
 import {
   invalidateConversationHistory,
   type ConversationHistoryData,

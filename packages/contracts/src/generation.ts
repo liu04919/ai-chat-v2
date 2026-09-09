@@ -21,11 +21,3 @@ export const activeGenerationSchema = z
     cancelRequestedAt: z.iso.datetime().nullable(),
   })
   .strict();
-
-export const chatRuntimeStateSchema = z
-  .object({
-    activeGeneration: activeGenerationSchema.nullable(),
-  })
-  .strict();
-
-export type ChatRuntimeStateDto = z.infer<typeof chatRuntimeStateSchema>;

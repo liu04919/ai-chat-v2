@@ -1,8 +1,8 @@
 import { createKnowledgeRepository } from "@ai-chat/db";
-import { knowledgeHttp } from "@/server/knowledge-http";
-import { completeKnowledgeUpload } from "@/server/knowledge";
-import { getAttachmentObjectStorage } from "@/server/attachment-storage";
-import { enqueueKnowledge } from "@/server/knowledge-queue";
+import { knowledgeHttp } from "@/server/knowledge/http";
+import { completeKnowledgeUpload } from "@/server/knowledge/service";
+import { getObjectStorage } from "@/server/object-storage";
+import { enqueueKnowledge } from "@/server/knowledge/queue";
 
 export async function POST(
   _request: Request,
@@ -13,7 +13,7 @@ export async function POST(
     return Response.json(
       await completeKnowledgeUpload(ownerId, baseId, documentId, {
         repository: createKnowledgeRepository(),
-        storage: getAttachmentObjectStorage(),
+        storage: getObjectStorage(),
         enqueue: enqueueKnowledge,
       }),
     );

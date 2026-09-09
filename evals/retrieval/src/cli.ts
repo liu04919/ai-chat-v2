@@ -20,7 +20,7 @@ import { sql } from "drizzle-orm";
 import {
   knowledgeSearchQueries,
   executeKnowledgeSearch,
-} from "../../../packages/db/src/knowledge-search";
+} from "../../../packages/db/src/knowledge/search";
 import { createKnowledgeEmbedder } from "../../../apps/worker/src/knowledge/embedding";
 import { createKnowledgeReranker } from "../../../apps/worker/src/knowledge/rerank";
 import { reciprocalRankFusion } from "../../../apps/worker/src/knowledge/retrieve";
@@ -305,7 +305,7 @@ async function main() {
     );
     const reranker = createKnowledgeReranker();
     const sourcePaths = [
-      "packages/db/src/knowledge-search.ts",
+      "packages/db/src/knowledge/search.ts",
       "apps/worker/src/knowledge/embedding.ts",
       "apps/worker/src/knowledge/rerank.ts",
       "apps/worker/src/knowledge/retrieve.ts",

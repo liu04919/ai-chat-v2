@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { authClient } from "@/lib/auth-client";
-import { navigateAfterAuthentication } from "@/lib/auth-navigation";
+import { authClient } from "@/lib/auth/client";
+import { navigateAfterAuthentication } from "@/lib/auth/navigation";
 
 const emailSchema = z.email("请输入有效的邮箱地址");
 const passwordSchema = z

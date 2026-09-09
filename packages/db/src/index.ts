@@ -13,11 +13,11 @@ export {
 export {
   getConversationRecordForOwner,
   listConversationRecordsForOwner,
-} from "./conversation-reader";
+} from "./conversations/reader";
 export type {
   ConversationDetailRecord,
   ConversationRecord,
-} from "./conversation-reader";
+} from "./conversations/reader";
 export {
   createConversationShareRecordForOwner,
   deleteConversationShareRecordForOwner,
@@ -28,31 +28,31 @@ export {
   type ConversationShareRecord,
   type ConversationShareStatusRecordResult,
   type CreateConversationShareResult,
-} from "./conversation-shares";
+} from "./conversations/shares";
 export {
   deleteConversationRecordForOwner,
   setConversationPinnedForOwner,
   type DeletedConversationRecord,
-} from "./conversation-mutations";
+} from "./conversations/mutations";
 export {
   cancelGenerationExecution,
   isGenerationCancellationRequested,
   requestGenerationCancellationForOwner,
   type GenerationCancellationRecord,
   type RequestGenerationCancellationResult,
-} from "./generation-cancellation";
+} from "./generations/cancellation";
 export {
   createGenerationCommandRecord,
   type CreateGenerationCommandRecordInput,
   type CreateGenerationCommandRecordResult,
   type GenerationCommandRecord,
-} from "./generation-command";
+} from "./generations/command";
 export {
   createRegenerationCommandRecord,
   type CreateRegenerationCommandRecordInput,
   type CreateRegenerationCommandRecordResult,
   type RegenerationCommandRecord,
-} from "./generation-regeneration";
+} from "./generations/regeneration";
 export {
   claimGenerationExecution,
   completeGenerationExecution,
@@ -61,18 +61,18 @@ export {
   type ClaimGenerationExecutionResult,
   type GenerationExecutionAttachmentRecord,
   type GenerationExecutionMessageRecord,
-} from "./generation-execution";
+} from "./generations/execution";
 export {
   getGenerationRecordForOwner,
   type GenerationRecord,
-} from "./generation-reader";
+} from "./generations/reader";
 export { migrateDatabase } from "./migration";
 export { saveMessageTokenCounts, saveAttachmentTokenCount } from "./context-token-counts";
-export { completeImageGenerationExecution } from "./image-generation-execution";
+export { completeImageGenerationExecution } from "./generations/image-execution";
 export {
   getMcpToolPreferencesForUser,
   saveMcpToolPreferencesForUser,
 } from "./tool-preferences";
 export * from "./schema/index";
-export { saveConversationSummary, type ConversationSummaryRecord, type SaveConversationSummaryInput } from "./conversation-summary";
-export { createKnowledgeRepository, validateKnowledgeVector, type KnowledgeHit } from "./knowledge";
+export { saveConversationSummary, type ConversationSummaryRecord, type SaveConversationSummaryInput } from "./conversations/summary";
+export { createKnowledgeRepository, validateKnowledgeVector, type KnowledgeHit } from "./knowledge/repository";

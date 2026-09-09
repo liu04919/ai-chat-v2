@@ -3,12 +3,12 @@ import {
   cancelGenerationResponseSchema,
 } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   cancelGenerationForOwner,
   GenerationCancellationServiceError,
-} from "@/server/generation-cancellation";
-import { getGenerationCancellationInfrastructure } from "@/server/generation-cancellation-infrastructure";
+} from "@/server/generations/cancellation";
+import { getGenerationCancellationInfrastructure } from "@/server/generations/cancellation-infrastructure";
 
 export const runtime = "nodejs";
 

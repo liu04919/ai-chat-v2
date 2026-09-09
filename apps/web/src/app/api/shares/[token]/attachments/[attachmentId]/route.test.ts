@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { readPublicConversationShareAttachment } from "@/server/conversation-shares";
+import { readPublicConversationShareAttachment } from "@/server/conversations/shares";
 import { GET } from "./route";
 
-vi.mock("@/server/conversation-shares", () => ({
+vi.mock("@/server/conversations/shares", () => ({
   readPublicConversationShareAttachment: vi.fn(),
 }));
 

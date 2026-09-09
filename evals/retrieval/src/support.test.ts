@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Budget, evaluationDatabaseUrl, upperTokens } from "./support";
-import { knowledgeSearchQueries } from "../../../packages/db/src/knowledge-search";
+import { knowledgeSearchQueries } from "../../../packages/db/src/knowledge/search";
 import { PgDialect } from "drizzle-orm/pg-core";
 
 describe("离线评测边界", () => {

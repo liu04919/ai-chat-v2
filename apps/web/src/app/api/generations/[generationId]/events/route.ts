@@ -1,7 +1,7 @@
 import { generationEventCursorSchema } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
-import { openGenerationEventStreamForOwner } from "@/server/generation-event-stream";
+import { getCurrentSession } from "@/server/auth/session";
+import { openGenerationEventStreamForOwner } from "@/server/generations/event-stream";
 
 export const runtime = "nodejs";
 

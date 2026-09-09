@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { conversationShareTokenSchema } from "@ai-chat/contracts";
 
 import { ShareConversation } from "@/components/share/share-conversation";
-import { getPublicConversationShare } from "@/server/conversation-shares";
+import { getPublicConversationShare } from "@/server/conversations/shares";
 
 export const dynamic = "force-dynamic";
 

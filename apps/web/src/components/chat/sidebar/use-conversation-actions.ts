@@ -16,7 +16,7 @@ import {
   setConversationPinned,
   updateConversationPinned,
   type ClientConversationListResponse,
-} from "@/lib/conversations-client";
+} from "@/lib/client/conversations";
 import { useGenerationProjectionStore } from "../generation/generation-projection-store";
 
 export function pinConversationMutationOptions(queryClient: QueryClient) {

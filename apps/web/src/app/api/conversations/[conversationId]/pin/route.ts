@@ -1,10 +1,10 @@
 import { conversationSummarySchema } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   ConversationMutationError,
   pinConversationForOwner,
-} from "@/server/conversation-mutations";
+} from "@/server/conversations/mutations";
 
 async function setPinned(
   pinned: boolean,

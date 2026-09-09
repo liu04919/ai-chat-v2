@@ -43,6 +43,25 @@ export const deleteKnowledgeBaseResponseSchema = z
     cleanupFailed: z.boolean(),
   })
   .strict();
+export const deleteKnowledgeDocumentResponseSchema = z
+  .object({ documentId: z.string().min(1) })
+  .strict();
+
+// HTTP 错误只公开约定的 code，不传内部异常、对象 key 或服务商响应。
+export const knowledgeErrorCodeSchema = z.enum([
+  "UNAUTHORIZED",
+  "INVALID_REQUEST",
+  "KNOWLEDGE_NOT_FOUND",
+  "KNOWLEDGE_UPLOAD_NOT_FOUND",
+  "KNOWLEDGE_METADATA_MISMATCH",
+  "KNOWLEDGE_UPLOAD_FAILED",
+  "KNOWLEDGE_OBJECT_DELETE_FAILED",
+  "INTERNAL_ERROR",
+]);
+export const knowledgeErrorResponseSchema = z
+  .object({ code: knowledgeErrorCodeSchema })
+  .strict();
+
 export const knowledgeDocumentSchema = z
   .object({
     id: z.string().min(1),
@@ -95,3 +114,8 @@ export const knowledgeSourcesPartSchema = z
 export type KnowledgeBaseDto = z.infer<typeof knowledgeBaseSchema>;
 export type KnowledgeDocumentDto = z.infer<typeof knowledgeDocumentSchema>;
 export type KnowledgeSourceDto = z.infer<typeof knowledgeSourceSchema>;
+export type KnowledgeErrorCode = z.infer<typeof knowledgeErrorCodeSchema>;
+export type KnowledgeErrorResponse = z.infer<typeof knowledgeErrorResponseSchema>;
+export type DeleteKnowledgeDocumentResponse = z.infer<
+  typeof deleteKnowledgeDocumentResponseSchema
+>;

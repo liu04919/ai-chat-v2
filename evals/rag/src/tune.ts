@@ -7,7 +7,7 @@ import { chunkPages } from "../../../apps/worker/src/knowledge/parse";
 import { createKnowledgeEmbedder } from "../../../apps/worker/src/knowledge/embedding";
 import { createKnowledgeReranker } from "../../../apps/worker/src/knowledge/rerank";
 import { reciprocalRankFusion } from "../../../apps/worker/src/knowledge/retrieve";
-import { executeKnowledgeSearch, knowledgeSearchQueries } from "../../../packages/db/src/knowledge-search";
+import { executeKnowledgeSearch, knowledgeSearchQueries } from "../../../packages/db/src/knowledge/search";
 import { evaluationDatabaseUrl } from "../../retrieval/src/support";
 import { sha256, type CorpusDocument, type EvalQuestion } from "./dataset";
 

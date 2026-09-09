@@ -1,7 +1,7 @@
 import type { ConversationDetailResponse, MessageDto } from "@ai-chat/contracts";
 import { InfiniteQueryObserver, QueryClient } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { conversationDetailQueryKey } from "../../../lib/conversations-client";
+import { conversationDetailQueryKey } from "../../../lib/client/conversations";
 import { conversationHistoryOptions, historyMessages, initialConversationHistory, mergeConversationHead, refreshConversationHistory, type ConversationHistoryData } from "./conversation-history-query";
 
 const now = "2026-09-01T00:00:00.000Z";

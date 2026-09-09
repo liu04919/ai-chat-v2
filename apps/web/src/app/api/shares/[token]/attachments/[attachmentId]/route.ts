@@ -1,6 +1,6 @@
 import { conversationShareTokenSchema } from "@ai-chat/contracts";
 
-import { readPublicConversationShareAttachment } from "@/server/conversation-shares";
+import { readPublicConversationShareAttachment } from "@/server/conversations/shares";
 
 export async function GET(
   _request: Request,

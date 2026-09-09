@@ -1,7 +1,8 @@
+import { deleteKnowledgeBaseResponseSchema } from "@ai-chat/contracts";
 import { createKnowledgeRepository } from "@ai-chat/db";
-import { knowledgeHttp } from "@/server/knowledge-http";
-import { deleteKnowledgeBase } from "@/server/knowledge";
-import { getAttachmentObjectStorage } from "@/server/attachment-storage";
+import { knowledgeHttp } from "@/server/knowledge/http";
+import { deleteKnowledgeBase } from "@/server/knowledge/service";
+import { getObjectStorage } from "@/server/object-storage";
 
 export async function DELETE(
   _request: Request,
@@ -9,11 +10,10 @@ export async function DELETE(
 ) {
   return knowledgeHttp(async (ownerId) => {
     const { baseId } = await context.params;
-    return Response.json(
-      await deleteKnowledgeBase(ownerId, baseId, {
-        repository: createKnowledgeRepository(),
-        storage: getAttachmentObjectStorage(),
-      }),
-    );
+    const response = await deleteKnowledgeBase(ownerId, baseId, {
+      repository: createKnowledgeRepository(),
+      storage: getObjectStorage(),
+    });
+    return Response.json(deleteKnowledgeBaseResponseSchema.parse(response));
   });
 }

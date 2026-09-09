@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   ConversationMutationError,
   pinConversationForOwner,
-} from "@/server/conversation-mutations";
+} from "@/server/conversations/mutations";
 import { DELETE, PUT } from "./route";
 
-vi.mock("@/lib/session", () => ({ getCurrentSession: vi.fn() }));
-vi.mock("@/server/conversation-mutations", () => ({
+vi.mock("@/server/auth/session", () => ({ getCurrentSession: vi.fn() }));
+vi.mock("@/server/conversations/mutations", () => ({
   ConversationMutationError: class ConversationMutationError extends Error {
     constructor(readonly status: 404) {
       super("CONVERSATION_NOT_FOUND");

@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth-client";
-import { navigateAfterAuthentication } from "@/lib/auth-navigation";
+import { authClient } from "@/lib/auth/client";
+import { navigateAfterAuthentication } from "@/lib/auth/navigation";
 
 export function SignOutButton() {
   const [error, setError] = useState<string>();

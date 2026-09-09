@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { useGenerationProjectionStore } from "@/components/chat/generation/generation-projection-store";
-import { watchAccountSession } from "@/lib/account-session";
+import { watchAccountSession } from "@/lib/auth/account-session";
 
 export function AccountBoundary({
   ownerId,

@@ -1,7 +1,7 @@
 import { conversationListResponseSchema } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
-import { listConversationsForOwner } from "@/server/conversations";
+import { getCurrentSession } from "@/server/auth/session";
+import { listConversationsForOwner } from "@/server/conversations/reader";
 
 export async function GET() {
   const session = await getCurrentSession();

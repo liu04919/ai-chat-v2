@@ -22,8 +22,8 @@ import { Button } from "@/components/ui/button";
 import {
   fetchMcpToolCatalog,
   mcpToolCatalogQueryKey,
-} from "@/lib/mcp-tools-client";
-import { updateMcpToolPreferences } from "@/lib/mcp-tool-preferences-client";
+} from "@/lib/client/mcp-tools";
+import { updateMcpToolPreferences } from "@/lib/client/mcp-tool-preferences";
 import { cn } from "@/lib/utils";
 
 import {

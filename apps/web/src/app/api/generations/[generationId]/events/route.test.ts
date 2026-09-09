@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getCurrentSession } from "@/lib/session";
-import { openGenerationEventStreamForOwner } from "@/server/generation-event-stream";
+import { getCurrentSession } from "@/server/auth/session";
+import { openGenerationEventStreamForOwner } from "@/server/generations/event-stream";
 
 import { GET } from "./route";
 
-vi.mock("@/lib/session", () => ({
+vi.mock("@/server/auth/session", () => ({
   getCurrentSession: vi.fn(),
 }));
-vi.mock("@/server/generation-event-stream", () => ({
+vi.mock("@/server/generations/event-stream", () => ({
   openGenerationEventStreamForOwner: vi.fn(),
 }));
 

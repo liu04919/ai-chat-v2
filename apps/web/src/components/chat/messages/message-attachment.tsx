@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FileText, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { getAttachmentClientErrorMessage } from "../../../lib/attachments-client";
+import { getAttachmentClientErrorMessage } from "../../../lib/client/attachments";
 import { AttachmentImage } from "./attachment-image";
 import { attachmentQueryOptions } from "./attachment-query";
 import { ImagePlaceholder } from "./image-placeholder";

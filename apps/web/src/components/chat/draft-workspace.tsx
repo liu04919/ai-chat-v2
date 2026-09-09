@@ -16,7 +16,7 @@ import { MessageParts } from "./messages/message-parts";
 import { ImageGenerationResponse } from "./generation/image-generation-response";
 import { useCreateGeneration } from "./generation/use-create-generation";
 import { createConversationTitle } from "@/lib/conversation-title";
-import { getGenerationClientErrorMessage } from "@/lib/generations-client";
+import { getGenerationClientErrorMessage } from "@/lib/client/generations";
 
 const modes: ReadonlyArray<{
   value: ConversationModeDto;

@@ -7,7 +7,7 @@
 - 数据：`C-MTEB/DuRetrieval` 完整 corpus（100,001 条 passage），上游 dev 的 2,000 个已标注问题中，按固定种子哈希排序抽取前 100 题。再取不重叠的 20 题供以后调试，未用于本轮调参。不是官方 test，也不是整个 DuReader 原始八百万语料。
 - 原样保留 passage 文本和 ID，不重新分块、不截断长文本、不挑选包含答案的小语料库。因此测试的是检索层，不涵盖项目 PDF 解析和 800 字符切块。
 - 四组：Vector Top 50；BM25 Top 50；两组经 RRF（k=60）合并后 Top 50；相同混合候选经 Rerank 返回 50 条。`@5/@10` 是评分截断，不是把候选提前缩为 5/10 条。
-- 复用 `packages/db/src/knowledge-search.ts` 的 SQL 与执行函数、Worker 的 Embedding、RRF、Rerank。业务默认依旧每路 30、精排 6；评测显式指定 50。
+- 复用 `packages/db/src/knowledge/search.ts` 的 SQL 与执行函数、Worker 的 Embedding、RRF、Rerank。业务默认依旧每路 30、精排 6；评测显式指定 50。
 - 一个 corpus 放在一个独立数据库的 `knowledge_chunks`。每条 passage 对应一行，`document_id` 指向评测语料容器；不写 R2。保留账户、知识库、ready 和模型过滤。完整语料入库前拒绝跑正式检索。
 - Precision/Recall@5/10、Recall@50、nDCG@10、MRR@10 由 `ranx` 计算；保存逐题排名和指标。原始 SQL 距离是小分在前，转换为严格递减的名次分交给 ranx，避免弄反排序。
 - 四组复用同一个 query embedding 和两路候选；这是准确性对照。两条 SQL 并发执行，延迟按阶段观测值组合，不能当作四组独立压测。第一条包含冷缓存影响；不做性能结论。

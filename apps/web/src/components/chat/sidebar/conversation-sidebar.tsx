@@ -24,7 +24,7 @@ import {
   conversationListQueryKey,
   fetchConversations,
   type ClientConversationSummary,
-} from "@/lib/conversations-client";
+} from "@/lib/client/conversations";
 
 import {
   Collapsible,

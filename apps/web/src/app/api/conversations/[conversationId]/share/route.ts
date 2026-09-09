@@ -5,13 +5,13 @@ import {
   deleteConversationShareResponseSchema,
 } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   ConversationShareServiceError,
   createConversationShareForOwner,
   deleteConversationShareForOwner,
   getConversationShareForOwner,
-} from "@/server/conversation-shares";
+} from "@/server/conversations/shares";
 
 type RouteContext = { params: Promise<{ conversationId: string }> };
 const privateHeaders = { "Cache-Control": "private, no-store" };

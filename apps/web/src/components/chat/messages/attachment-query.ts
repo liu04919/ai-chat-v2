@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
-import { readAttachment } from "../../../lib/attachments-client";
+import { readAttachment } from "../../../lib/client/attachments";
 
 export function attachmentQueryOptions(attachmentId: string) {
   return queryOptions({

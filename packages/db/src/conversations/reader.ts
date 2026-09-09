@@ -1,0 +1,183 @@
+import type {
+  AssistantMessagePartsDto,
+  ConversationDetailResponse,
+  UserMessagePartsDto,
+} from "@ai-chat/contracts";
+import {
+  CONVERSATION_MESSAGE_PAGE_SIZE,
+  assistantMessagePartsSchema,
+  userMessagePartsSchema,
+} from "@ai-chat/contracts";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
+
+import { getDatabase } from "../client";
+import { conversations, generations, messages } from "../schema/index";
+
+type Database = ReturnType<typeof getDatabase>;
+
+const activeGenerationStatuses = ["queued", "running"] as const;
+
+export type ConversationRecord = {
+  id: string;
+  mode: "chat" | "image";
+  title: string;
+  pinnedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ConversationDetailRecord = {
+  conversation: ConversationRecord;
+  activeGeneration: {
+    id: string;
+    status: (typeof activeGenerationStatuses)[number];
+    cancelRequestedAt: Date | null;
+  } | null;
+  latestGeneration: ConversationDetailResponse["latestGeneration"];
+  nextCursor: number | null;
+  messages: Array<
+    | {
+        id: string;
+        role: "user";
+        parts: UserMessagePartsDto;
+        sequence: number;
+        createdAt: Date;
+      }
+    | {
+        id: string;
+        role: "assistant";
+        parts: AssistantMessagePartsDto;
+        sequence: number;
+        createdAt: Date;
+      }
+  >;
+};
+
+export async function listConversationRecordsForOwner(
+  ownerId: string,
+  database: Database = getDatabase(),
+): Promise<ConversationRecord[]> {
+  return database
+    .select({
+      id: conversations.id,
+      mode: conversations.mode,
+      title: conversations.title,
+      pinnedAt: conversations.pinnedAt,
+      createdAt: conversations.createdAt,
+      updatedAt: conversations.updatedAt,
+    })
+    .from(conversations)
+    .where(eq(conversations.ownerId, ownerId))
+    .orderBy(
+      sql`${conversations.pinnedAt} desc nulls last`,
+      desc(conversations.updatedAt),
+      desc(conversations.id),
+    );
+}
+
+export async function getConversationRecordForOwner(
+  ownerId: string,
+  conversationId: string,
+  { before, database = getDatabase() }: { before?: number; database?: Database } = {},
+): Promise<ConversationDetailRecord | null> {
+  const [row] = await database
+    .select({
+      id: conversations.id,
+      mode: conversations.mode,
+      title: conversations.title,
+      pinnedAt: conversations.pinnedAt,
+      createdAt: conversations.createdAt,
+      updatedAt: conversations.updatedAt,
+      generationId: generations.id,
+      generationStatus: generations.status,
+      generationCancelRequestedAt: generations.cancelRequestedAt,
+    })
+    .from(conversations)
+    .leftJoin(
+      generations,
+      and(
+        eq(generations.conversationId, conversations.id),
+        inArray(generations.status, activeGenerationStatuses),
+      ),
+    )
+    .where(
+      and(
+        eq(conversations.id, conversationId),
+        eq(conversations.ownerId, ownerId),
+      ),
+    )
+    .limit(1);
+
+  if (!row) {
+    return null;
+  }
+
+  const activeGeneration =
+    row.generationId &&
+    (row.generationStatus === "queued" || row.generationStatus === "running")
+      ? {
+          id: row.generationId,
+          status: row.generationStatus,
+          cancelRequestedAt: row.generationCancelRequestedAt,
+        }
+      : null;
+  const [rawMessageRecords, [latestGeneration]] = await Promise.all([
+    database
+      .select({
+        id: messages.id,
+        role: messages.role,
+        parts: messages.parts,
+        sequence: messages.sequence,
+        createdAt: messages.createdAt,
+      })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.conversationId, row.id),
+          before === undefined ? undefined : lt(messages.sequence, before),
+        ),
+      )
+      .orderBy(desc(messages.sequence))
+      .limit(CONVERSATION_MESSAGE_PAGE_SIZE + 1),
+    database
+      .select({ id: generations.id, status: generations.status, knowledgeBaseId: generations.knowledgeBaseId })
+      .from(generations)
+      .where(eq(generations.conversationId, row.id))
+      .orderBy(desc(generations.createdAt), desc(generations.id))
+      .limit(1),
+  ]);
+  const messageRecords: ConversationDetailRecord["messages"] =
+    rawMessageRecords
+      .slice(0, CONVERSATION_MESSAGE_PAGE_SIZE)
+      .reverse()
+      .map((message) =>
+      message.role === "user"
+        ? {
+            ...message,
+            role: "user",
+            parts: userMessagePartsSchema.parse(message.parts),
+          }
+        : {
+            ...message,
+            role: "assistant",
+            parts: assistantMessagePartsSchema.parse(message.parts),
+          },
+    );
+
+  return {
+    conversation: {
+      id: row.id,
+      mode: row.mode,
+      title: row.title,
+      pinnedAt: row.pinnedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    },
+    activeGeneration,
+    latestGeneration: latestGeneration ?? null,
+    messages: messageRecords,
+    nextCursor: rawMessageRecords.length > CONVERSATION_MESSAGE_PAGE_SIZE
+      ? messageRecords[0]!.sequence
+      : null,
+  };
+}

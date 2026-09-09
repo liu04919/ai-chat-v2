@@ -1,0 +1,15 @@
+{
+  "type": "knowledge.sources",
+  "generationId": "generation_example",
+  "partId": "knowledge-generation_example",
+  "sources": [
+    {
+      "number": 1,
+      "chunkId": "knowledge_chunk_example",
+      "documentId": "knowledge_document_example",
+      "originalName": "数据库笔记.md",
+      "page": 1,
+      "content": "混合检索组合关键词检索和向量检索，再对候选结果进行融合与精排。"
+    }
+  ]
+}

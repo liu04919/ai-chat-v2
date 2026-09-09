@@ -19,8 +19,8 @@ import {
   prependConversation,
   removeConversation,
   type ClientConversationListResponse,
-} from "../../../lib/conversations-client";
-import { createGeneration } from "../../../lib/generations-client";
+} from "../../../lib/client/conversations";
+import { createGeneration } from "../../../lib/client/generations";
 import { useGenerationProjectionStore } from "./generation-projection-store";
 import {
   invalidateConversationHistory,

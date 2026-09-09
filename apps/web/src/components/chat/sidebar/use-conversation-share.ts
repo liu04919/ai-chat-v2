@@ -6,7 +6,7 @@ import {
   createConversationShare,
   deleteConversationShare,
   fetchConversationShare,
-} from "@/lib/conversation-shares-client";
+} from "@/lib/client/conversation-shares";
 
 export function conversationShareQueryKey(conversationId: string) {
   return ["conversation-share", conversationId] as const;

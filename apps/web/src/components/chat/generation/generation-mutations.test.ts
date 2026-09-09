@@ -10,7 +10,7 @@ import {
   conversationListQueryKey,
   prependConversation,
   type ClientConversationListResponse,
-} from "../../../lib/conversations-client";
+} from "../../../lib/client/conversations";
 import { useGenerationProjectionStore } from "./generation-projection-store";
 import { createGenerationMutationOptions } from "./use-create-generation";
 import { cancelGenerationMutationOptions } from "./use-cancel-generation";

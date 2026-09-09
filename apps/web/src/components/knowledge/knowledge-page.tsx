@@ -26,7 +26,7 @@ import {
   fetchKnowledgeDocuments,
   removeKnowledgeFile,
   uploadKnowledgeFile,
-} from "@/lib/knowledge-client";
+} from "@/lib/client/knowledge";
 import { useKnowledgeBases } from "./knowledge-provider";
 import { DeleteKnowledgeBaseButton } from "./delete-knowledge-base-button";
 

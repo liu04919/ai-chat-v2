@@ -8,7 +8,7 @@ import {
 import {
   conversationDetailQueryKey,
   fetchConversation,
-} from "../../../lib/conversations-client";
+} from "../../../lib/client/conversations";
 
 export type ConversationHistoryData = InfiniteData<
   ConversationDetailResponse,

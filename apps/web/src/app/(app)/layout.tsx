@@ -4,12 +4,12 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AccountBoundary } from "@/components/auth/account-boundary";
 import { ConversationSidebar } from "@/components/chat/sidebar/conversation-sidebar";
 import { McpToolPreferencesProvider } from "@/components/tools/mcp-tool-preferences-provider";
-import { getCurrentSession } from "@/lib/session";
-import { listConversationsForOwner } from "@/server/conversations";
+import { getCurrentSession } from "@/server/auth/session";
+import { listConversationsForOwner } from "@/server/conversations/reader";
 import { getMcpToolPreferencesForUser } from "@ai-chat/db";
 import { createKnowledgeRepository } from "@ai-chat/db";
 import { KnowledgeProvider } from "@/components/knowledge/knowledge-provider";
-import { toKnowledgeBase } from "@/server/knowledge";
+import { toKnowledgeBase } from "@/server/knowledge/service";
 
 export default async function AppLayout({
   children,

@@ -3,7 +3,7 @@
 import type { KnowledgeBaseDto } from "@ai-chat/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
-import { fetchKnowledgeBases } from "@/lib/knowledge-client";
+import { fetchKnowledgeBases } from "@/lib/client/knowledge";
 
 const KnowledgeContext = createContext<{
   ownerId: string;

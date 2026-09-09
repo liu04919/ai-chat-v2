@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getCurrentSession } from "@/lib/session";
-import { getGenerationQueueProducer } from "@/server/generation-queue";
+import { getCurrentSession } from "@/server/auth/session";
+import { getGenerationQueueProducer } from "@/server/generations/queue";
 import {
   regenerateGenerationForOwner,
   RegenerationServiceError,
-} from "@/server/generation-regeneration";
+} from "@/server/generations/regenerate";
 
 import { POST } from "./route";
 
-vi.mock("@/lib/session", () => ({ getCurrentSession: vi.fn() }));
-vi.mock("@/server/generation-queue", () => ({
+vi.mock("@/server/auth/session", () => ({ getCurrentSession: vi.fn() }));
+vi.mock("@/server/generations/queue", () => ({
   getGenerationQueueProducer: vi.fn(),
 }));
-vi.mock("@/server/generation-regeneration", () => {
+vi.mock("@/server/generations/regenerate", () => {
   class MockRegenerationServiceError extends Error {
     constructor(
       readonly response: { code: string },

@@ -4,12 +4,12 @@ import {
   deleteConversationResponseSchema,
 } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   ConversationMutationError,
   deleteConversationForOwner,
-} from "@/server/conversation-mutations";
-import { getConversationForOwner } from "@/server/conversations";
+} from "@/server/conversations/mutations";
+import { getConversationForOwner } from "@/server/conversations/reader";
 
 export async function GET(
   request: Request,

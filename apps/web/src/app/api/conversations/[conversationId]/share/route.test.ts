@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   ConversationShareServiceError,
   createConversationShareForOwner,
   deleteConversationShareForOwner,
   getConversationShareForOwner,
-} from "@/server/conversation-shares";
+} from "@/server/conversations/shares";
 import { DELETE, GET, POST } from "./route";
 
-vi.mock("@/lib/session", () => ({ getCurrentSession: vi.fn() }));
-vi.mock("@/server/conversation-shares", () => ({
+vi.mock("@/server/auth/session", () => ({ getCurrentSession: vi.fn() }));
+vi.mock("@/server/conversations/shares", () => ({
   ConversationShareServiceError: class ConversationShareServiceError extends Error {
     constructor(
       readonly code:

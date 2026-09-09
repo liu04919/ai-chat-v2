@@ -3,7 +3,7 @@ import {
   completeAttachmentUploadResponseSchema,
 } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   AttachmentServiceError,
   completeAttachmentUploadForOwner,

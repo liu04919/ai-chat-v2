@@ -56,10 +56,8 @@ export {
 } from "./conversation-share";
 export {
   activeGenerationSchema,
-  chatRuntimeStateSchema,
   generationStatusSchema,
   reasoningEffortSchema,
-  type ChatRuntimeStateDto,
   type GenerationStatusDto,
   type ReasoningEffortDto,
 } from "./generation";

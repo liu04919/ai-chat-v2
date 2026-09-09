@@ -1,7 +1,7 @@
 import { createKnowledgeRepository } from "@ai-chat/db";
-import { knowledgeHttp } from "@/server/knowledge-http";
-import { createKnowledgeUpload, toKnowledgeDocument } from "@/server/knowledge";
-import { getAttachmentObjectStorage } from "@/server/attachment-storage";
+import { knowledgeHttp } from "@/server/knowledge/http";
+import { createKnowledgeUpload, toKnowledgeDocument } from "@/server/knowledge/service";
+import { getObjectStorage } from "@/server/object-storage";
 
 type Context = { params: Promise<{ baseId: string }> };
 export async function GET(_request: Request, context: Context) {
@@ -23,7 +23,7 @@ export async function POST(request: Request, context: Context) {
     return Response.json(
       await createKnowledgeUpload(ownerId, baseId, input, {
         repository,
-        storage: getAttachmentObjectStorage(),
+        storage: getObjectStorage(),
       }),
       { status: 201 },
     );

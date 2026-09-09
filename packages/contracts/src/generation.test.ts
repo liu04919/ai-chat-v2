@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { chatRuntimeStateSchema, generationStatusSchema } from "./generation";
+import { activeGenerationSchema, generationStatusSchema } from "./generation";
 
 describe("generationStatusSchema", () => {
   it.each(["queued", "running", "completed", "failed", "cancelled"])(
@@ -11,38 +11,15 @@ describe("generationStatusSchema", () => {
   );
 });
 
-describe("chatRuntimeStateSchema", () => {
-  it("只允许 queued 或 running 作为 active Generation", () => {
-    expect(
-      chatRuntimeStateSchema.parse({
-        activeGeneration: {
-          id: "gen_123",
-          status: "running",
-          cancelRequestedAt: null,
-        },
-      }),
-    ).toEqual({
-      activeGeneration: {
-        id: "gen_123",
-        status: "running",
-        cancelRequestedAt: null,
-      },
-    });
-
-    expect(() =>
-      chatRuntimeStateSchema.parse({
-        activeGeneration: {
-          id: "gen_123",
-          status: "completed",
-          cancelRequestedAt: null,
-        },
-      }),
-    ).toThrow();
+describe("activeGenerationSchema", () => {
+  it.each(["queued", "running"])("接受活跃状态 %s", (status) => {
+    const generation = { id: "gen_123", status, cancelRequestedAt: null };
+    expect(activeGenerationSchema.parse(generation)).toEqual(generation);
   });
 
-  it("允许没有 active Generation", () => {
-    expect(chatRuntimeStateSchema.parse({ activeGeneration: null })).toEqual({
-      activeGeneration: null,
-    });
+  it.each(["completed", "failed", "cancelled"])("终态 %s 不能作为 active Generation", (status) => {
+    expect(() => activeGenerationSchema.parse({
+      id: "gen_123", status, cancelRequestedAt: null,
+    })).toThrow();
   });
 });

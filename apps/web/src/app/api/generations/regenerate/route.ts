@@ -4,12 +4,12 @@ import {
   regenerationErrorResponseSchema,
 } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
-import { getGenerationQueueProducer } from "@/server/generation-queue";
+import { getCurrentSession } from "@/server/auth/session";
+import { getGenerationQueueProducer } from "@/server/generations/queue";
 import {
   regenerateGenerationForOwner,
   RegenerationServiceError,
-} from "@/server/generation-regeneration";
+} from "@/server/generations/regenerate";
 
 export async function POST(request: Request) {
   const session = await getCurrentSession();

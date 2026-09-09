@@ -1,0 +1,20 @@
+{
+  "document": {
+    "id": "knowledge_document_example",
+    "originalName": "数据库笔记.md",
+    "mediaType": "text/markdown",
+    "sizeBytes": 1024,
+    "status": "uploading",
+    "chunkCount": 0,
+    "errorCode": null,
+    "createdAt": "2026-09-09T00:01:00.000Z"
+  },
+  "upload": {
+    "method": "PUT",
+    "url": "https://objects.example.test/knowledge/upload?signature=example",
+    "headers": {
+      "Content-Type": "text/markdown"
+    },
+    "expiresAt": "2026-09-09T00:06:00.000Z"
+  }
+}

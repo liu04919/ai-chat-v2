@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 
 import { ConversationWorkspace } from "@/components/chat/conversation-workspace";
-import { getCurrentSession } from "@/lib/session";
-import { getConversationForOwner } from "@/server/conversations";
+import { getCurrentSession } from "@/server/auth/session";
+import { getConversationForOwner } from "@/server/conversations/reader";
 
 export default async function ConversationPage({
   params,

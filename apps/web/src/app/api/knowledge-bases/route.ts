@@ -1,7 +1,7 @@
 import { knowledgeBaseInputSchema } from "@ai-chat/contracts";
 import { createKnowledgeRepository } from "@ai-chat/db";
-import { knowledgeHttp } from "@/server/knowledge-http";
-import { toKnowledgeBase } from "@/server/knowledge";
+import { knowledgeHttp } from "@/server/knowledge/http";
+import { toKnowledgeBase } from "@/server/knowledge/service";
 
 export async function GET() {
   return knowledgeHttp(async (ownerId) =>

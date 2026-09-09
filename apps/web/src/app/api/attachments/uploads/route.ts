@@ -4,7 +4,7 @@ import {
   createAttachmentUploadResponseSchema,
 } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import { createAttachmentUploadForOwner } from "@/server/attachments";
 
 export async function POST(request: Request) {

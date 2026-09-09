@@ -10,8 +10,8 @@ import {
 import {
   conversationDetailQueryKey,
   conversationListQueryKey,
-} from "../../../lib/conversations-client";
-import { cancelGeneration } from "../../../lib/generations-client";
+} from "../../../lib/client/conversations";
+import { cancelGeneration } from "../../../lib/client/generations";
 import { useGenerationProjectionStore } from "./generation-projection-store";
 import { invalidateConversationHistory, updateConversationHead } from "../messages/conversation-history-query";
 

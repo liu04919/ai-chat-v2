@@ -23,12 +23,12 @@ import { useRegenerateGeneration } from "./generation/use-regenerate-generation"
 import { VirtualMessageList } from "./messages/virtual-message-list";
 import { useConversationHistory } from "./messages/use-conversation-history";
 import { refreshConversationHistory } from "./messages/conversation-history-query";
-import { conversationListQueryKey } from "@/lib/conversations-client";
+import { conversationListQueryKey } from "@/lib/client/conversations";
 import {
   getGenerationCancellationClientErrorMessage,
   getGenerationClientErrorMessage,
   getGenerationRegenerationClientErrorMessage,
-} from "@/lib/generations-client";
+} from "@/lib/client/generations";
 
 type TerminalGenerationEvent = Extract<
   GenerationEventDto,

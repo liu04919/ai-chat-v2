@@ -10,12 +10,17 @@ AI Chat V2 是对本地 `D:\code\Next\ai-chat` 的正式重构。项目保留流
 apps/web            Next.js Web/API
 apps/worker         独立 Node Worker runtime
 packages/contracts  跨 runtime 的运行时 Schema 与 wire types
-packages/core       不依赖框架的领域规则
-packages/db         Drizzle schema、PostgreSQL client 与 migrations
+packages/db         Drizzle schema、PostgreSQL 查询与事务、迁移
 packages/storage    Web/Worker 共享的薄 R2 对象存储边界
 packages/event-store Web/Worker 共享的 Redis GenerationEvent 日志边界
 packages/mcp        Web/Worker 共享的服务端 MCP Registry、Client 与工具目录
 ```
+
+`packages/db/src` 按业务职责组织：`conversations/` 管会话、分享和摘要读写，`generations/` 管生成任务的数据库事务，`knowledge/` 管知识库持久化与检索 SQL。配套测试与实现放在一起；表定义仍集中在 `schema/`，对外入口保持 `@ai-chat/db` 和 `@ai-chat/db/schema`。
+
+`apps/web/src/server` 是 Web 侧的业务编排：`conversations/` 管会话读取、修改和分享，`generations/` 管创建、重新生成、取消、入队及 SSE，`knowledge/` 管知识库文件流程、HTTP 错误和入库队列。附件和 MCP 目前各保留为 `attachments.ts`、`mcp-tools.ts`；`object-storage.ts` 初始化附件、分享和知识库共用的 R2 客户端。测试与实现放在一起，调用方直接引用具体文件，不设统一转发入口。这里组织数据库、队列和对象存储的调用，SQL 与事务仍由 `packages/db` 负责。
+
+`apps/web/src/lib` 按运行职责组织：`client/` 放浏览器请求、响应校验和客户端缓存辅助函数，`auth/` 放浏览器认证客户端、登录后跳转和跨标签页账户同步；依赖数据库和请求头的认证实例、会话读取放在 `server/auth/`。`conversation-title.ts` 是前后端共用的标题函数，`utils.ts` 保留 UI 使用的 `cn()`；两者保持单文件。认证的客户端与服务端分别引用具体文件，不设混合导出入口。
 
 ## 本地运行
 
@@ -98,7 +103,7 @@ pnpm --filter @ai-chat/worker knowledge delete <ownerId> <baseId> <documentId>
 - 查询先取得允许访问的文档 ID，把该过滤放进 chunk 的 Top K 查询。向量直接按余弦距离排序，BM25 直接按索引打分排序；只物化已取出的候选，不预先物化全部 chunk。向量查询在事务内设置 `SET LOCAL hnsw.iterative_scan = strict_order`，补充过滤后的候选；受扫描上限约束，并非保证召回齐全。正式查询不强制索引，执行计划由 PostgreSQL 选择。
 - BM25 继续使用共享索引的语料统计，不是每个知识库独立计算 IDF。分块变更只影响新上传的文档；已有文档若要采用新策略，需要重新上传，不自动改写已有向量。
 
-测试覆盖数据库/队列、账户隔离、失败与重复任务、原子发布、删除、解析和分批请求。`knowledge-search.integration.test.ts` 使用同一条业务 SQL 执行 `EXPLAIN (ANALYZE, BUFFERS)`，在仅测试启用的计划设置下验证两个索引可用，以及过滤掉 90% 数据后返回 30 条。测试使用可控向量验证流程，不能当成检索效果或性能跑分；效果评测需要另外准备标注问题与相关 chunk。
+测试覆盖数据库/队列、账户隔离、失败与重复任务、原子发布、删除、解析和分批请求。`packages/db/src/knowledge/search.integration.test.ts` 使用同一条业务 SQL 执行 `EXPLAIN (ANALYZE, BUFFERS)`，在仅测试启用的计划设置下验证两个索引可用，以及过滤掉 90% 数据后返回 30 条。测试使用可控向量验证流程，不能当成检索效果或性能跑分；效果评测需要另外准备标注问题与相关 chunk。
 
 ```bash
 pnpm exec vitest run packages/db/src/rag-extensions.integration.test.ts

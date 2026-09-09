@@ -8,15 +8,15 @@ import {
   saveAttachmentTokenCount,
   saveMessageTokenCounts,
 } from "./context-token-counts";
-import { createGenerationCommandRecord } from "./generation-command";
+import { createGenerationCommandRecord } from "./generations/command";
 import {
   cancelGenerationExecution,
   requestGenerationCancellationForOwner,
-} from "./generation-cancellation";
+} from "./generations/cancellation";
 import {
   claimGenerationExecution,
   completeGenerationExecution,
-} from "./generation-execution";
+} from "./generations/execution";
 import { migrateDatabase } from "./migration";
 import { attachments, messages, user } from "./schema/index";
 import { loadIntegrationTestEnvironment } from "./test-environment";

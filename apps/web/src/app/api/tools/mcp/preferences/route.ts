@@ -4,7 +4,7 @@ import {
   saveMcpToolPreferencesForUser,
 } from "@ai-chat/db";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 
 export async function GET() {
   const session = await getCurrentSession();

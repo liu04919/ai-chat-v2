@@ -214,8 +214,6 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
 
-  packages/core: {}
-
   packages/db:
     dependencies:
       '@ai-chat/contracts':

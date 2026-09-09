@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
-import { conversationDetailQueryKey } from "../../../lib/conversations-client";
+import { conversationDetailQueryKey } from "../../../lib/client/conversations";
 import {
   conversationHistoryOptions,
   historyMessages,

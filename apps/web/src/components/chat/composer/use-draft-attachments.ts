@@ -16,7 +16,7 @@ import {
   deleteAttachment,
   getAttachmentClientErrorMessage,
   uploadAttachmentObject,
-} from "@/lib/attachments-client";
+} from "@/lib/client/attachments";
 
 export type DraftAttachmentStatus =
   | "uploading"

@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   cancelGenerationForOwner,
   GenerationCancellationServiceError,
-} from "@/server/generation-cancellation";
-import { getGenerationCancellationInfrastructure } from "@/server/generation-cancellation-infrastructure";
+} from "@/server/generations/cancellation";
+import { getGenerationCancellationInfrastructure } from "@/server/generations/cancellation-infrastructure";
 
 import { POST } from "./route";
 
-vi.mock("@/lib/session", () => ({ getCurrentSession: vi.fn() }));
-vi.mock("@/server/generation-cancellation", () => {
+vi.mock("@/server/auth/session", () => ({ getCurrentSession: vi.fn() }));
+vi.mock("@/server/generations/cancellation", () => {
   class MockGenerationCancellationServiceError extends Error {
     constructor(
       readonly response: { code: string },
@@ -26,7 +26,7 @@ vi.mock("@/server/generation-cancellation", () => {
       MockGenerationCancellationServiceError,
   };
 });
-vi.mock("@/server/generation-cancellation-infrastructure", () => ({
+vi.mock("@/server/generations/cancellation-infrastructure", () => ({
   getGenerationCancellationInfrastructure: vi.fn(),
 }));
 

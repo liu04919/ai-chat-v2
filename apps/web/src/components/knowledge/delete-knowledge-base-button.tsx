@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { removeKnowledgeBase } from "@/lib/knowledge-client";
+import { removeKnowledgeBase } from "@/lib/client/knowledge";
 import { useKnowledgeBases } from "./knowledge-provider";
 
 export function DeleteKnowledgeBaseButton({

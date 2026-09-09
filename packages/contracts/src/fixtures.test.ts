@@ -26,6 +26,19 @@ import {
 } from "./generation-command";
 import { generationEventSchema } from "./generation-event";
 import { mcpToolCatalogResponseSchema } from "./generation-tools";
+import {
+  createKnowledgeUploadResponseSchema,
+  deleteKnowledgeBaseResponseSchema,
+  deleteKnowledgeDocumentResponseSchema,
+  knowledgeBaseInputSchema,
+  knowledgeBaseListSchema,
+  knowledgeBaseSchema,
+  knowledgeDocumentInputSchema,
+  knowledgeDocumentListSchema,
+  knowledgeDocumentSchema,
+  knowledgeErrorResponseSchema,
+  knowledgeJobSchema,
+} from "./knowledge";
 
 function readExample(name: string): unknown {
   const url = new URL(`../examples/${name}`, import.meta.url);
@@ -33,6 +46,24 @@ function readExample(name: string): unknown {
 }
 
 describe("contract examples", () => {
+  it.each([
+    ["http/knowledge/base-create.request.json", knowledgeBaseInputSchema],
+    ["http/knowledge/base-create.response.json", knowledgeBaseSchema],
+    ["http/knowledge/base-list.response.json", knowledgeBaseListSchema],
+    ["http/knowledge/base-delete.response.json", deleteKnowledgeBaseResponseSchema],
+    ["http/knowledge/upload.request.json", knowledgeDocumentInputSchema],
+    ["http/knowledge/upload.response.json", createKnowledgeUploadResponseSchema],
+    ["http/knowledge/upload-complete.response.json", knowledgeDocumentSchema],
+    ["http/knowledge/document-list.response.json", knowledgeDocumentListSchema],
+    ["http/knowledge/document-delete.response.json", deleteKnowledgeDocumentResponseSchema],
+    ["http/knowledge/error.response.json", knowledgeErrorResponseSchema],
+    ["http/knowledge/generation.request.json", createGenerationRequestSchema],
+    ["worker/knowledge.job.json", knowledgeJobSchema],
+  ] as const)("知识库示例 %s 与 Schema 保持一致", (name, schema) => {
+    const example = readExample(name);
+    expect(schema.parse(example)).toEqual(example);
+  });
+
   it("attachment read response 与 Schema 保持一致", () => {
     const response = readExample("http/attachment/read.response.json");
     expect(readAttachmentResponseSchema.parse(response)).toEqual(response);
@@ -115,6 +146,7 @@ describe("contract examples", () => {
     "reasoning-delta",
     "tool-call",
     "tool-result",
+    "knowledge-sources",
     "completed",
     "failed",
     "cancelled",

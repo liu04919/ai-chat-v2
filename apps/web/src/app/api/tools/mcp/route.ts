@@ -1,6 +1,6 @@
 import { mcpToolCatalogResponseSchema } from "@ai-chat/contracts";
 
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/server/auth/session";
 import { listMcpTools } from "@/server/mcp-tools";
 
 export async function GET() {

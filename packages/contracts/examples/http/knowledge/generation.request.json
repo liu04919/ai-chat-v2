@@ -1,0 +1,20 @@
+{
+  "target": {
+    "type": "new",
+    "conversationId": "conversation_example",
+    "mode": "chat"
+  },
+  "userMessageId": "user_message_example",
+  "parts": [
+    {
+      "type": "text",
+      "text": "什么是混合检索？"
+    }
+  ],
+  "reasoningEffort": "medium",
+  "tools": {
+    "webSearch": false,
+    "mcpToolIds": []
+  },
+  "knowledgeBaseId": "knowledge_base_example"
+}

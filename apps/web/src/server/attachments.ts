@@ -18,7 +18,7 @@ import {
 } from "@ai-chat/db";
 import type { ObjectStorage } from "@ai-chat/storage";
 
-import { getAttachmentObjectStorage } from "./attachment-storage";
+import { getObjectStorage } from "./object-storage";
 
 export class AttachmentServiceError extends Error {
   constructor(
@@ -70,7 +70,7 @@ export async function readAttachmentForOwner(
     throw new AttachmentServiceError("ATTACHMENT_NOT_READY", 409);
   }
   const now = (dependencies.now ?? (() => new Date()))();
-  const storage = dependencies.storage ?? getAttachmentObjectStorage();
+  const storage = dependencies.storage ?? getObjectStorage();
   const url = await storage.createDownloadUrl(
     attachment.objectKey,
     ATTACHMENT_DOWNLOAD_TTL_SECONDS,
@@ -91,7 +91,7 @@ export async function createAttachmentUploadForOwner(
   input: CreateAttachmentUploadRequest,
   dependencies: AttachmentServiceDependencies = {},
 ): Promise<CreateAttachmentUploadResponse> {
-  const storage = dependencies.storage ?? getAttachmentObjectStorage();
+  const storage = dependencies.storage ?? getObjectStorage();
   const attachmentId = (dependencies.createId ?? randomUUID)();
   const now = (dependencies.now ?? (() => new Date()))();
   const objectKey = `attachments/${attachmentId}`;
@@ -135,7 +135,7 @@ export async function completeAttachmentUploadForOwner(
     return toAttachmentDto(attachment);
   }
 
-  const storage = dependencies.storage ?? getAttachmentObjectStorage();
+  const storage = dependencies.storage ?? getObjectStorage();
   const storedObject = await storage.headObject(attachment.objectKey);
 
   if (!storedObject) {
@@ -192,6 +192,6 @@ export async function deleteAttachmentForOwner(
     throw new AttachmentServiceError("ATTACHMENT_NOT_FOUND", 404);
   }
 
-  const storage = dependencies.storage ?? getAttachmentObjectStorage();
+  const storage = dependencies.storage ?? getObjectStorage();
   await storage.deleteObject(attachment.objectKey);
 }
