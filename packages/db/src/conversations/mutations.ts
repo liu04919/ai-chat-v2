@@ -15,10 +15,10 @@ type Database = ReturnType<typeof getDatabase>;
 
 export type DeletedConversationRecord = {
   conversationId: string;
-  activeGenerations: Array<{
+  activeGeneration: {
     id: string;
     status: "queued" | "running";
-  }>;
+  } | null;
   attachmentObjectKeys: string[];
 };
 
@@ -78,7 +78,8 @@ export async function deleteConversationRecordForOwner(
       return null;
     }
 
-    const activeGenerations = await transaction
+    // 部分唯一索引保证同一会话的 queued / running 合计最多一条。
+    const [activeGeneration] = await transaction
       .select({ id: generations.id, status: generations.status })
       .from(generations)
       .where(
@@ -86,7 +87,8 @@ export async function deleteConversationRecordForOwner(
           eq(generations.conversationId, conversationId),
           inArray(generations.status, ["queued", "running"]),
         ),
-      );
+      )
+      .limit(1);
     const messageRows = await transaction
       .select({ parts: messages.parts })
       .from(messages)
@@ -128,19 +130,13 @@ export async function deleteConversationRecordForOwner(
       .delete(conversations)
       .where(eq(conversations.id, conversationId));
 
-    const activeGenerationRecords: DeletedConversationRecord["activeGenerations"] = [];
-    for (const generation of activeGenerations) {
-      if (generation.status === "queued" || generation.status === "running") {
-        activeGenerationRecords.push({
-          id: generation.id,
-          status: generation.status,
-        });
-      }
-    }
-
+    // SQL 的过滤不会收窄 TypeScript 枚举，返回时显式收窄活动状态。
     return {
       conversationId,
-      activeGenerations: activeGenerationRecords,
+      activeGeneration:
+        activeGeneration?.status === "queued" || activeGeneration?.status === "running"
+          ? { id: activeGeneration.id, status: activeGeneration.status }
+          : null,
       attachmentObjectKeys: deletedAttachments.map(
         (attachment) => attachment.objectKey,
       ),

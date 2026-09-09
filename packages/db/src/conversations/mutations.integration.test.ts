@@ -144,7 +144,9 @@ describe("Conversation mutations", () => {
     }
   });
 
-  it("删除会话会级联消息和 Generation，并返回需要清理的附件与运行任务", async () => {
+  it.each([
+    "queued", "running", "completed", "failed", "cancelled",
+  ] as const)("删除会话级联消息和 Generation，返回附件与单个活动任务（%s）", async (status) => {
     const conversationId = randomUUID();
     const messageId = randomUUID();
     const generationId = randomUUID();
@@ -181,14 +183,16 @@ describe("Conversation mutations", () => {
       id: generationId,
       conversationId,
       userMessageId: messageId,
-      status: "running",
+      status,
     });
 
     await expect(
       deleteConversationRecordForOwner(ownerId, conversationId, database.db),
     ).resolves.toEqual({
       conversationId,
-      activeGenerations: [{ id: generationId, status: "running" }],
+      activeGeneration: status === "queued" || status === "running"
+        ? { id: generationId, status }
+        : null,
       attachmentObjectKeys: [objectKey],
     });
     await expect(
@@ -266,7 +270,7 @@ describe("Conversation mutations", () => {
       deleteConversationRecordForOwner(ownerId, conversationId, database.db),
     ).resolves.toEqual({
       conversationId,
-      activeGenerations: [],
+      activeGeneration: null,
       attachmentObjectKeys: [objectKey],
     });
     await expect(

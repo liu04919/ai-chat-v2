@@ -60,10 +60,7 @@ describe("Conversation mutation services", () => {
     const deleteObject = vi.fn(async () => undefined);
     deleteRecord.mockResolvedValue({
       conversationId: "c1",
-      activeGenerations: [
-        { id: "queued", status: "queued" },
-        { id: "running", status: "running" },
-      ],
+      activeGeneration: { id: "running", status: "running" },
       attachmentObjectKeys: ["attachments/a", "attachments/b"],
     });
 
@@ -78,13 +75,30 @@ describe("Conversation mutation services", () => {
     expect(deleteObject).toHaveBeenCalledTimes(2);
   });
 
+  it("queued Generation 不发送取消通知，但仍清理附件对象", async () => {
+    const publish = vi.fn(async () => undefined);
+    const deleteObject = vi.fn(async () => undefined);
+    deleteRecord.mockResolvedValue({
+      conversationId: "c1",
+      activeGeneration: { id: "queued", status: "queued" },
+      attachmentObjectKeys: ["attachments/a"],
+    });
+
+    await expect(deleteConversationForOwner("owner", "c1", {
+      cancellationPublisher: { publish }, storage: { deleteObject },
+    })).resolves.toEqual({ conversationId: "c1" });
+    expect(publish).not.toHaveBeenCalled();
+    expect(getGenerationCancellationInfrastructure).not.toHaveBeenCalled();
+    expect(deleteObject).toHaveBeenCalledExactlyOnceWith("attachments/a");
+  });
+
   it("R2 初始化失败不改变已删除结果，也不妨碍通知 Worker", async () => {
     const failure = new Error("R2 configuration missing");
     vi.mocked(getObjectStorage).mockImplementation(() => { throw failure; });
     const publish = vi.fn(async () => undefined);
     deleteRecord.mockResolvedValue({
       conversationId: "c1",
-      activeGenerations: [{ id: "running", status: "running" }],
+      activeGeneration: { id: "running", status: "running" },
       attachmentObjectKeys: ["attachments/a"],
     });
 
@@ -101,7 +115,7 @@ describe("Conversation mutation services", () => {
     const deleteObject = vi.fn(async () => undefined);
     deleteRecord.mockResolvedValue({
       conversationId: "c1",
-      activeGenerations: [{ id: "running", status: "running" }],
+      activeGeneration: { id: "running", status: "running" },
       attachmentObjectKeys: ["attachments/a", "attachments/b"],
     });
 
@@ -120,7 +134,7 @@ describe("Conversation mutation services", () => {
     });
     deleteRecord.mockResolvedValue({
       conversationId: "c1",
-      activeGenerations: [{ id: "running", status: "running" }],
+      activeGeneration: { id: "running", status: "running" },
       attachmentObjectKeys: ["attachments/a", "attachments/b"],
     });
 
@@ -133,7 +147,7 @@ describe("Conversation mutation services", () => {
 
   it("没有运行任务或附件时不初始化清理依赖", async () => {
     deleteRecord.mockResolvedValue({
-      conversationId: "c1", activeGenerations: [], attachmentObjectKeys: [],
+      conversationId: "c1", activeGeneration: null, attachmentObjectKeys: [],
     });
     await expect(deleteConversationForOwner("owner", "c1")).resolves.toEqual({ conversationId: "c1" });
     expect(getObjectStorage).not.toHaveBeenCalled();
