@@ -7,7 +7,7 @@ import {
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
 
-export const GENERATION_WORKER_CONCURRENCY = 1;
+export const GENERATION_WORKER_CONCURRENCY = 5;
 
 export type GenerationJobProcessor = (
   generationId: string,

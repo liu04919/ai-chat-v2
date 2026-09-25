@@ -21,6 +21,7 @@ type GenerationProjectionState = {
   setConnected(conversationId: string): void;
   setConnectionError(conversationId: string): void;
   clear(conversationId: string): void;
+  clearGeneration(conversationId: string, generationId: string): void;
 };
 
 export const useGenerationProjectionStore =
@@ -100,6 +101,16 @@ export const useGenerationProjectionStore =
 
       clear(conversationId) {
         set((state) => {
+          delete state.projections[conversationId];
+        });
+      },
+
+      clearGeneration(conversationId, generationId) {
+        set((state) => {
+          // 终态同步可能晚于下一轮开始，旧回调不能删除新任务的投影。
+          if (state.projections[conversationId]?.generationId !== generationId) {
+            return;
+          }
           delete state.projections[conversationId];
         });
       },

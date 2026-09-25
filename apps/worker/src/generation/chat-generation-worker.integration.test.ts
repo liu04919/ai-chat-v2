@@ -146,6 +146,10 @@ const fakeChatModel: ChatModel = {
       throw new Error("Fake LLM failure");
     }
 
+    if (latestUserText(request).includes("无输出失败")) {
+      throw new Error("Fake empty failure");
+    }
+
     if (latestUserText(request).includes("等待无输出取消")) {
       await new Promise<void>((resolve) => {
         if (request.abortSignal?.aborted) {
@@ -812,7 +816,7 @@ describe("Chat Generation Worker 主链", () => {
     ).resolves.toMatchObject({ assistantMessageId: null });
   });
 
-  it("重新生成失败时不恢复已经删除的旧回答", async () => {
+  it("重新生成失败时保存本次 partial，不恢复已经删除的旧回答", async () => {
     const conversationId = `worker-regenerate-fail-conversation-${randomUUID()}`;
     const userMessageId = `worker-regenerate-fail-user-${randomUUID()}`;
     const assistantMessageId = `worker-regenerate-fail-assistant-${randomUUID()}`;
@@ -840,9 +844,12 @@ describe("Chat Generation Worker 主链", () => {
     await expect(
       database.db.query.messages.findMany({
         where: (table, { eq }) => eq(table.conversationId, conversationId),
+        orderBy: (table, { asc }) => asc(table.sequence),
       }),
     ).resolves.toMatchObject([
       { id: userMessageId, role: "user", sequence: 0 },
+      { role: "assistant", sequence: 1,
+        parts: [{ id: "failed-text", type: "text", text: "部分" }] },
     ]);
     await expect(
       database.db.query.generations.findFirst({
@@ -850,9 +857,12 @@ describe("Chat Generation Worker 主链", () => {
       }),
     ).resolves.toMatchObject({
       status: "failed",
-      assistantMessageId: null,
+      assistantMessageId: expect.any(String),
       errorCode: "CHAT_GENERATION_FAILED",
     });
+    expect(await database.db.query.messages.findFirst({
+      where: (table, { eq }) => eq(table.id, assistantMessageId),
+    })).toBeUndefined();
   });
 
   it("模型流失败时保留已发布 delta，并把 Generation 标记为 failed", async () => {
@@ -875,7 +885,7 @@ describe("Chat Generation Worker 主链", () => {
       }),
     ).resolves.toMatchObject({
       status: "failed",
-      assistantMessageId: null,
+      assistantMessageId: expect.any(String),
       errorCode: "CHAT_GENERATION_FAILED",
     });
     expect(
@@ -890,11 +900,55 @@ describe("Chat Generation Worker 主链", () => {
       },
       { type: "generation.failed", generationId },
     ]);
-    expect(
-      await database.db.query.messages.findMany({
-        where: (table, { eq }) => eq(table.conversationId, conversationId),
-      }),
-    ).toHaveLength(1);
+    const persisted = await database.db.query.messages.findMany({
+      where: (table, { eq }) => eq(table.conversationId, conversationId),
+      orderBy: (table, { asc }) => asc(table.sequence),
+    });
+    expect(persisted).toMatchObject([
+      { role: "user", sequence: 0 },
+      { role: "assistant", sequence: 1,
+        parts: [{ id: "failed-text", type: "text", text: "部分" }],
+        contextTokenCount: { version: expect.any(String), textTokens: expect.any(Number) } },
+    ]);
+    // 失败的 partial 仍可使用原 assistantMessageId 重新生成接口。
+    await createQueuedRegeneration({
+      generationId: randomUUID(), conversationId, assistantMessageId: persisted[1]!.id,
+    });
+  });
+
+  it("无输出失败不创建空回答，下一条用户消息仍可继续生成", async () => {
+    const generationId = randomUUID();
+    const conversationId = randomUUID();
+    await createQueuedGeneration({
+      generationId, conversationId, userMessageId: randomUUID(),
+      parts: [{ type: "text", text: "无输出失败" }],
+    });
+    const failedJob = await enqueue(generationId);
+    await expect(failedJob.waitUntilFinished(queueEvents, 5_000))
+      .rejects.toThrow("Fake empty failure");
+    expect(await database.db.query.generations.findFirst({
+      where: (table, { eq }) => eq(table.id, generationId),
+    })).toMatchObject({ status: "failed", assistantMessageId: null });
+    expect(await database.db.query.messages.findMany({
+      where: (table, { eq }) => eq(table.conversationId, conversationId),
+    })).toMatchObject([{ role: "user", sequence: 0 }]);
+
+    const nextId = randomUUID();
+    await createExistingQueuedGeneration({
+      generationId: nextId, conversationId, userMessageId: randomUUID(),
+      parts: [{ type: "text", text: "换个问题，你好" }],
+    });
+    const nextJob = await enqueue(nextId);
+    await expect(nextJob.waitUntilFinished(queueEvents, 5_000))
+      .resolves.toMatchObject({ kind: "completed" });
+    expect(await database.db.query.messages.findMany({
+      where: (table, { eq }) => eq(table.conversationId, conversationId),
+      orderBy: (table, { asc }) => asc(table.sequence),
+    })).toMatchObject([
+      { role: "user", sequence: 0 },
+      { role: "user", sequence: 1 },
+      { role: "assistant", sequence: 2 },
+    ]);
   });
 
   it("收到跨进程取消信号后停止模型并持久化 reasoning-only partial", async () => {

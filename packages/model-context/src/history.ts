@@ -6,10 +6,6 @@ import {
   toRuntimeHistoryToolName,
 } from "./tool-names";
 
-function assistantHistoryLabel(text: string): string {
-  return `[上一轮助手输出]\n${text}`;
-}
-
 type AssistantContentPart = Extract<
   Extract<ModelMessage, { role: "assistant" }>["content"],
   readonly unknown[]
@@ -54,10 +50,17 @@ function toAssistantModelMessages(
         // 历史不重复注入原文；本轮需要资料时由工具重新检索。
         break;
       case "reasoning":
-        // 思考展示不是确定事实，不回放进下一轮或历史摘要。
+        // 用户可能追问网页中的思考。我们只保存了展示文本，没有供应商的推理元数据；
+        // 因此作为带标注的普通历史文本回放，不能伪造原生 reasoning part（SDK 会丢弃）。
+        if (part.text.trim()) {
+          content.push({
+            type: "text",
+            text: `[历史可见思考：可能包含未采纳的推测，不是最终结论]\n${part.text}\n[历史可见思考结束]`,
+          });
+        }
         break;
       case "text":
-        content.push({ type: "text", text: assistantHistoryLabel(part.text) });
+        content.push({ type: "text", text: part.text });
         break;
       case "attachment":
         throw new Error("Chat Model 暂不支持 Assistant Attachment 历史");

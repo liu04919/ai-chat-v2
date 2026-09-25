@@ -6,7 +6,7 @@ import {
   failGenerationExecution,
   isGenerationCancellationRequested,
 } from "@ai-chat/db";
-import type { GenerationEventDto } from "@ai-chat/contracts";
+import type { GenerationEventDto, KnowledgeSourceDto } from "@ai-chat/contracts";
 import type { ChatModelRequest, ChatModelStreamPart } from "../llm/chat-model";
 import {
   executeChatGeneration,
@@ -72,7 +72,7 @@ function setup() {
     tools: undefined,
     toPublicToolName: (name: string) => name,
     activeTools: () => [],
-    takeSources: () => [],
+    takeSources: (): KnowledgeSourceDto[] => [],
     close,
   }));
   const dependencies: ExecuteChatGenerationDependencies = {
@@ -157,8 +157,99 @@ describe("摘要准备接入 Generation 生命周期", () => {
     ).rejects.toThrow("CHAT_CONTEXT_TOO_LARGE");
     expect(context.stream).not.toHaveBeenCalled();
     expect(failGenerationExecution).toHaveBeenCalledOnce();
+    expect(vi.mocked(failGenerationExecution).mock.calls[0]![0])
+      .not.toHaveProperty("partialMessage");
     expect(context.events.at(-1)?.type).toBe("generation.failed");
     expect(context.close).toHaveBeenCalledOnce();
     expect(context.unsubscribe).toHaveBeenCalledOnce();
+  });
+});
+
+describe("失败回答的持久化", () => {
+  it.each(["text", "reasoning"] as const)(
+    "哪怕只有一个 %s 字符也保存，并在保存后发布失败终态", async (type) => {
+      const context = setup();
+      context.dependencies.createAssistantMessageId = () => "partial";
+      context.stream.mockImplementation(async function* () {
+        yield { type, partId: "part", delta: "字" };
+        throw new Error("upstream failed");
+      });
+      vi.mocked(failGenerationExecution).mockImplementation(async () => {
+        expect(context.events.some(event => event.type === "generation.failed"))
+          .toBe(false);
+        return true;
+      });
+
+      await expect(executeChatGeneration(execution, context.dependencies))
+        .rejects.toThrow("upstream failed");
+      expect(failGenerationExecution).toHaveBeenCalledWith({
+        generationId: execution.id,
+        errorCode: "CHAT_GENERATION_FAILED",
+        partialMessage: { id: "partial", parts: [{ id: "part", type, text: "字" }] },
+        now: expect.any(Date),
+      });
+      expect(context.events.at(-1)?.type).toBe("generation.failed");
+      expect(completeGenerationExecution).not.toHaveBeenCalled();
+      expect(context.close).toHaveBeenCalledOnce();
+      expect(context.unsubscribe).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("只有工具过程和引用、尚无正文时也保留所有 Parts", async () => {
+    const context = setup();
+    context.dependencies.createAssistantMessageId = () => "partial";
+    const sources: KnowledgeSourceDto[] = [{
+      number: 1, chunkId: "chunk", documentId: "doc",
+      originalName: "资料.md", page: 1, content: "原文",
+    }];
+    context.resolve.mockImplementation(async () => ({
+      instructions: "system", tools: undefined, activeTools: () => [],
+      toPublicToolName: (name: string) => name,
+      takeSources: () => sources, close: context.close,
+    }));
+    context.stream.mockImplementation(async function* () {
+      yield { type: "tool-call", partId: "call", toolCallId: "c",
+        toolName: "knowledge_search", input: { query: "问题" } };
+      yield { type: "tool-result", partId: "result", toolCallId: "c",
+        output: { answer: "原文" }, isError: false };
+      throw new Error("upstream failed");
+    });
+
+    await expect(executeChatGeneration(execution, context.dependencies))
+      .rejects.toThrow("upstream failed");
+    expect(vi.mocked(failGenerationExecution).mock.calls[0]![0].partialMessage)
+      .toEqual({ id: "partial", parts: [
+        { id: "call", type: "tool-call", toolCallId: "c",
+          toolName: "knowledge_search", input: { query: "问题" } },
+        { id: "result", type: "tool-result", toolCallId: "c",
+          output: { answer: "原文" }, isError: false },
+        { id: "knowledge-generation", type: "knowledge-sources", sources },
+      ] });
+    expect(context.events.map(event => event.type)).toEqual([
+      "generation.started", "tool.call", "tool.result", "knowledge.sources", "generation.failed",
+    ]);
+  });
+
+  it("取消先于失败落库时由取消路径保存 partial，不发布失败事件", async () => {
+    const context = setup();
+    context.dependencies.createAssistantMessageId = () => "partial";
+    context.stream.mockImplementation(async function* () {
+      yield { type: "reasoning", partId: "r", delta: "思" };
+      throw new Error("upstream failed");
+    });
+    vi.mocked(failGenerationExecution).mockImplementation(async () => {
+      vi.mocked(isGenerationCancellationRequested).mockResolvedValue(true);
+      return false;
+    });
+
+    await expect(executeChatGeneration(execution, context.dependencies))
+      .resolves.toEqual({ kind: "cancelled", assistantMessageId: "partial" });
+    expect(cancelGenerationExecution).toHaveBeenCalledWith({
+      generationId: execution.id, assistantMessageId: "partial",
+      assistantParts: [{ id: "r", type: "reasoning", text: "思" }],
+      now: expect.any(Date),
+    });
+    expect(context.events.at(-1)?.type).toBe("generation.cancelled");
+    expect(context.events.some(event => event.type === "generation.failed")).toBe(false);
   });
 });

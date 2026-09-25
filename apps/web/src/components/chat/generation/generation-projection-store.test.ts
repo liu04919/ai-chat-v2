@@ -55,4 +55,51 @@ describe("Generation projection store", () => {
       useGenerationProjectionStore.getState().projections[conversationId],
     ).toBeUndefined();
   });
+
+  it.each([
+    "generation.completed", "generation.failed", "generation.cancelled",
+  ] as const)("%s 同步后按任务清理，不影响其他会话", (type) => {
+    const store = useGenerationProjectionStore.getState();
+    store.start(conversationId, generationId);
+    store.start("other-conversation", "other-generation");
+    store.apply(conversationId, [{ type, generationId }]);
+
+    store.clearGeneration(conversationId, generationId);
+
+    const { projections } = useGenerationProjectionStore.getState();
+    expect(projections[conversationId]).toBeUndefined();
+    expect(projections["other-conversation"]?.generationId).toBe("other-generation");
+  });
+
+  it("上一轮的终态同步晚到时，不删除下一轮投影", () => {
+    const store = useGenerationProjectionStore.getState();
+    store.start(conversationId, generationId);
+    store.start(conversationId, "next-generation");
+    store.apply(conversationId, [{
+      type: "text.delta", generationId: "next-generation",
+      partId: "text-next", delta: "新回复",
+    }]);
+    const before = useGenerationProjectionStore.getState();
+
+    store.clearGeneration(conversationId, generationId);
+
+    // 不匹配时不修改状态，也不触发一次无意义的状态通知。
+    expect(useGenerationProjectionStore.getState()).toBe(before);
+    expect(before.projections[conversationId]).toMatchObject({
+      generationId: "next-generation",
+      parts: [{ id: "text-next", type: "text", text: "新回复" }],
+    });
+  });
+
+  it("投影不存在或已清理时，重复清理无副作用", () => {
+    const store = useGenerationProjectionStore.getState();
+    store.clearGeneration(conversationId, generationId);
+    expect(useGenerationProjectionStore.getState().projections).toEqual({});
+
+    store.start(conversationId, generationId);
+    store.clearGeneration(conversationId, generationId);
+    const cleared = useGenerationProjectionStore.getState();
+    store.clearGeneration(conversationId, generationId);
+    expect(useGenerationProjectionStore.getState()).toBe(cleared);
+  });
 });

@@ -100,7 +100,7 @@ Message 是永久业务记录，不使用 AI SDK 的 `UIMessage` 作为领域类
 
 Message 按角色约束 Parts：User Message 只允许 `text | attachment`；Assistant Message 使用有序 Parts，允许 `reasoning | text | attachment | tool-call | tool-result | knowledge-sources`。持久化数组保留 `reasoning → tool-call → tool-result → reasoning → text` 等原始交替顺序，不为了界面布局改写记录。Assistant Part 使用稳定 `id`，Tool call/result 通过 `toolCallId` 关联。PostgreSQL 中的服务端 Assistant Parts 保留完整 Tool `input/output`；面向浏览器的 Message DTO 是显式安全投影，不包含这两个字段。浏览器可将思考与工具过程归入回答顶部的同一折叠区域，这是展示投影，不是存储顺序。
 
-浏览器可见历史不等于模型输入。`packages/model-context` 统一负责历史投影与 token 计数：保留普通回答，跳过 reasoning 展示、旧知识库引用原文以及成对的 `search_knowledge` 调用/结果；其他工具保留调用/结果，缺失结果时补充“结果未知”，不自动重试。系统不保存或依赖 Provider 私有推理状态。原始持久化 Parts 不因投影或摘要而修改，仍供网页、分享与历史分页展示。
+浏览器可见历史不等于模型输入。`packages/model-context` 统一负责历史投影与 token 计数：普通回答保留原文；可见 reasoning 转成带“可能包含未采纳推测”标注的普通助手历史文本，支持用户追问思考中的内容。跳过旧知识库引用原文以及成对的 `search_knowledge` 调用/结果；其他工具保留调用/结果，缺失结果时补充“结果未知”，不自动重试。系统不保存或依赖 Provider 私有推理状态，不把展示文本伪装成原生 reasoning 输入。原始持久化 Parts 不因投影或摘要而修改，仍供网页、分享与历史分页展示。
 
 Message 与 Attachment 的关系唯一记录在 `Message.parts` 中；第一版不增加 `message_attachment` 关系表，也不把 MessagePart 拆成 `image | file`。具体类型由 Attachment 元数据决定。
 
@@ -117,7 +117,7 @@ type GenerationStatus =
   | "cancelled";
 ```
 
-Generation 与 Assistant Message 不是同一个对象。执行中的增量属于 Generation；成功完成后，按原始顺序聚合的可见 reasoning、tool 过程和最终输出共同成为 Assistant Message。普通失败不保存 partial；用户主动取消时，已经生成的可见 parts 作为 partial Assistant Message 永久保存，没有任何可见 part 时不创建空 Message。
+Generation 与 Assistant Message 不是同一个对象。执行中的增量属于 Generation；成功完成后，按原始顺序聚合的可见 reasoning、tool 过程和最终输出共同成为 Assistant Message。聊天失败或用户主动取消时，已经生成的可见 parts 作为 partial Assistant Message，与 Generation 终态在同一事务中永久保存；只有思考、工具过程或引用也保留，没有任何可见 part 时不创建空 Message。失败终态同步历史后，持久化消息接替临时投影；红色提示由 `latestGeneration` 推导，下一次生成开始后消失，不成为历史消息正文。
 
 ### 存储职责
 
@@ -200,7 +200,7 @@ POST 不运行模型，不把生成生命周期绑在 HTTP 请求上。
 
 重新生成只作用于 Chat 会话最末尾的 Assistant Message。客户端只提交 `conversationId` 和 `assistantMessageId`；服务端沿用原回答关联的 User Message、Attachment、reasoning effort 与 Tool 选择，不新增 User Message。
 
-服务端接受命令时在同一事务中删除旧 Assistant Message，并创建复用原 User Message 与 reasoning effort 的 queued Generation。此后它与普通 Generation 共用完全相同的 Worker 与持久化路径：成功保存完整回答，用户取消保存已有 partial，没有可见输出或失败时不创建 Assistant Message。浏览器点击后乐观移除旧回答，请求未成立才恢复缓存。第一版不做回答版本树，不支持 Image 会话重新生成。
+服务端接受命令时在同一事务中删除旧 Assistant Message，并创建复用原 User Message 与 reasoning effort 的 queued Generation。此后它与普通 Generation 共用完全相同的 Worker 与持久化路径：成功保存完整回答，失败或用户取消保存已有 partial，没有可见输出时不创建 Assistant Message。生成失败不会恢复已删除的旧回答；失败 partial 若仍是最后一条消息，可继续使用原重新生成接口。无输出失败不展示重新生成按钮，用户可复制问题重新发送。浏览器点击后乐观移除旧回答，请求未成立才恢复缓存。第一版不做回答版本树，不支持 Image 会话重新生成。
 
 ### 事件订阅与恢复
 
@@ -267,7 +267,7 @@ Adapter 必须小而明确，并有 contract tests。实现 AI SDK 功能时先�
 
 正式 Chat 链路只使用 OpenAI Responses 兼容协议，不同时维护 Chat Completions 与 Responses 两套业务实现。Adapter 使用 SDK 的 `ToolLoopAgent` 管理多步调用，向应用层转换文本、思考、工具与终态事件，不手写通用 Agent engine。
 
-Provider 按无状态服务使用：每次 Generation 都从本地持久化记录组装摘要和保留的原始历史，并为仍需使用的 Attachment 签发短期 URL。请求设置 `store: false`，不依赖 `previous_response_id`、供应商保存的 Conversation 或私有推理状态；公开 reasoning 只用于展示，不进入下一轮模型历史或摘要。
+Provider 按无状态服务使用：每次 Generation 都从本地持久化记录组装摘要和保留的原始历史，并为仍需使用的 Attachment 签发短期 URL。请求设置 `store: false`，不依赖 `previous_response_id`、供应商保存的 Conversation 或私有推理状态；公开 reasoning 作为标注的普通历史文本进入下一轮上下文及摘要输入，不代表恢复供应商的内部推理状态。
 
 第三方 file ID 不能成为 Attachment 主键或资产事实来源。聊天附件继续使用模型原生图片/PDF 输入，不因上游失败静默切换成自研文本解析 fallback。PDF 解析用于知识入库和本地 token 估算，不能把估算用途误认为向模型注入了解析全文。
 
@@ -360,7 +360,7 @@ Regenerate 只针对最后一条 Assistant Message，并创建新的 Generation�
 
 取消请求先写入 PostgreSQL，再通过 Redis Pub/Sub 唤醒 Worker；PostgreSQL 标记负责可靠判定，Pub/Sub 只负责快速中断。`queued` Generation 可由 API 直接置为 `cancelled`；`running` Generation 在 Worker 完成 partial 落库前仍保持 active，避免下一条用户消息越过尚未提交的上下文。
 
-Worker 收到请求后用 `AbortSignal` 停止模型流，把内存中按原顺序聚合的可见 parts 与 `cancelled` 状态在同一 PostgreSQL transaction 中提交；reasoning-only partial 合法，没有可见 part 时不创建空 Assistant Message。durable transaction 成功后才能发布 `generation.cancelled`。后续 Context Builder 对 partial 使用同一套历史投影：不回放 reasoning，其他工具缺少结果时明确标为未知，不假定成功、不自动重做。
+Worker 收到请求后用 `AbortSignal` 停止模型流，把内存中按原顺序聚合的可见 parts 与 `cancelled` 状态在同一 PostgreSQL transaction 中提交；reasoning-only partial 合法，没有可见 part 时不创建空 Assistant Message。durable transaction 成功后才能发布 `generation.cancelled`。后续 Context Builder 对 partial 使用同一套历史投影：可见 reasoning 以标注的普通历史文本回放，其他工具缺少结果时明确标为未知，不假定成功、不自动重做。
 
 ### Delete Conversation
 

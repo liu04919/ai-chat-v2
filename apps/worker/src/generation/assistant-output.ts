@@ -118,7 +118,7 @@ export function createAssistantOutput(input: {
   return {
     async consume(part: ChatModelStreamPart) {
       signal?.throwIfAborted();
-      // 先累计，再发送事件：即使发送失败，取消处理仍可取得已经收到的片段。
+      // 先累计，再发送事件：即使发送失败，失败/取消处理仍可保存已经收到的片段。
       // 调用方必须逐片 await，保证 Parts 与展示事件保持相同顺序。
       switch (part.type) {
         case "text":
@@ -185,7 +185,7 @@ export function createAssistantOutput(input: {
       }
     },
 
-    // 取消时允许读取部分回答。返回数组副本，避免调用方改变收集器内的排列。
+    // 失败/取消时允许读取部分回答。返回数组副本，避免调用方改变收集器内的排列。
     getParts() {
       return [...parts];
     },

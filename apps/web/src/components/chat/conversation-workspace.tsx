@@ -13,6 +13,7 @@ import {
   type ChatComposerSubmission,
 } from "./composer/chat-composer";
 import { GenerationResponse } from "./generation/generation-response";
+import { getChatGenerationDisplay } from "./generation/chat-generation-display";
 import { ImageGenerationResponse } from "./generation/image-generation-response";
 import { getImageGenerationStatus } from "./generation/image-generation-status";
 import { useGenerationEventStream } from "./generation/use-generation-event-stream";
@@ -52,7 +53,9 @@ export function ConversationWorkspace({
     : cancelMutation.error
       ? getGenerationCancellationClientErrorMessage(cancelMutation.error)
       : null;
-  const clearProjection = useGenerationProjectionStore((state) => state.clear);
+  const clearGenerationProjection = useGenerationProjectionStore(
+    (state) => state.clearGeneration,
+  );
   const storedProjection = useGenerationProjectionStore(
     (state) => state.projections[conversationId] ?? null,
   );
@@ -79,13 +82,16 @@ export function ConversationWorkspace({
           conversationId,
         );
 
-        if (
-          (event.type === "generation.completed" ||
-            (event.type === "generation.cancelled" &&
-              detail.conversation.mode === "chat")) &&
-          refreshedDetail.activeGeneration === null
-        ) {
-          clearProjection(conversationId);
+        // 历史已接管本轮终态，聊天和图片都不再依赖临时投影。
+        const latest = refreshedDetail.latestGeneration;
+        const hasSyncedTerminal =
+          refreshedDetail.activeGeneration === null &&
+          latest?.id === event.generationId &&
+          latest.status !== "queued" &&
+          latest.status !== "running";
+
+        if (hasSyncedTerminal) {
+          clearGenerationProjection(conversationId, event.generationId);
         }
 
         void queryClient.invalidateQueries({
@@ -95,7 +101,7 @@ export function ConversationWorkspace({
         // 保留当前投影；用户刷新后仍以 PostgreSQL 中的详情为准。
       }
     },
-    [clearProjection, conversationId, queryClient, detail.conversation.mode],
+    [clearGenerationProjection, conversationId, queryClient],
   );
 
   useGenerationEventStream({
@@ -166,9 +172,17 @@ export function ConversationWorkspace({
         isStopping: cancelMutation.isPending,
       })
     : null;
+  const chatDisplay = getChatGenerationDisplay({
+    activeGeneration: detail.activeGeneration,
+    latestGeneration: detail.latestGeneration,
+    projection: storedProjection,
+    isSubmitting: createMutation.isPending || regenerateMutation.isPending,
+  });
   const tail = conversation.mode === "image"
     ? imageStatus && <ImageGenerationResponse status={imageStatus} />
-    : projection && <GenerationResponse projection={projection} />;
+    : (chatDisplay.projection || chatDisplay.failed) && (
+        <GenerationResponse {...chatDisplay} />
+      );
 
   return (
     <section className="flex h-full min-h-0 flex-col">

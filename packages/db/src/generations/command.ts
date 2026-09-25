@@ -26,6 +26,7 @@ import {
 } from "../schema/index";
 
 type Database = ReturnType<typeof getDatabase>;
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 export type GenerationCommandRecord = {
   id: string;
@@ -138,7 +139,10 @@ async function findExistingCommand(
 function resolveExistingCommand(
   existing: ExistingCommandRow,
   input: CreateGenerationCommandRecordInput,
-): CreateGenerationCommandRecordResult {
+): Extract<
+  CreateGenerationCommandRecordResult,
+  { kind: "idempotent" | "message_id_conflict" }
+> {
   const targetMatches =
     input.target.type === "new"
       ? input.target.conversationId === existing.conversationId &&
@@ -203,120 +207,37 @@ export async function createGenerationCommandRecord(
   input: CreateGenerationCommandRecordInput,
   database: Database = getDatabase(),
 ): Promise<CreateGenerationCommandRecordResult> {
+  // 已提交请求直接返回，避免重试时重新校验已绑定的附件或当前活跃任务。
   const existing = await findExistingCommand(input.userMessageId, database);
-
   if (existing) {
     return resolveExistingCommand(existing, input);
   }
 
+  // Token 计数不依赖数据库，放在事务外，减少持锁时间。
   const contextTokenCount = countStoredMessage({ role: "user", parts: input.parts });
+  const attachmentIds = input.parts.flatMap((part) =>
+    part.type === "attachment" ? [part.attachmentId] : [],
+  );
 
   try {
     return await database.transaction(async (transaction) => {
-      let conversation: {
-        id: string;
-        mode: "chat" | "image";
-      };
-
-      if (input.target.type === "new") {
-        const [createdConversation] = await transaction
-          .insert(conversations)
-          .values({
-            id: input.target.conversationId,
-            ownerId: input.ownerId,
-            mode: input.target.mode,
-            title: input.conversationTitle,
-            createdAt: input.now,
-            updatedAt: input.now,
-          })
-          .returning({ id: conversations.id, mode: conversations.mode });
-
-        if (!createdConversation) {
-          throw new Error("创建 Conversation 后数据库没有返回记录");
-        }
-
-        conversation = createdConversation;
-      } else {
-        const [existingConversation] = await transaction
-          .select({ id: conversations.id, mode: conversations.mode })
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.id, input.target.conversationId),
-              eq(conversations.ownerId, input.ownerId),
-            ),
-          )
-          .for("update")
-          .limit(1);
-
-        if (!existingConversation) {
-          throw new GenerationCommandRejected({ kind: "conversation_not_found" });
-        }
-
-        conversation = existingConversation;
-      }
+      // 与删除、执行和重新生成保持一致：先锁父会话，再访问或锁定子资源。
+      const conversation = await createOrLockConversation(input, transaction);
 
       // 等待会话锁时，相同请求可能已经提交，必须先检查幂等再检查活跃任务。
       const concurrentExisting = await findExistingCommand(input.userMessageId, transaction);
       if (concurrentExisting) {
         const result = resolveExistingCommand(concurrentExisting, input);
-        if (result.kind === "message_id_conflict") throw new GenerationCommandRejected(result);
+        if (result.kind === "message_id_conflict") {
+          throw new GenerationCommandRejected(result);
+        }
         return result;
       }
 
-      if (
-        (conversation.mode === "chat" && input.reasoningEffort === null) ||
-        (conversation.mode === "image" &&
-          (input.reasoningEffort !== null ||
-            input.tools.webSearch ||
-            input.tools.mcpToolIds.length > 0))
-      ) {
-        throw new GenerationCommandRejected({ kind: "invalid_request" });
-      }
+      validateRequestForMode(input, conversation.mode, attachmentIds);
+      await validateSelectedKnowledgeBase(input, transaction);
 
-      const textParts = input.parts.filter((part) => part.type === "text");
-      if (input.knowledgeBaseId) {
-        if (
-          conversation.mode !== "chat" ||
-          !textParts.some((p) => p.text.trim())
-        ) {
-          throw new GenerationCommandRejected({ kind: "invalid_request" });
-        }
-        const [base] = await transaction
-          .select({ id: knowledgeBases.id })
-          .from(knowledgeBases)
-          .where(and(
-            eq(knowledgeBases.id, input.knowledgeBaseId),
-            eq(knowledgeBases.ownerId, input.ownerId),
-          ));
-        if (!base) {
-          throw new GenerationCommandRejected({ kind: "knowledge_not_found" });
-        }
-      }
-      const attachmentIds = input.parts.flatMap((part) =>
-        part.type === "attachment" ? [part.attachmentId] : [],
-      );
-
-      if (
-        conversation.mode === "image" &&
-        (textParts.length !== 1 ||
-          textParts[0]?.text.trim().length === 0 ||
-          attachmentIds.length > 1)
-      ) {
-        throw new GenerationCommandRejected({ kind: "invalid_request" });
-      }
-
-      const [activeGeneration] = await transaction
-        .select({ id: generations.id })
-        .from(generations)
-        .where(
-          and(
-            eq(generations.conversationId, conversation.id),
-            inArray(generations.status, ["queued", "running"]),
-          ),
-        )
-        .limit(1);
-
+      const activeGeneration = await findActiveGeneration(conversation.id, transaction);
       if (activeGeneration) {
         throw new GenerationCommandRejected({
           kind: "active_generation",
@@ -324,130 +245,22 @@ export async function createGenerationCommandRecord(
         });
       }
 
-      if (attachmentIds.length > 0) {
-        const attachmentRows = await transaction
-          .select({
-            id: attachments.id,
-            mediaType: attachments.mediaType,
-            status: attachments.status,
-            linkedAt: attachments.linkedAt,
-          })
-          .from(attachments)
-          .where(
-            and(
-              eq(attachments.ownerId, input.ownerId),
-              inArray(attachments.id, attachmentIds),
-            ),
-          )
-          .for("update");
-        const attachmentsById = new Map(
-          attachmentRows.map((attachment) => [attachment.id, attachment]),
-        );
+      await lockAndValidateAttachments(input, conversation.mode, attachmentIds, transaction);
 
-        for (const attachmentId of attachmentIds) {
-          const attachment = attachmentsById.get(attachmentId);
-
-          if (!attachment) {
-            throw new GenerationCommandRejected({ kind: "attachment_not_found", attachmentId });
-          }
-
-          if (attachment.status !== "ready") {
-            throw new GenerationCommandRejected({ kind: "attachment_not_ready", attachmentId });
-          }
-
-          if (attachment.linkedAt) {
-            throw new GenerationCommandRejected({ kind: "attachment_in_use", attachmentId });
-          }
-
-          if (
-            conversation.mode === "image" &&
-            !attachment.mediaType.startsWith("image/")
-          ) {
-            throw new GenerationCommandRejected({ kind: "attachment_mode_mismatch", attachmentId });
-          }
-        }
-      }
-
-      const [sequenceRow] = await transaction
-        .select({ sequence: max(messages.sequence) })
-        .from(messages)
-        .where(eq(messages.conversationId, conversation.id));
-      const nextSequence = Number(sequenceRow?.sequence ?? -1) + 1;
-
-      await transaction.insert(messages).values({
-        id: input.userMessageId,
-        conversationId: conversation.id,
-        role: "user",
-        parts: input.parts,
+      // 所有写入仍共用当前事务；任何后续失败都要撤销消息、附件绑定及新建会话。
+      const generation = await insertGenerationRecords(
+        input,
         contextTokenCount,
-        sequence: nextSequence,
-        createdAt: input.now,
-      });
-
-      if (attachmentIds.length > 0) {
-        await transaction
-          .update(attachments)
-          .set({ linkedAt: input.now, updatedAt: input.now })
-          .where(
-            and(
-              eq(attachments.ownerId, input.ownerId),
-              inArray(attachments.id, attachmentIds),
-              isNull(attachments.linkedAt),
-            ),
-          );
-      }
-
-      const [generation] = await transaction
-        .insert(generations)
-        .values({
-          id: input.generationId,
-          conversationId: conversation.id,
-          userMessageId: input.userMessageId,
-          status: "queued",
-          reasoningEffort: input.reasoningEffort,
-          webSearchEnabled: input.tools.webSearch,
-          mcpToolIds: input.tools.mcpToolIds,
-          knowledgeBaseId: input.knowledgeBaseId ?? null,
-          createdAt: input.now,
-        })
-        .returning({
-          id: generations.id,
-          conversationId: generations.conversationId,
-          userMessageId: generations.userMessageId,
-          status: generations.status,
-          reasoningEffort: generations.reasoningEffort,
-          webSearchEnabled: generations.webSearchEnabled,
-          mcpToolIds: generations.mcpToolIds,
-          createdAt: generations.createdAt,
-        });
-
-      if (!generation) {
-        throw new Error("创建 Generation 后数据库没有返回记录");
-      }
-
-      const { webSearchEnabled, mcpToolIds, ...generationRecord } =
-        generation;
-
-      await transaction
-        .update(conversations)
-        .set({ updatedAt: input.now })
-        .where(eq(conversations.id, conversation.id));
-
-      return {
-        kind: "created",
-        generation: {
-          ...generationRecord,
-          tools: {
-            webSearch: webSearchEnabled,
-            mcpToolIds,
-          },
-        },
-      };
+        attachmentIds,
+        transaction,
+      );
+      return { kind: "created", generation };
     });
   } catch (error) {
     if (error instanceof GenerationCommandRejected) {
       return error.result;
     }
+    // 并发创建新会话可能先撞上主键；回滚后读取胜出的请求，判定是否为同一次提交。
     if (
       isPostgresConstraintError(error, "messages_pkey") ||
       isPostgresConstraintError(error, "conversations_pkey")
@@ -468,16 +281,10 @@ export async function createGenerationCommandRecord(
         "generations_one_active_per_conversation",
       )
     ) {
-      const [activeGeneration] = await database
-        .select({ id: generations.id })
-        .from(generations)
-        .where(
-          and(
-            eq(generations.conversationId, input.target.conversationId),
-            inArray(generations.status, ["queued", "running"]),
-          ),
-        )
-        .limit(1);
+      const activeGeneration = await findActiveGeneration(
+        input.target.conversationId,
+        database,
+      );
 
       if (activeGeneration) {
         return {
@@ -489,4 +296,245 @@ export async function createGenerationCommandRecord(
 
     throw error;
   }
+}
+
+async function createOrLockConversation(
+  input: CreateGenerationCommandRecordInput,
+  transaction: Transaction,
+): Promise<{ id: string; mode: "chat" | "image" }> {
+  if (input.target.type === "new") {
+    const [conversation] = await transaction
+      .insert(conversations)
+      .values({
+        id: input.target.conversationId,
+        ownerId: input.ownerId,
+        mode: input.target.mode,
+        title: input.conversationTitle,
+        createdAt: input.now,
+        updatedAt: input.now,
+      })
+      .returning({ id: conversations.id, mode: conversations.mode });
+
+    if (!conversation) {
+      throw new Error("创建 Conversation 后数据库没有返回记录");
+    }
+    return conversation;
+  }
+
+  const [conversation] = await transaction
+    .select({ id: conversations.id, mode: conversations.mode })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.id, input.target.conversationId),
+        eq(conversations.ownerId, input.ownerId),
+      ),
+    )
+    .for("update")
+    .limit(1);
+
+  if (!conversation) {
+    throw new GenerationCommandRejected({ kind: "conversation_not_found" });
+  }
+  return conversation;
+}
+
+function validateRequestForMode(
+  input: CreateGenerationCommandRecordInput,
+  mode: "chat" | "image",
+  attachmentIds: string[],
+): void {
+  const textParts = input.parts.filter((part) => part.type === "text");
+
+  // existing 请求不携带 mode，必须以锁定后的会话模式为准。
+  if (mode === "chat") {
+    if (
+      input.reasoningEffort === null ||
+      (input.knowledgeBaseId && !textParts.some((part) => part.text.trim()))
+    ) {
+      throw new GenerationCommandRejected({ kind: "invalid_request" });
+    }
+    return;
+  }
+
+  if (
+    input.reasoningEffort !== null ||
+    input.tools.webSearch ||
+    input.tools.mcpToolIds.length > 0 ||
+    input.knowledgeBaseId ||
+    textParts.length !== 1 ||
+    textParts[0]?.text.trim().length === 0 ||
+    attachmentIds.length > 1
+  ) {
+    throw new GenerationCommandRejected({ kind: "invalid_request" });
+  }
+}
+
+async function validateSelectedKnowledgeBase(
+  input: CreateGenerationCommandRecordInput,
+  transaction: Transaction,
+): Promise<void> {
+  if (!input.knowledgeBaseId) return;
+
+  const [base] = await transaction
+    .select({ id: knowledgeBases.id })
+    .from(knowledgeBases)
+    .where(
+      and(
+        eq(knowledgeBases.id, input.knowledgeBaseId),
+        eq(knowledgeBases.ownerId, input.ownerId),
+      ),
+    );
+  if (!base) {
+    throw new GenerationCommandRejected({ kind: "knowledge_not_found" });
+  }
+}
+
+async function findActiveGeneration(
+  conversationId: string,
+  database: Pick<Database, "select">,
+): Promise<{ id: string } | null> {
+  const [generation] = await database
+    .select({ id: generations.id })
+    .from(generations)
+    .where(
+      and(
+        eq(generations.conversationId, conversationId),
+        inArray(generations.status, ["queued", "running"]),
+      ),
+    )
+    .limit(1);
+  return generation ?? null;
+}
+
+async function lockAndValidateAttachments(
+  input: CreateGenerationCommandRecordInput,
+  mode: "chat" | "image",
+  attachmentIds: string[],
+  transaction: Transaction,
+): Promise<void> {
+  if (attachmentIds.length === 0) return;
+
+  // 锁一直持有到外层事务结束，避免附件在校验后、绑定前被另一条消息占用。
+  const attachmentRows = await transaction
+    .select({
+      id: attachments.id,
+      mediaType: attachments.mediaType,
+      status: attachments.status,
+      linkedAt: attachments.linkedAt,
+    })
+    .from(attachments)
+    .where(
+      and(
+        eq(attachments.ownerId, input.ownerId),
+        inArray(attachments.id, attachmentIds),
+      ),
+    )
+    .for("update");
+  const attachmentsById = new Map(
+    attachmentRows.map((attachment) => [attachment.id, attachment]),
+  );
+
+  for (const attachmentId of attachmentIds) {
+    const attachment = attachmentsById.get(attachmentId);
+
+    if (!attachment) {
+      throw new GenerationCommandRejected({ kind: "attachment_not_found", attachmentId });
+    }
+
+    if (attachment.status !== "ready") {
+      throw new GenerationCommandRejected({ kind: "attachment_not_ready", attachmentId });
+    }
+
+    if (attachment.linkedAt) {
+      throw new GenerationCommandRejected({ kind: "attachment_in_use", attachmentId });
+    }
+
+    if (
+      mode === "image" &&
+      !attachment.mediaType.startsWith("image/")
+    ) {
+      throw new GenerationCommandRejected({ kind: "attachment_mode_mismatch", attachmentId });
+    }
+  }
+}
+
+async function insertGenerationRecords(
+  input: CreateGenerationCommandRecordInput,
+  contextTokenCount: ReturnType<typeof countStoredMessage>,
+  attachmentIds: string[],
+  transaction: Transaction,
+): Promise<GenerationCommandRecord> {
+  const [sequenceRow] = await transaction
+    .select({ sequence: max(messages.sequence) })
+    .from(messages)
+    .where(eq(messages.conversationId, input.target.conversationId));
+  const nextSequence = Number(sequenceRow?.sequence ?? -1) + 1;
+
+  await transaction.insert(messages).values({
+    id: input.userMessageId,
+    conversationId: input.target.conversationId,
+    role: "user",
+    parts: input.parts,
+    contextTokenCount,
+    sequence: nextSequence,
+    createdAt: input.now,
+  });
+
+  if (attachmentIds.length > 0) {
+    await transaction
+      .update(attachments)
+      .set({ linkedAt: input.now, updatedAt: input.now })
+      .where(
+        and(
+          eq(attachments.ownerId, input.ownerId),
+          inArray(attachments.id, attachmentIds),
+          isNull(attachments.linkedAt),
+        ),
+      );
+  }
+
+  const [generation] = await transaction
+    .insert(generations)
+    .values({
+      id: input.generationId,
+      conversationId: input.target.conversationId,
+      userMessageId: input.userMessageId,
+      status: "queued",
+      reasoningEffort: input.reasoningEffort,
+      webSearchEnabled: input.tools.webSearch,
+      mcpToolIds: input.tools.mcpToolIds,
+      knowledgeBaseId: input.knowledgeBaseId ?? null,
+      createdAt: input.now,
+    })
+    .returning({
+      id: generations.id,
+      conversationId: generations.conversationId,
+      userMessageId: generations.userMessageId,
+      status: generations.status,
+      reasoningEffort: generations.reasoningEffort,
+      webSearchEnabled: generations.webSearchEnabled,
+      mcpToolIds: generations.mcpToolIds,
+      createdAt: generations.createdAt,
+    });
+
+  if (!generation) {
+    throw new Error("创建 Generation 后数据库没有返回记录");
+  }
+
+  const { webSearchEnabled, mcpToolIds, ...generationRecord } =
+    generation;
+
+  await transaction
+    .update(conversations)
+    .set({ updatedAt: input.now })
+    .where(eq(conversations.id, input.target.conversationId));
+
+  return {
+    ...generationRecord,
+    tools: {
+      webSearch: webSearchEnabled,
+      mcpToolIds,
+    },
+  };
 }

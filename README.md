@@ -46,6 +46,8 @@ Worker 的 `dev` / `start` 命令在 Node 启动时读取 `.env.local` 并启用
 
 附件读取校验登录身份与归属后签发短期 R2 下载地址，不保存签名 URL。会话详情中的 `activeGeneration` 用于发现正在执行的任务，`latestGeneration` 用于恢复最近一次失败或停止的状态。
 
+聊天失败或停止时，已有文字、思考、工具过程和引用与 Generation 终态在同一事务中保存；完全没有输出时不创建空 Assistant Message。失败事件触发历史同步，成功后由持久化消息接替流式投影，避免重复展示；同步失败则保留投影。红色失败提示只根据最近一次 Generation 展示，发送下一条消息或重新生成后消失；命令未成立则恢复。重新生成仍要求最后一条消息是已保存的 Assistant Message，无输出失败时用户可复制问题重新发送，不增加按 Generation ID 重试的接口。
+
 ## RAG 数据库底座
 
 PostgreSQL 使用 `docker/postgres/Dockerfile` 构建的 `ai-chat-postgres:18.4-rag` 镜像，仍基于原来的 PostgreSQL 18.4 Alpine，保留 `postgres-data` 卷和 5433 端口。扩展源码固定为具体提交：pgvector 0.8.6、pg_textsearch 1.4.0、zhparser 2.4（依赖 SCWS 1.2.3）。最终镜像不包含构建阶段安装的编译工具。
@@ -154,7 +156,9 @@ Chat 在 Worker 内处理长历史，沿用 `LLM_MODEL` 配置的 Sol / Response
 
 这些是本地代理下的工程预算，不是 Sol 官方最大窗口或跑分得出的最优值。输入计算包含系统指令、实际工具 schema、摘要、近期原文及当前问题。`js-tiktoken` 的 `o200k_base` 在本地计数，分段编码与协议预留使它属于估算，不等同于服务端账单；不会额外请求计数接口。
 
-`@ai-chat/model-context` 共享实际历史投影与计数规则。用户消息入库、助手完成或停止定稿时，将文本/协议计数与版本写入 `messages.context_token_count`；日常请求直接累加，规则版本变化时才按需刷新。每个工具步骤只增加本次调用新产生的消息，不重新编码整段旧历史。
+`@ai-chat/model-context` 共享实际历史投影与计数规则。用户消息入库、助手完成、失败或停止定稿时，将文本/协议计数与版本写入 `messages.context_token_count`；日常请求直接累加，规则版本变化时才按需刷新。每个工具步骤只增加本次调用新产生的消息，不重新编码整段旧历史。
+
+历史普通回答不额外添加前缀。网页中可见的思考以带明确标注的普通助手历史文本回放，支持用户追问其中内容，同时提醒模型这可能是未采纳的推测；数据库与网页仍保留原 `reasoning` Parts。这不是 Provider 私有推理状态的恢复。摘要输入和 Token 计数采用同一份投影；开发阶段改变计数口径时直接清空受影响的派生计数缓存，不维护历史版本兼容。
 
 附件首次用于聊天时由 Worker 从对象存储读取实际文件并缓存至 `attachments.context_token_count`。图片读取宽高，按 Sol 默认 `auto=original` 的 32×32 patch 和 1.2 倍系数估算；超过该模式的 patch 限制会提示缩小图片。PDF 读取实际文字和页数，文字用 tokenizer 计数，每页额外预留 3,000 视觉 tokens（`auto=high` 的 2,500 patches × 1.2）。这仍是逐页保守估算，不是已知服务端渲染 DPI 下的精确值；不再每份文件一律 64k。规则依据 [图片文档](https://developers.openai.com/api/docs/guides/images-vision)和 [PDF 文档](https://developers.openai.com/api/docs/guides/file-inputs)。之后通过 HEAD 校验 ETag，版本不变便不下载/解析；GET 使用 If-Match 防止校验后读取到不同对象。派生缓存写入失败不阻断已取得计数的本轮回答。
 

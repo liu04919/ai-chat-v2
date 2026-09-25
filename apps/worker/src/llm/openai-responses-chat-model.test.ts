@@ -357,7 +357,8 @@ describe("OpenAI Responses Chat Adapter", () => {
         .toMatchObject({ code: "TOOL_RESULT_UNAVAILABLE" });
     }
     expect(JSON.stringify(body.input)).toContain("已经生成的部分回答");
-    expect(JSON.stringify(body.input)).not.toContain("正在查询");
+    expect(JSON.stringify(body.input)).toContain("历史可见思考");
+    expect(JSON.stringify(body.input)).toContain("正在查询");
     expect(parts).toContainEqual({ type: "text", partId: "message_final", delta: "查询完成。" });
     expect(execute).not.toHaveBeenCalled();
     expect(history).toEqual(original);
@@ -506,11 +507,53 @@ describe("OpenAI Responses Chat Adapter", () => {
         content: [
           {
             type: "output_text",
-            text: "[上一轮助手输出]\n我会读取。",
+            text: "[历史可见思考：可能包含未采纳的推测，不是最终结论]\n先检查附件类型\n[历史可见思考结束]",
+          },
+        ],
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text: "我会读取。",
           },
         ],
       },
     ]);
+  });
+
+  it("用户追问只有思考的历史回答时，可见思考确实进入 HTTP 请求且不改变存储 Parts", async () => {
+    let capturedBody: unknown;
+    const model = createOpenAIResponsesChatModel({
+      baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-model",
+      fetch: async (input, init) => {
+        capturedBody = await new Request(input, init).json();
+        return new Response(createFinalAnswerStream(), {
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+    });
+    const history: ChatModelMessage = {
+      role: "assistant",
+      parts: [{ id: "thought", type: "reasoning", text: "可以考虑方案 X" }],
+    };
+    const original = structuredClone(history);
+    const parts: ChatModelStreamPart[] = [];
+    for await (const part of model.stream({
+      messages: [history, { role: "user", parts: [{ type: "text", text: "你刚才思考里说的方案 X 是什么？" }] }],
+      reasoningEffort: "low",
+    })) parts.push(part);
+
+    expect(capturedBody).toMatchObject({ input: [
+      { role: "assistant", content: [{
+        type: "output_text",
+        text: "[历史可见思考：可能包含未采纳的推测，不是最终结论]\n可以考虑方案 X\n[历史可见思考结束]",
+      }] },
+      { role: "user", content: [{ type: "input_text", text: "你刚才思考里说的方案 X 是什么？" }] },
+    ] });
+    expect(parts).toContainEqual({ type: "text", partId: "message_final", delta: "查询完成。" });
+    expect(history).toEqual(original);
   });
 
   it("把 SDK stream error 抛给 Worker 编排层", async () => {

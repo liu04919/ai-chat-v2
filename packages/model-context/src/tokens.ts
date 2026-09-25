@@ -8,7 +8,7 @@ import o200kBase from "js-tiktoken/ranks/o200k_base";
 import { toModelMessages } from "./history";
 import type { MessageTokenCount } from "./types";
 
-// 修改 tokenizer、协议开销或历史投影时一起升级；附件的计数版本单独管理。
+// 开发阶段改变计数口径时直接清空派生缓存，不维护历史版本兼容；附件缓存独立管理。
 export const TOKENIZER_ID = "o200k_base-js-tiktoken-1.0.21-estimate-v2";
 export const MESSAGE_TOKEN_VERSION = `${TOKENIZER_ID}:history-v1`;
 let tokenizer: Tiktoken | undefined;
@@ -45,7 +45,7 @@ export function countModelMessages(
   }, 0);
 }
 
-/** 新用户消息入库、助手完成/停止定稿时调用；不在流式 delta 阶段重复计算。 */
+/** 新用户消息入库、助手完成/失败/停止定稿时调用；不在流式 delta 阶段重复计算。 */
 export function countStoredMessage(
   message:
     | { role: "user"; parts: UserMessagePartsDto }

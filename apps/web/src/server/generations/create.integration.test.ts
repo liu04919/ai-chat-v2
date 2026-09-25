@@ -180,6 +180,21 @@ describe("Generation creation service", () => {
         where: (table, { eq }) => eq(table.id, attachmentId),
       }),
     ).resolves.toMatchObject({ linkedAt: now });
+
+    // 幂等必须优先于附件占用和活跃任务检查：重试不能拒绝自己已经绑定的附件。
+    await expect(createGenerationForOwner(ownerId, request, { queue }))
+      .resolves.toEqual(response);
+
+    const anotherConversationId = `attachment-reuse-${randomUUID()}`;
+    await expect(createGenerationForOwner(ownerId, {
+      ...request,
+      target: { ...request.target, conversationId: anotherConversationId },
+      userMessageId: randomUUID(),
+    }, { queue })).rejects.toMatchObject({
+      response: { code: "ATTACHMENT_IN_USE", attachmentId },
+    });
+    expect(await database.client`SELECT id FROM conversations WHERE id = ${anotherConversationId}`)
+      .toHaveLength(0);
   });
 
   it("相同 userMessageId 与相同 parts 返回原 Generation，并沿用稳定 job ID", async () => {
@@ -364,6 +379,111 @@ describe("Generation creation service", () => {
     expect(queue.jobs.size).toBe(initialJobs);
     const [attachment] = await database.client`SELECT linked_at FROM attachments WHERE id = ${pdfAttachmentId}`;
     expect(attachment!.linked_at).toBeNull();
+  });
+});
+
+describe.each(["new", "existing"] as const)("Generation %s 会话校验与回滚", (targetType) => {
+  it.each([
+    { name: "聊天缺少思考等级", mode: "chat", patch: { reasoningEffort: null } },
+    { name: "知识库问题为空白", mode: "chat", patch: {
+      knowledgeBaseId: "not-looked-up", parts: [{ type: "text", text: "   " }],
+    } },
+    { name: "图片携带思考等级", mode: "image", patch: { reasoningEffort: "medium" } },
+    { name: "图片启用联网", mode: "image", patch: { tools: { webSearch: true, mcpToolIds: [] } } },
+    { name: "图片启用 MCP", mode: "image", patch: { tools: { webSearch: false, mcpToolIds: ["test.tool"] } } },
+    { name: "图片选择知识库", mode: "image", patch: { knowledgeBaseId: "not-looked-up" } },
+    { name: "图片没有提示文本", mode: "image", patch: { parts: [] } },
+    { name: "图片提示文本为空白", mode: "image", patch: { parts: [{ type: "text", text: " " }] } },
+    { name: "图片含多段提示文本", mode: "image", patch: { parts: [
+      { type: "text", text: "第一段" }, { type: "text", text: "第二段" },
+    ] } },
+    { name: "图片含多份附件", mode: "image", patch: { parts: [
+      { type: "text", text: "修改图片" },
+      { type: "attachment", attachmentId: "first" },
+      { type: "attachment", attachmentId: "second" },
+    ] } },
+  ] satisfies Array<{
+    name: string;
+    mode: "chat" | "image";
+    patch: Partial<CreateGenerationRequest>;
+  }>)("拒绝 $name，不残留写入或入队", async ({ mode, patch }) => {
+    const conversationId = randomUUID();
+    if (targetType === "existing") {
+      await database.db.insert(conversations).values({
+        id: conversationId, ownerId, mode, title: "原有会话",
+      });
+    }
+    const initialJobs = queue.jobs.size;
+    await expect(createGenerationForOwner(ownerId, {
+      target: targetType === "new"
+        ? { type: "new", conversationId, mode }
+        : { type: "existing", conversationId },
+      userMessageId: randomUUID(),
+      parts: [{ type: "text", text: "测试请求" }],
+      reasoningEffort: mode === "chat" ? "medium" : null,
+      tools: noTools,
+      ...patch,
+    }, { queue })).rejects.toMatchObject({
+      response: { code: "INVALID_REQUEST" }, status: 400,
+    });
+    expect(await database.client`SELECT id FROM conversations WHERE id = ${conversationId}`)
+      .toHaveLength(targetType === "new" ? 0 : 1);
+    expect(await database.client`SELECT id FROM messages WHERE conversation_id = ${conversationId}`)
+      .toHaveLength(0);
+    expect(await database.client`SELECT id FROM generations WHERE conversation_id = ${conversationId}`)
+      .toHaveLength(0);
+    expect(queue.jobs.size).toBe(initialJobs);
+  });
+
+  it("写入 Generation 失败时回滚之前的消息和附件绑定", async () => {
+    const occupiedGenerationId = randomUUID();
+    await createGenerationForOwner(ownerId, {
+      target: { type: "new", conversationId: randomUUID(), mode: "chat" },
+      userMessageId: randomUUID(), parts: [{ type: "text", text: "占用生成任务 ID" }],
+      reasoningEffort: "medium", tools: noTools,
+    }, { queue, createGenerationId: () => occupiedGenerationId });
+
+    const conversationId = randomUUID();
+    const attachmentId = randomUUID();
+    const originalUpdatedAt = new Date("2026-09-01T00:00:00.000Z");
+    if (targetType === "existing") {
+      await database.db.insert(conversations).values({
+        id: conversationId, ownerId, mode: "chat", title: "原有会话",
+        updatedAt: originalUpdatedAt,
+      });
+    }
+    await database.db.insert(attachments).values({
+      id: attachmentId, ownerId, objectKey: `attachments/${attachmentId}`,
+      originalName: "rollback.png", mediaType: "image/png", sizeBytes: 100,
+      status: "ready", readyAt: originalUpdatedAt,
+    });
+
+    const initialJobs = queue.jobs.size;
+    // 主键冲突发生在消息写入、附件绑定之后，确保提取出的函数仍共用一个事务。
+    await expect(createGenerationForOwner(ownerId, {
+      target: targetType === "new"
+        ? { type: "new", conversationId, mode: "chat" }
+        : { type: "existing", conversationId },
+      userMessageId: randomUUID(),
+      parts: [{ type: "text", text: "应该全部回滚" }, { type: "attachment", attachmentId }],
+      reasoningEffort: "medium", tools: noTools,
+    }, { queue, createGenerationId: () => occupiedGenerationId })).rejects.toMatchObject({
+      cause: { code: "23505", constraint_name: "generations_pkey" },
+    });
+
+    const remainingConversations = await database.client`
+      SELECT updated_at FROM conversations WHERE id = ${conversationId}`;
+    expect(remainingConversations).toHaveLength(targetType === "new" ? 0 : 1);
+    if (targetType === "existing") {
+      expect(new Date(remainingConversations[0]!.updated_at)).toEqual(originalUpdatedAt);
+    }
+    expect(await database.client`SELECT id FROM messages WHERE conversation_id = ${conversationId}`)
+      .toHaveLength(0);
+    expect(await database.client`SELECT id FROM generations WHERE conversation_id = ${conversationId}`)
+      .toHaveLength(0);
+    const [attachment] = await database.client`SELECT linked_at FROM attachments WHERE id = ${attachmentId}`;
+    expect(attachment!.linked_at).toBeNull();
+    expect(queue.jobs.size).toBe(initialJobs);
   });
 });
 

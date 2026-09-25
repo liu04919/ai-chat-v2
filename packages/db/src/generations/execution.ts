@@ -311,6 +311,10 @@ export async function failGenerationExecution(
   input: {
     generationId: string;
     errorCode: string;
+    partialMessage?: {
+      id: string;
+      parts: AssistantMessagePartsDto;
+    };
     now: Date;
   },
   database: Database = getDatabase(),
@@ -318,21 +322,69 @@ export async function failGenerationExecution(
   assertNonEmpty(input.generationId, "generationId");
   assertNonEmpty(input.errorCode, "errorCode");
 
-  const [failed] = await database
-    .update(generations)
-    .set({
-      status: "failed",
-      errorCode: input.errorCode,
-      finishedAt: input.now,
-    })
-    .where(
-      and(
-        eq(generations.id, input.generationId),
-        eq(generations.status, "running"),
-        isNull(generations.cancelRequestedAt),
-      ),
-    )
-    .returning({ id: generations.id });
+  const partialMessage = input.partialMessage
+    ? {
+        id: assertNonEmpty(input.partialMessage.id, "partialMessage.id"),
+        parts: assistantMessagePartsSchema.parse(input.partialMessage.parts),
+      }
+    : null;
+  const contextTokenCount = partialMessage
+    ? countStoredMessage({ role: "assistant", parts: partialMessage.parts })
+    : null;
 
-  return Boolean(failed);
+  return database.transaction(async (transaction) => {
+    if (!await lockGenerationConversation(transaction, input.generationId)) return false;
+    const [generation] = await transaction
+      .select({
+        conversationId: generations.conversationId,
+        status: generations.status,
+        cancelRequestedAt: generations.cancelRequestedAt,
+      })
+      .from(generations)
+      .where(eq(generations.id, input.generationId))
+      .for("update")
+      .limit(1);
+
+    if (
+      !generation ||
+      generation.status !== "running" ||
+      generation.cancelRequestedAt
+    ) {
+      return false;
+    }
+
+    // 失败不代表已有内容无效：思考、工具过程和引用也随消息保留。
+    // 与失败状态一起提交，避免刷新后只有 failed，却丢失已经显示的内容。
+    if (partialMessage) {
+      const [sequenceRow] = await transaction
+        .select({ sequence: max(messages.sequence) })
+        .from(messages)
+        .where(eq(messages.conversationId, generation.conversationId));
+      await transaction.insert(messages).values({
+        id: partialMessage.id,
+        conversationId: generation.conversationId,
+        role: "assistant",
+        parts: partialMessage.parts,
+        contextTokenCount,
+        sequence: Number(sequenceRow?.sequence ?? -1) + 1,
+        createdAt: input.now,
+      });
+    }
+
+    await transaction
+      .update(generations)
+      .set({
+        status: "failed",
+        assistantMessageId: partialMessage?.id ?? null,
+        errorCode: input.errorCode,
+        finishedAt: input.now,
+      })
+      .where(eq(generations.id, input.generationId));
+    await transaction
+      .update(conversations)
+      .set({ updatedAt: input.now })
+      .where(eq(conversations.id, generation.conversationId));
+
+    return true;
+  });
 }

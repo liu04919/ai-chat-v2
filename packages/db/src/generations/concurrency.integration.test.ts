@@ -5,12 +5,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createDatabase } from "../client";
 import { createGenerationCommandRecord, type CreateGenerationCommandRecordInput } from "./command";
-import { claimGenerationExecution, completeGenerationExecution } from "./execution";
+import { claimGenerationExecution, completeGenerationExecution, failGenerationExecution } from "./execution";
 import { requestGenerationCancellationForOwner, cancelGenerationExecution } from "./cancellation";
 import { completeImageGenerationExecution } from "./image-execution";
 import { deleteConversationRecordForOwner } from "../conversations/mutations";
+import { getConversationRecordForOwner } from "../conversations/reader";
 import { migrateDatabase } from "../migration";
-import { conversations, user } from "../schema/index";
+import { attachments, conversations, user } from "../schema/index";
 import { loadIntegrationTestEnvironment } from "../test-environment";
 
 const url = loadIntegrationTestEnvironment();
@@ -89,7 +90,61 @@ describe("Generation 数据库并发", () => {
     expect(await database.client`SELECT id FROM conversations WHERE id IN (${input.target.conversationId}, ${other.target.conversationId})`).toHaveLength(1);
   });
 
-  it.each(["complete", "image", "cancel", "request-cancel", "claim"] as const)(
+  it("同一会话的不同消息并发提交，只允许一个活跃任务", async () => {
+    const conversationId = randomUUID();
+    await db.insert(conversations).values({
+      id: conversationId, ownerId, mode: "chat", title: "并发发送",
+    });
+    const concurrent = concurrentDatabase();
+    const inputs = [command(), command()].map(input => ({
+      ...input, target: { type: "existing" as const, conversationId },
+    }));
+    const results = await Promise.all(inputs.map(input =>
+      createGenerationCommandRecord(input, concurrent),
+    ));
+    expect(results.map(result => result.kind).sort()).toEqual(["active_generation", "created"]);
+    const created = results.find(result => result.kind === "created")!;
+    expect(results.find(result => result.kind === "active_generation")).toEqual({
+      kind: "active_generation", activeGenerationId: created.generation.id,
+    });
+    expect(await database.client`SELECT sequence FROM messages WHERE conversation_id = ${conversationId}`)
+      .toEqual([{ sequence: 0 }]);
+    expect(await database.client`SELECT id FROM generations WHERE conversation_id = ${conversationId}`)
+      .toHaveLength(1);
+  });
+
+  it("两个新会话并发争用附件，失败一方回滚而不留下空会话", async () => {
+    const attachmentId = randomUUID();
+    await db.insert(attachments).values({
+      id: attachmentId, ownerId, objectKey: `attachments/${attachmentId}`,
+      originalName: "shared.png", mediaType: "image/png", sizeBytes: 100,
+      status: "ready", readyAt: new Date(),
+    });
+    const inputs = [command(), command()].map(input => ({
+      ...input, parts: [...input.parts, { type: "attachment" as const, attachmentId }],
+    }));
+    const concurrent = concurrentDatabase();
+    const results = await Promise.all(inputs.map(input =>
+      createGenerationCommandRecord(input, concurrent),
+    ));
+    expect(results.map(result => result.kind).sort()).toEqual(["attachment_in_use", "created"]);
+    expect(results.find(result => result.kind === "attachment_in_use"))
+      .toEqual({ kind: "attachment_in_use", attachmentId });
+    for (let index = 0; index < inputs.length; index++) {
+      const expectedCount = results[index]!.kind === "created" ? 1 : 0;
+      const conversationId = inputs[index]!.target.conversationId;
+      expect(await database.client`SELECT id FROM conversations WHERE id = ${conversationId}`)
+        .toHaveLength(expectedCount);
+      expect(await database.client`SELECT id FROM messages WHERE conversation_id = ${conversationId}`)
+        .toHaveLength(expectedCount);
+      expect(await database.client`SELECT id FROM generations WHERE conversation_id = ${conversationId}`)
+        .toHaveLength(expectedCount);
+    }
+    const [attachment] = await database.client`SELECT linked_at FROM attachments WHERE id = ${attachmentId}`;
+    expect(attachment!.linked_at).not.toBeNull();
+  });
+
+  it.each(["complete", "fail", "image", "cancel", "request-cancel", "claim"] as const)(
     "删除已持有会话锁时，%s 等待后安全退出，不与级联删除死锁", async (operation) => {
       const input = command();
       if (operation === "image") {
@@ -109,6 +164,11 @@ describe("Generation 数据库并发", () => {
           const execute = () => {
             switch (operation) {
               case "complete": return completeGenerationExecution(args, db);
+              case "fail": return failGenerationExecution({
+                generationId: input.generationId, errorCode: "CHAT_GENERATION_FAILED",
+                partialMessage: { id: args.assistantMessageId, parts: args.assistantParts },
+                now: args.now,
+              }, db);
               case "cancel": return cancelGenerationExecution(args, db);
               case "request-cancel": return requestGenerationCancellationForOwner({ ...args, ownerId }, db);
               case "claim": return claimGenerationExecution(input.generationId, new Date(), db);
@@ -140,4 +200,84 @@ describe("Generation 数据库并发", () => {
       }
     }, 10000,
   );
+});
+
+describe("失败 partial 与终态原子保存", () => {
+  it.each([
+    [{ id: "r", type: "reasoning" as const, text: "思" }],
+    [{ id: "call", type: "tool-call" as const, toolCallId: "c",
+      toolName: "web_search", input: { query: "问题" } }],
+  ])("无正文的 partial 也保存，重复失败不重复插入 %#", async (parts) => {
+    const input = command();
+    await createGenerationCommandRecord(input, db);
+    await claimGenerationExecution(input.generationId, new Date(), db);
+    const partialMessage = { id: randomUUID(), parts: [parts] };
+    const failure = {
+      generationId: input.generationId, errorCode: "CHAT_GENERATION_FAILED",
+      partialMessage, now: new Date(),
+    };
+    expect(await failGenerationExecution(failure, db)).toBe(true);
+    expect(await failGenerationExecution({
+      ...failure, partialMessage: { ...partialMessage, id: randomUUID() },
+    }, db)).toBe(false);
+    const detail = await getConversationRecordForOwner(
+      ownerId, input.target.conversationId, { database: db },
+    );
+    expect(detail).toMatchObject({
+      activeGeneration: null,
+      latestGeneration: { id: input.generationId, status: "failed" },
+      messages: [
+        { role: "user", sequence: 0 },
+        { id: partialMessage.id, role: "assistant", sequence: 1, parts: partialMessage.parts },
+      ],
+    });
+    expect(await db.query.generations.findFirst({
+      where: (table, { eq }) => eq(table.id, input.generationId),
+    })).toMatchObject({ assistantMessageId: partialMessage.id, status: "failed" });
+    expect(await db.query.messages.findFirst({
+      where: (table, { eq }) => eq(table.id, partialMessage.id),
+    })).toMatchObject({
+      contextTokenCount: { version: expect.any(String), textTokens: expect.any(Number) },
+    });
+  });
+
+  it("partial 插入失败时整笔事务回滚，不提交 failed 状态", async () => {
+    const input = command();
+    await createGenerationCommandRecord(input, db);
+    await claimGenerationExecution(input.generationId, new Date(), db);
+    await expect(failGenerationExecution({
+      generationId: input.generationId, errorCode: "CHAT_GENERATION_FAILED",
+      partialMessage: {
+        id: input.userMessageId,
+        parts: [{ id: "text", type: "text", text: "部分" }],
+      },
+      now: new Date(),
+    }, db)).rejects.toThrow();
+    expect(await db.query.generations.findFirst({
+      where: (table, { eq }) => eq(table.id, input.generationId),
+    })).toMatchObject({ status: "running", assistantMessageId: null, errorCode: null });
+    expect(await db.query.messages.findMany({
+      where: (table, { eq }) => eq(table.conversationId, input.target.conversationId),
+    })).toMatchObject([{ id: input.userMessageId, role: "user" }]);
+  });
+
+  it("已有取消请求时失败落库不抢占终态，也不插入 partial", async () => {
+    const input = command();
+    await createGenerationCommandRecord(input, db);
+    await claimGenerationExecution(input.generationId, new Date(), db);
+    await requestGenerationCancellationForOwner({
+      ownerId, generationId: input.generationId, now: new Date(),
+    }, db);
+    expect(await failGenerationExecution({
+      generationId: input.generationId, errorCode: "CHAT_GENERATION_FAILED",
+      partialMessage: { id: randomUUID(), parts: [{ id: "r", type: "reasoning", text: "思" }] },
+      now: new Date(),
+    }, db)).toBe(false);
+    expect(await db.query.generations.findFirst({
+      where: (table, { eq }) => eq(table.id, input.generationId),
+    })).toMatchObject({ status: "running", assistantMessageId: null, errorCode: null });
+    expect(await db.query.messages.findMany({
+      where: (table, { eq }) => eq(table.conversationId, input.target.conversationId),
+    })).toHaveLength(1);
+  });
 });

@@ -9,7 +9,10 @@ import {
 import { createConfiguredMcpServerRegistry } from "@ai-chat/mcp";
 import { createR2ObjectStorage } from "@ai-chat/storage";
 
-import { createBullMqGenerationWorker } from "./generation/bullmq-generation-worker";
+import {
+  createBullMqGenerationWorker,
+  GENERATION_WORKER_CONCURRENCY,
+} from "./generation/bullmq-generation-worker";
 import { executeGeneration } from "./generation/execute-generation";
 import { createOpenAIResponsesChatModel } from "./llm/openai-responses-chat-model";
 import { createHistorySummarizer } from "./context/history-summarizer";
@@ -123,4 +126,4 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 await worker.waitUntilReady();
 await knowledgeWorker.waitUntilReady();
 console.info("Knowledge Worker 已开始消费文档入库任务（concurrency=1）");
-console.info("@ai-chat/worker 已开始消费 Generation job（concurrency=1）");
+console.info(`@ai-chat/worker 已开始消费 Generation job（concurrency=${GENERATION_WORKER_CONCURRENCY}）`);

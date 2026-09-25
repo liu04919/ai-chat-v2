@@ -354,7 +354,7 @@ describe("完整轮次的历史压缩（离线假模型）", () => {
 });
 
 describe("模型历史投影与附件预算", () => {
-  it("摘要与回放都移除旧 RAG 原文及思考；其他缺失的工具结果保持未知", () => {
+  it("摘要与回放都保留标注的可见思考、移除旧 RAG 原文；缺失工具结果保持未知", () => {
     const input = execution(2);
     input.messages[1] = {
       id: "assistant-0",
@@ -387,7 +387,9 @@ describe("模型历史投影与附件预算", () => {
       ],
     };
     const text = summaryHistoryText(projectHistory(input, input.messages));
-    expect(text).not.toContain("tentative-thought");
+    expect(text).toContain("tentative-thought");
+    expect(text).toContain("可能包含未采纳的推测，不是最终结论");
+    expect(text).not.toContain('"type":"reasoning"');
     expect(text).not.toContain("raw-private-document");
     expect(text).not.toContain("old-query");
     expect(text).toContain("TOOL_RESULT_UNAVAILABLE");

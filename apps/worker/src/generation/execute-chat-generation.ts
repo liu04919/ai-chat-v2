@@ -62,10 +62,19 @@ async function recordFailure(
     const failed = await failGenerationExecution({
       generationId,
       errorCode: CHAT_GENERATION_FAILED,
+      ...(assistantParts.length > 0
+        ? {
+            partialMessage: {
+              id: (dependencies.createAssistantMessageId ?? randomUUID)(),
+              parts: assistantParts,
+            },
+          }
+        : {}),
       now: (dependencies.now ?? (() => new Date()))(),
     });
 
     if (failed) {
+      // 部分消息与失败状态已提交，浏览器收到终态后可直接刷新历史。
       await dependencies.eventWriter.append({
         type: "generation.failed",
         generationId,
