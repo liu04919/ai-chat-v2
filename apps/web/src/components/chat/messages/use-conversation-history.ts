@@ -6,7 +6,7 @@ import {
   useIsFetching,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { conversationDetailQueryKey } from "../../../lib/client/conversations";
 import {
@@ -14,12 +14,15 @@ import {
   historyMessages,
   initialConversationHistory,
   refreshConversationHistory,
-  type ConversationHistoryData,
 } from "./conversation-history-query";
 
 export function useConversationHistory(initialDetail: ConversationDetailResponse) {
   const conversationId = initialDetail.conversation.id;
   const queryClient = useQueryClient();
+  const [entrySync, setEntrySync] = useState<{
+    conversationId: string;
+    succeeded: boolean;
+  } | null>(null);
   const query = useInfiniteQuery({
     ...conversationHistoryOptions(conversationId),
     initialData: () => initialConversationHistory(initialDetail),
@@ -28,20 +31,29 @@ export function useConversationHistory(initialDetail: ConversationDetailResponse
     queryKey: [...conversationDetailQueryKey(conversationId), "latest"],
   }) > 0;
   useEffect(() => {
-    // 首次直接使用 SSR 的最新一页；重新进入已有缓存的会话则同步尾部。
-    const cached = queryClient.getQueryData<ConversationHistoryData>(
-      conversationDetailQueryKey(conversationId),
+    let disposed = false;
+    // SSR/路由缓存用于立即展示；每次进入只同步一次最新详情，再允许流式对账。
+    // 不能用旧缓存决定清理投影，否则会丢掉可续传的内容与游标。
+    void refreshConversationHistory(queryClient, conversationId).then(
+      () => {
+        if (!disposed) setEntrySync({ conversationId, succeeded: true });
+      },
+      () => {
+        if (!disposed) setEntrySync({ conversationId, succeeded: false });
+      },
     );
-    if (cached?.pages[0] !== initialDetail) {
-      void refreshConversationHistory(queryClient, conversationId).catch(() => {
-        // 暂时不可用时保留已有历史，后续终态同步仍可更新最新消息。
-      });
-    }
-  }, [conversationId, initialDetail, queryClient]);
+    return () => {
+      disposed = true;
+    };
+  }, [conversationId, queryClient]);
 
   const messages = useMemo(() => historyMessages(query.data), [query.data]);
   return {
     detail: query.data.pages[0]!,
+    isSynchronized:
+      entrySync?.conversationId === conversationId && entrySync.succeeded,
+    synchronizationFailed:
+      entrySync?.conversationId === conversationId && !entrySync.succeeded,
     messages,
     hasOlder: query.hasNextPage,
     isLoadingOlder: query.isFetchingNextPage,

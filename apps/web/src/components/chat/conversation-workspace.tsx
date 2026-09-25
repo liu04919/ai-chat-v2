@@ -107,6 +107,7 @@ export function ConversationWorkspace({
   useGenerationEventStream({
     conversationId,
     generationId: activeGenerationId,
+    enabled: history.isSynchronized,
     onTerminal: handleTerminal,
   });
 
@@ -160,6 +161,7 @@ export function ConversationWorkspace({
   const regeneratableAssistantMessageId =
     conversation.mode === "chat" &&
     !isGenerating &&
+    history.isSynchronized &&
     latestAssistantMessageId === history.messages.at(-1)?.id
       ? latestAssistantMessageId ?? null
       : null;
@@ -191,6 +193,12 @@ export function ConversationWorkspace({
         <h1 className="truncate font-medium">{conversation.title}</h1>
       </header>
 
+      {history.synchronizationFailed ? (
+        <p role="alert" className="px-8 py-2 text-sm text-destructive">
+          无法同步会话，已保留现有内容。请刷新页面后重试。
+        </p>
+      ) : null}
+
       <VirtualMessageList
         messages={messages}
         mode={conversation.mode}
@@ -208,11 +216,13 @@ export function ConversationWorkspace({
         <ChatComposer
           key={conversationId}
           initialKnowledgeBaseId={initialDetail.latestGeneration?.knowledgeBaseId ?? null}
-          disabled={isGenerating}
+          disabled={isGenerating || !history.isSynchronized}
           isSubmitting={createMutation.isPending}
           isStopping={cancelMutation.isPending}
           mode={conversation.mode}
-          onStopGeneration={activeGenerationId ? stopGeneration : undefined}
+          onStopGeneration={
+            history.isSynchronized && activeGenerationId ? stopGeneration : undefined
+          }
           onSubmit={submitMessage}
           stopRequested={Boolean(detail.activeGeneration?.cancelRequestedAt)}
           submitError={submitError}

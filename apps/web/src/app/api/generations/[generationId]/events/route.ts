@@ -15,8 +15,10 @@ export async function GET(
     return Response.json({ code: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const lastEventId = request.headers.get("last-event-id");
-  const cursor = lastEventId
+  // 路由切回时由 URL 指定起点；同一 EventSource 自动重连时 Header 是更新的游标。
+  const lastEventId = request.headers.get("last-event-id")
+    ?? new URL(request.url).searchParams.get("after");
+  const cursor = lastEventId !== null
     ? generationEventCursorSchema.safeParse(lastEventId)
     : undefined;
 

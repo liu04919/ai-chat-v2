@@ -41,7 +41,8 @@ describe("Generation event frame buffer", () => {
       },
     ];
 
-    events.forEach((event) => buffer.enqueue(event));
+    const entries = events.map((event, index) => ({ cursor: `100-${index}`, event }));
+    entries.forEach((entry) => buffer.enqueue(entry));
 
     expect(scheduler.request).toHaveBeenCalledTimes(1);
     expect(flush).not.toHaveBeenCalled();
@@ -49,7 +50,7 @@ describe("Generation event frame buffer", () => {
     flushFrame();
 
     expect(flush).toHaveBeenCalledOnce();
-    expect(flush).toHaveBeenCalledWith(events);
+    expect(flush).toHaveBeenCalledWith(entries);
   });
 
   it("dispose 会取消尚未执行的帧并丢弃缓冲事件", () => {
@@ -58,8 +59,8 @@ describe("Generation event frame buffer", () => {
     const buffer = createGenerationEventBuffer(flush, scheduler);
 
     buffer.enqueue({
-      type: "generation.started",
-      generationId: "generation_123",
+      cursor: "100-0",
+      event: { type: "generation.started", generationId: "generation_123" },
     });
     buffer.dispose();
     flushFrame();
@@ -83,10 +84,10 @@ describe("Generation event frame buffer", () => {
       delta: "最后几个字",
     };
     const terminal: GenerationEventDto = { type, generationId: "g1" };
-    buffer.enqueue(delta);
-    buffer.enqueue(terminal);
+    const entries = [{ cursor: "100-0", event: delta }, { cursor: "100-1", event: terminal }];
+    entries.forEach((entry) => buffer.enqueue(entry));
     expect(scheduler.cancel).toHaveBeenCalledWith(7);
-    expect(flush).toHaveBeenCalledExactlyOnceWith([delta, terminal]);
+    expect(flush).toHaveBeenCalledExactlyOnceWith(entries);
     buffer.dispose();
     flushFrame();
     expect(flush).toHaveBeenCalledOnce();

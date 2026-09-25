@@ -2,6 +2,7 @@
 
 import {
   generationEventSchema,
+  generationEventCursorSchema,
   type GenerationEventDto,
 } from "@ai-chat/contracts";
 import { useEffect, useEffectEvent } from "react";
@@ -22,29 +23,51 @@ type TerminalGenerationEvent = Extract<
 export function useGenerationEventStream({
   conversationId,
   generationId,
+  enabled,
   onTerminal,
 }: {
   conversationId: string;
   generationId: string | null;
+  enabled: boolean;
   onTerminal: (event: TerminalGenerationEvent) => void;
 }) {
   const onTerminalEvent = useEffectEvent(onTerminal);
 
   useEffect(() => {
+    // 返回会话先读取权威详情；旧 Query 缓存里的 null/running 都不能用于对账。
+    if (!enabled) return;
+    const store = useGenerationProjectionStore.getState();
     if (!generationId) {
+      store.clear(conversationId);
       return;
     }
 
-    const store = useGenerationProjectionStore.getState();
     store.start(conversationId, generationId);
+    const cached = useGenerationProjectionStore.getState().projections[conversationId]!;
+    if (
+      cached.status === "completed" ||
+      cached.status === "failed" ||
+      cached.status === "cancelled"
+    ) {
+      // 曾收到终态但历史同步失败：只重试同步，不从终态游标后打开一条空流。
+      onTerminalEvent({ type: `generation.${cached.status}`, generationId });
+      return;
+    }
+    let disposed = false;
+    const search = cached.lastEventId
+      ? `?after=${encodeURIComponent(cached.lastEventId)}`
+      : "";
 
     const source = new EventSource(
-      `/api/generations/${encodeURIComponent(generationId)}/events`,
+      `/api/generations/${encodeURIComponent(generationId)}/events${search}`,
     );
-    const buffer = createGenerationEventBuffer((events) => {
-      useGenerationProjectionStore.getState().apply(conversationId, events);
+    const buffer = createGenerationEventBuffer((entries) => {
+      if (disposed) return;
+      useGenerationProjectionStore
+        .getState()
+        .apply(conversationId, generationId, entries);
 
-      const terminalEvent = events.findLast(
+      const terminalEvent = entries.map((entry) => entry.event).findLast(
         (event): event is TerminalGenerationEvent =>
           event.type === "generation.completed" ||
           event.type === "generation.failed" ||
@@ -57,10 +80,14 @@ export function useGenerationEventStream({
     });
 
     source.onopen = () => {
-      useGenerationProjectionStore.getState().setConnected(conversationId);
+      if (disposed) return;
+      useGenerationProjectionStore
+        .getState()
+        .setConnected(conversationId, generationId);
     };
 
     source.onmessage = (message) => {
+      if (disposed) return;
       let body: unknown;
 
       try {
@@ -70,13 +97,15 @@ export function useGenerationEventStream({
         buffer.dispose();
         useGenerationProjectionStore
           .getState()
-          .setConnectionError(conversationId);
+          .setConnectionError(conversationId, generationId);
         return;
       }
 
       const parsedEvent = generationEventSchema.safeParse(body);
+      const cursor = generationEventCursorSchema.safeParse(message.lastEventId);
 
       if (
+        !cursor.success ||
         !parsedEvent.success ||
         parsedEvent.data.generationId !== generationId
       ) {
@@ -84,11 +113,11 @@ export function useGenerationEventStream({
         buffer.dispose();
         useGenerationProjectionStore
           .getState()
-          .setConnectionError(conversationId);
+          .setConnectionError(conversationId, generationId);
         return;
       }
 
-      buffer.enqueue(parsedEvent.data);
+      buffer.enqueue({ cursor: cursor.data, event: parsedEvent.data });
 
       if (
         parsedEvent.data.type === "generation.completed" ||
@@ -100,14 +129,16 @@ export function useGenerationEventStream({
     };
 
     source.onerror = () => {
+      if (disposed) return;
       useGenerationProjectionStore
         .getState()
-        .setReconnecting(conversationId);
+        .setReconnecting(conversationId, generationId);
     };
 
     return () => {
+      disposed = true;
       source.close();
       buffer.dispose();
     };
-  }, [conversationId, generationId]);
+  }, [conversationId, generationId, enabled]);
 }

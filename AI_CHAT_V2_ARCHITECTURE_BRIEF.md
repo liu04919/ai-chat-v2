@@ -206,7 +206,7 @@ POST 不运行模型，不把生成生命周期绑在 HTTP 请求上。
 
 ```text
 GET /api/generations/:generationId/events
-Last-Event-ID
+Last-Event-ID（自动重连） / ?after=<cursor>（新连接恢复）
 → Redis Stream cursor
 → SSE
 → Browser reducer
@@ -221,6 +221,8 @@ Reader 先用非阻塞批量读取追到当前最新 cursor，再从同一 curso
 1. 浏览器获取 Chat Detail
 2. 服务端从 PostgreSQL 返回持久化 Message 与 `activeGeneration: { id, status, cancelRequestedAt } | null`
 3. 存在 Active Generation 时，浏览器使用该 ID 重新建立 EventSource
+
+同一页面内切换会话会关闭旧 SSE，但保留 Zustand 中的投影与已应用游标。返回时先请求最新详情，不能使用旧 Query/路由缓存决定清理或续传：同一任务保留快照并从 URL 游标后接收，新任务初始化空投影，无活跃任务由持久化历史接管并清理。对账失败不清缓存，显示刷新提示。Header 游标优先于 URL，避免自动重连退回最初起点。
 
 浏览器不得根据 Redis、本地缓存、旧连接或 UI 残留状态猜测 Active Generation。首次消费和恢复使用同一 endpoint 与同一事件协议，不增加 Snapshot Stream 或 recovery 专用协议。
 
@@ -338,6 +340,8 @@ Context Builder 在每次 Generation 中组合 Summary、近期 Messages 和 Att
 - 当前 Generation events 投影出的临时 Projection
 
 收到 `generation.completed` 后，前端重新读取 PostgreSQL Messages 并移除临时 Projection。实时事件不能直接修改永久消息缓存并把自己当成数据库事实。
+
+Projection 缓存同时保存内容、已应用的 `lastEventId` 和访问顺序；内容与游标按帧原子提交，重复事件按 Redis ID 去重。切走前未合并的缓冲可以丢弃，但游标不得越过这些事件。最多保留最近访问的 5 个会话投影，超限淘汰最久未访问项且不淘汰当前项；淘汰不取消生成、不删除服务端消息，后续可全量回放。没有额外定时 GC、后台多会话 SSE 或本地持久化；换号时全部清空。
 
 性能处理分两层：
 

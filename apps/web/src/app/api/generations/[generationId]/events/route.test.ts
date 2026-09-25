@@ -100,4 +100,25 @@ describe("Generation events route", () => {
 
     expect(response.status).toBe(404);
   });
+
+  it.each([
+    { search: "?after=123-0", header: null, expected: "123-0" },
+    { search: "?after=123-0", header: "456-0", expected: "456-0" },
+    { search: "", header: null, expected: undefined },
+  ])("新连接使用 URL 起点，自动重连 Header 优先：$search / $header", async ({ search, header, expected }) => {
+    getSessionMock.mockResolvedValue({ session: {} as never, user: { id: "owner_123" } as never });
+    openStreamMock.mockResolvedValue(new ReadableStream({ start: (controller) => controller.close() }));
+    const response = await GET(new Request(`http://localhost/api/generations/generation_123/events${search}`, {
+      headers: header ? { "Last-Event-ID": header } : {},
+    }), routeContext);
+    expect(response.status).toBe(200);
+    expect(openStreamMock).toHaveBeenCalledWith("owner_123", "generation_123", expected);
+  });
+
+  it.each(["?after=invalid", "?after="])("拒绝非法 URL 游标：%s", async (search) => {
+    getSessionMock.mockResolvedValue({ session: {} as never, user: { id: "owner_123" } as never });
+    const response = await GET(new Request(`http://localhost/api/generations/generation_123/events${search}`), routeContext);
+    expect(response.status).toBe(400);
+    expect(openStreamMock).not.toHaveBeenCalled();
+  });
 });

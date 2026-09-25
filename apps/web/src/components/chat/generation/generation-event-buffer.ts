@@ -1,4 +1,4 @@
-import type { GenerationEventDto } from "@ai-chat/contracts";
+import type { GenerationEventEntry } from "@ai-chat/event-store";
 
 export type FrameScheduler = {
   request(callback: () => void): number;
@@ -6,7 +6,7 @@ export type FrameScheduler = {
 };
 
 export type GenerationEventBuffer = {
-  enqueue(event: GenerationEventDto): void;
+  enqueue(entry: GenerationEventEntry): void;
   dispose(): void;
 };
 
@@ -16,10 +16,10 @@ const browserFrameScheduler: FrameScheduler = {
 };
 
 export function createGenerationEventBuffer(
-  flush: (events: readonly GenerationEventDto[]) => void,
+  flush: (entries: readonly GenerationEventEntry[]) => void,
   scheduler: FrameScheduler = browserFrameScheduler,
 ): GenerationEventBuffer {
-  let queuedEvents: GenerationEventDto[] = [];
+  let queuedEvents: GenerationEventEntry[] = [];
   let frameHandle: number | null = null;
   let disposed = false;
 
@@ -36,12 +36,13 @@ export function createGenerationEventBuffer(
   };
 
   return {
-    enqueue(event) {
+    enqueue(entry) {
       if (disposed) {
         return;
       }
 
-      queuedEvents.push(event);
+      queuedEvents.push(entry);
+      const { event } = entry;
       if (
         event.type === "generation.completed" ||
         event.type === "generation.failed" ||
