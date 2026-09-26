@@ -8,8 +8,8 @@ export {
   createMcpToolId,
   parseMcpToolId,
   toMcpRuntimeToolName,
-  toRuntimeHistoryToolName,
-} from "@ai-chat/model-context";
+} from "@ai-chat/mcp/tool-names";
+export { toRuntimeHistoryToolName } from "@ai-chat/model-context";
 export {
   createTavilyWebSearchTool,
   type TavilyWebSearchToolOptions,

@@ -240,6 +240,9 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@ai-chat/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@ai-sdk/mcp':
         specifier: 2.0.39
         version: 2.0.39(zod@4.4.3)
@@ -249,6 +252,9 @@ importers:
       '@ai-chat/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ai-chat/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       ai:
         specifier: ^7.0.83
         version: 7.0.83(zod@4.4.3)

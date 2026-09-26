@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@ai-chat/contracts": "workspace:*",
+    "@ai-chat/mcp": "workspace:*",
     "ai": "^7.0.83",
     "js-tiktoken": "1.0.21"
   }

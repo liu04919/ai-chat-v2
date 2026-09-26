@@ -9,6 +9,7 @@ import type {
   McpServerSummary,
   RemoteMcpServerDefinition,
 } from "./mcp-server-registry";
+import { createMcpToolId } from "./tool-names";
 
 export const MCP_TOOL_DISCOVERY_TTL_MS = 5 * 60 * 1000;
 export const MCP_REQUEST_TIMEOUT_MS = 10 * 1000;
@@ -52,7 +53,7 @@ type CacheEntry = {
 
 function toCatalogTool(serverId: string, tool: McpTool): DiscoveredMcpTool {
   return {
-    id: `${serverId}.${tool.name}`,
+    id: createMcpToolId(serverId, tool.name),
     serverId,
     name: tool.name,
     inputSchema: tool.inputSchema,
