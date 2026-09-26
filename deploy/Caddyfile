@@ -1,0 +1,9 @@
+{
+	# 外部传输由 SSH 隧道加密；这里不申请域名证书。
+	admin off
+	auto_https off
+}
+
+:80 {
+	reverse_proxy web:3000
+}

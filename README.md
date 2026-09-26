@@ -27,6 +27,8 @@ packages/model-context 数据库/Worker 共用的模型历史投影与 token 计
 
 ## 本地运行
 
+服务器部署见 [deploy/README.md](./deploy/README.md)：生产 Compose 与本地环境分开，使用 Docker + Caddy，并通过 SSH 隧道访问，不需要域名。
+
 需要 Node.js 24.5+、pnpm 10 和 Docker Desktop。本项目 PostgreSQL 使用宿主机 `5433`，避免占用 monitor-platform 的 `5432`。
 
 ```bash
