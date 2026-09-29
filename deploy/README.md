@@ -16,7 +16,30 @@ docker pull caddy:2.10-alpine
 
 Web 使用 Next.js standalone 产物；Worker 沿用 `tsx` 和工作区源码，同一镜像也运行迁移。构建不需要真实数据库、R2 或模型密钥，`.dockerignore` 排除本地环境文件、评测和临时产物。
 
-服务器不能访问 Docker Hub 时，可先用 `docker save` 导出这五个镜像，经 SSH 上传后 `sudo docker load` 导入，不需要临时使用未知的公共镜像站。后续 CI/CD 可以将镜像发布至可访问的仓库，并修改 `.env` 中五个 `*_IMAGE` 地址；这不是已经接通的自动发布流程。
+首次部署曾用 `docker save` 导出镜像，经 SSH 上传后 `sudo docker load` 导入。后续更新使用 [GitHub Actions CI 与手动发布](./CI_CD.md)：Actions 构建并推送 TCR，服务器拉取，不再经 SSH 传大镜像包。
+
+### 腾讯云 Docker Hub 加速
+
+腾讯云服务器可在已有 `/etc/docker/daemon.json` 中合并以下设置，不要覆盖其他配置：
+
+```json
+{
+  "registry-mirrors": ["https://mirror.ccs.tencentyun.com"]
+}
+```
+
+生效后，`docker pull redis:8-alpine` / `docker pull caddy:2.10-alpine` 仍使用原名称。加速源只支持腾讯云内网、仅用于 Docker Hub，不加速 TCR 或 GHCR。当前服务器支持 `registry-mirrors` 热重载，可先用 `sudo dockerd --validate --config-file /etc/docker/daemon.json` 校验，再执行 `sudo systemctl reload docker`，无需重启容器。其他环境先检查 `systemctl show docker -p CanReload`；如需重启 Docker，应安排停机。
+
+不改全局配置也能用以下命令单独验证加速源。这里的完整名称与原镜像名不同，测试成功不代表 `registry-mirrors` 已配置：
+
+```bash
+sudo docker pull mirror.ccs.tencentyun.com/library/redis:8-alpine
+sudo docker pull mirror.ccs.tencentyun.com/library/caddy:2.10-alpine
+```
+
+自定义 PG 初次通过 TCR 安装时，将 `.env` 的 `POSTGRES_IMAGE` 设为 `ccr.ccs.tencentyun.com/<命名空间>/ai-chat-postgres:<已验证提交号>` 并拉取。已有服务器可以继续使用已导入的本地 PG 镜像，不必为了换分发方式重建数据库容器。
+
+参考：[腾讯云官方镜像加速配置](https://cloud.tencent.com/document/product/1207/45596)。
 
 ## 配置与启动
 
@@ -68,4 +91,4 @@ sudo docker compose --env-file deploy/.env -f compose.production.yaml run --rm m
 sudo docker compose --env-file deploy/.env -f compose.production.yaml up -d --pull never --wait
 ```
 
-仅暂停使用时运行 `stop`；恢复时运行 `up -d --pull never --wait`，不要删除数据卷。本轮未配置 GitHub Actions，也没有将 SSH 私钥或模型密钥上传到 GitHub。
+仅暂停使用时运行 `stop`；恢复时运行 `up -d --pull never --wait`，不要删除数据卷。启用 Actions 发布后，应使用 `deploy/current-release` 指向版本的 Compose 与 `images.env`，见 [CI/CD 说明](./CI_CD.md)，避免重新切回根目录的旧镜像。GitHub Secrets 存专用部署 SSH 密钥和 TCR 登录凭据，模型密钥仍留在服务器。

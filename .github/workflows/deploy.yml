@@ -1,0 +1,69 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 发布不能被新一次发布中途取消，避免停服务或迁移只完成一半。
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+    with:
+      publish-images: true
+    secrets:
+      TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+      TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: image-ref-*
+          merge-multiple: true
+          path: image-refs
+      - name: Package the exact tested revision
+        run: |
+          mkdir -p bundle/deploy
+          cp compose.production.yaml bundle/
+          cp deploy/Caddyfile deploy/activate.sh bundle/deploy/
+          cat image-refs/web.env image-refs/worker.env > bundle/images.env
+          cd bundle
+          sha256sum images.env compose.production.yaml deploy/Caddyfile deploy/activate.sh > SHA256SUMS
+          tar -cf ../release.tar .
+      - name: Upload and activate
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          test -n "$DEPLOY_SSH_KEY" && test -n "$DEPLOY_KNOWN_HOSTS"
+          umask 077
+          key="$RUNNER_TEMP/deploy-key"
+          hosts="$RUNNER_TEMP/deploy-known-hosts"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$hosts"
+          trap 'rm -f "$key" "$hosts"' EXIT
+          ssh_options=(-i "$key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$hosts" -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          release="/home/ubuntu/ai-chat/releases/$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh "${ssh_options[@]}" "$target" "umask 077; mkdir -p '$release'"
+          scp "${ssh_options[@]}" release.tar "$target:$release/release.tar"
+          ssh "${ssh_options[@]}" "$target" "cd '$release' && tar -xf release.tar && bash deploy/activate.sh '$GITHUB_SHA'"
+          printf 'Published commit `%s` through SSH.\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
