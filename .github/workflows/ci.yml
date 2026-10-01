@@ -6,16 +6,6 @@ on:
   pull_request:
     branches: [main]
   workflow_call:
-    inputs:
-      publish-images:
-        description: Publish tested images to TCR for a manual deployment
-        type: boolean
-        default: false
-    secrets:
-      TCR_USERNAME:
-        required: false
-      TCR_PASSWORD:
-        required: false
 
 permissions:
   contents: read
@@ -23,10 +13,6 @@ permissions:
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
-
-env:
-  TCR_REGISTRY: ${{ vars.TCR_REGISTRY }}
-  TCR_NAMESPACE: ${{ vars.TCR_NAMESPACE }}
 
 jobs:
   checks:
@@ -43,11 +29,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Validate registry configuration
-        if: inputs.publish-images
-        run: |
-          [[ "$TCR_REGISTRY" =~ ^[a-z0-9][a-z0-9.-]*$ ]]
-          [[ "$TCR_NAMESPACE" =~ ^[a-z0-9][a-z0-9._-]*$ ]]
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
@@ -73,19 +54,6 @@ jobs:
       - run: docker compose up -d --no-build --wait postgres redis
       # 假模型/假存储配合真实 PG、Redis，不调用付费模型或线上资源。
       - run: pnpm test:integration
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        if: inputs.publish-images
-        with:
-          registry: ${{ vars.TCR_REGISTRY }}
-          username: ${{ secrets.TCR_USERNAME }}
-          password: ${{ secrets.TCR_PASSWORD }}
-      # 发布通过集成测试的 PG 镜像，供初装/重建使用；不自动升级线上 PG。
-      - name: Publish tested PostgreSQL image
-        if: inputs.publish-images
-        run: |
-          image="$TCR_REGISTRY/$TCR_NAMESPACE/ai-chat-postgres:$GITHUB_SHA"
-          docker tag ai-chat-postgres:18.4-rag "$image"
-          docker push "$image"
       - name: Clean up isolated CI infrastructure
         if: always()
         run: docker compose -p ai-chat-ci down --volumes
@@ -103,36 +71,13 @@ jobs:
         with:
           persist-credentials: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        if: inputs.publish-images
-        with:
-          registry: ${{ vars.TCR_REGISTRY }}
-          username: ${{ secrets.TCR_USERNAME }}
-          password: ${{ secrets.TCR_PASSWORD }}
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        id: build
         with:
           context: .
           target: ${{ matrix.target }}
           platforms: linux/amd64
-          load: ${{ !inputs.publish-images }}
-          push: ${{ inputs.publish-images == true }}
-          tags: ${{ inputs.publish-images && format('{0}/{1}/ai-chat-{2}:{3}', vars.TCR_REGISTRY, vars.TCR_NAMESPACE, matrix.target, github.sha) || format('ai-chat-{0}:{1}', matrix.target, github.sha) }}
+          load: true
+          push: false
+          tags: ai-chat-${{ matrix.target }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.target }}
           cache-to: type=gha,mode=max,scope=${{ matrix.target }}
-      # 只传递镜像引用，不打包镜像；digest 固定这次构建内容，回退不依赖可变标签。
-      - name: Record published image digest
-        if: inputs.publish-images
-        env:
-          TARGET: ${{ matrix.target }}
-          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
-        run: |
-          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
-          printf '%s_IMAGE=%s/%s/ai-chat-%s@%s\n' "${TARGET^^}" "$TCR_REGISTRY" "$TCR_NAMESPACE" "$TARGET" "$IMAGE_DIGEST" > "$TARGET.env"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: inputs.publish-images
-        with:
-          name: image-ref-${{ matrix.target }}
-          path: ${{ matrix.target }}.env
-          retention-days: 1
-          if-no-files-found: error

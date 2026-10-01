@@ -1,6 +1,8 @@
 FROM node:24-bookworm-slim AS dependencies
 WORKDIR /app
-RUN npm install --global pnpm@10.24.0
+# CI 默认走官方源；国内服务器构建时可单独选择下载源，不改锁文件。
+ARG NPM_REGISTRY=https://registry.npmjs.org
+RUN npm install --global pnpm@10.24.0 --registry="${NPM_REGISTRY}"
 
 # 先安装依赖，源码变化时可复用这一层；本地 .env 不进入构建上下文。
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -12,7 +14,7 @@ COPY packages/event-store/package.json ./packages/event-store/package.json
 COPY packages/mcp/package.json ./packages/mcp/package.json
 COPY packages/model-context/package.json ./packages/model-context/package.json
 COPY packages/storage/package.json ./packages/storage/package.json
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --registry="${NPM_REGISTRY}"
 
 FROM dependencies AS source
 COPY tsconfig.base.json ./

@@ -15,34 +15,28 @@ jobs:
   ci:
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
-    with:
-      publish-images: true
-    secrets:
-      TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
-      TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
 
   deploy:
     needs: ci
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          pattern: image-ref-*
-          merge-multiple: true
-          path: image-refs
       - name: Package the exact tested revision
         run: |
-          mkdir -p bundle/deploy
-          cp compose.production.yaml bundle/
-          cp deploy/Caddyfile deploy/activate.sh bundle/deploy/
-          cat image-refs/web.env image-refs/worker.env > bundle/images.env
+          set -euo pipefail
+          mkdir bundle
+          # 只取 Git 中这次通过 CI 的源码，不带依赖、构建产物或线上密钥。
+          git archive "$GITHUB_SHA" Dockerfile .dockerignore package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json apps packages compose.production.yaml deploy/Caddyfile deploy/activate.sh | tar -x -C bundle
           cd bundle
-          sha256sum images.env compose.production.yaml deploy/Caddyfile deploy/activate.sh > SHA256SUMS
-          tar -cf ../release.tar .
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > ../SHA256SUMS
+          mv ../SHA256SUMS .
+          tar -czf ../release.tar.gz .
+          cd ..
+          sha256sum release.tar.gz > release.tar.gz.sha256
+          printf 'Source archive: %s bytes\n' "$(stat -c %s release.tar.gz)"
       - name: Upload and activate
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -64,6 +58,6 @@ jobs:
           target="$DEPLOY_USER@$DEPLOY_HOST"
           release="/home/ubuntu/ai-chat/releases/$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           ssh "${ssh_options[@]}" "$target" "umask 077; mkdir -p '$release'"
-          scp "${ssh_options[@]}" release.tar "$target:$release/release.tar"
-          ssh "${ssh_options[@]}" "$target" "cd '$release' && tar -xf release.tar && bash deploy/activate.sh '$GITHUB_SHA'"
+          scp "${ssh_options[@]}" release.tar.gz release.tar.gz.sha256 "$target:$release/"
+          ssh "${ssh_options[@]}" "$target" "cd '$release' && sha256sum --check --strict release.tar.gz.sha256 && tar -xzf release.tar.gz && bash deploy/activate.sh '$GITHUB_SHA'"
           printf 'Published commit `%s` through SSH.\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
