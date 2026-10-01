@@ -45,7 +45,7 @@ GitHub Settings → Secrets and variables → Actions 只需以下 **Secrets**�
 2. 获得发布锁，串行构建 Web/Worker；构建失败不会进入停止旧服务的步骤，但构建本身仍可能争用资源。
 3. 两个镜像都成功后写入本版本 `images.env`，镜像标签包含完整版本目录名，避免不同发布互相覆盖。已记录版本重试时直接复用镜像，镜像缺失则报错，不自动重建旧版本。
 4. 校验 Compose，确认原有 PG/Redis 健康，停止 Caddy、Web、Worker，用新 Worker 镜像执行迁移。
-5. 启动新应用，等待 Web 健康、Worker 两个消费者就绪，并检查 Caddy `/login`。
+5. 启动新应用，等待 Web、Caddy `/login` 健康以及 Worker 两个消费者就绪；容器刚进入 running 不代表代理已经开始监听。
 6. 仅成功后更新 `deploy/current-release` 和 `deploy/previous-release`，保留旧镜像及目录。
 
 这是短暂停机发布，不是零停机。迁移或启动失败会让工作流失败，可能需要人工恢复；不自动回滚数据库。Worker 就绪检查只证明消费者启动，不代表所有外部模型和存储都已通过真实调用。

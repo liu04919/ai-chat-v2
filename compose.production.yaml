@@ -115,6 +115,13 @@ services:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+    # running 不等于已经监听；让发布的 --wait 等代理链路真正可用。
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/login"]
+      interval: 5s
+      timeout: 3s
+      start_period: 5s
+      retries: 12
     depends_on:
       web:
         condition: service_healthy
