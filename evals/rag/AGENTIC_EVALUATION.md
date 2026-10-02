@@ -1,6 +1,12 @@
-# Agentic RAG 对照评测
+# Agentic RAG 对照评测（历史实验）
 
-这是独立评测代码，不向业务添加传统模式。传统代码固定在 Git `7134eb0` 的 detached worktree；Agentic 代码固定在 `9e55d20`。本轮未修改业务模型指令、检索参数或工具实现。
+本文记录已完成实验的操作与口径，不是当前分支的直接运行指南。传统代码固定在 Git `7134eb0` 的 detached worktree；Agentic 基线为 `9e55d20`，来源上限修复版另外记录精确补丁。实验未修改业务模型指令、检索参数或工具实现，也没有向业务添加传统模式。结果见[对照报告](reports/agentic-v1/agentic-fixed/comparison.md)和[结论边界](reports/agentic-v1/agentic-fixed/findings.md)。
+
+## 复现前提
+
+复现需在独立工作目录恢复对应版本、评测工具、原始数据及预算账本；修复版还需恢复记录中的精确补丁。不要在当前主分支直接执行下述历史命令，也不要删除版本或哈希检查来强行续跑。
+
+`compare-prepare.ts` 会冻结当时的 HEAD；已有计划与当前提交不同会报 `FROZEN_PLAN_CHANGED`。`prepare-source-fix.ts` 专用于当时那次来源上限修复，要求 HEAD 等于原实验基线且工作区包含指定补丁，否则报 `BASE_COMMIT_CHANGED` 或 `SOURCE_FIX_REQUIRED`。这些保护和旧报告保留用于复核，不是待删除的业务兼容分支。新的实验应另建计划与结果目录，并重新确认调用预算。
 
 ## 预先确定的口径
 
@@ -25,7 +31,7 @@ Agentic 最多三次检索、最多十八条累计来源，传统一次六条。
 
 只有主对照两版 50 题全部完成后，才能导入专项资料，避免改变主对照的共享 BM25 统计。专项走真实预签名上传与入库。输出中的字符串断言仅是回归烟测，不能冒充语义准确率或公开 benchmark；需要检查回答和实际工具轨迹。若一次检索已经得到充分证据，正确回答不要求为了展示能力而多次调用工具。
 
-## 命令
+## 当时执行的命令
 
 先确保旧隔离评测数据仍在、原 host 已停止、本地 Proxy 已启动：
 
@@ -60,7 +66,7 @@ pnpm --filter @ai-chat/rag-eval exec tsx src/compare-report.ts --publish
 ## 来源上限修复后的独立重跑
 
 旧 Agentic 批次 43/50 成功，七次因为 SSE 来源上限仍为 6 而失败。经确认已让 SSE 复用消息来源 schema（最多 18）；没有调整模型指令或检索参数。
-修复未提交，因此用原 Git commit + 精确 patch SHA-256 标识，记录在 `agentic-fixed/revision.json`。旧 `agentic/` 目录不移动、不覆盖；付费预算仍累计原 `usage.jsonl`。
+当时运行该批实验时，修复尚未提交，因此用原 Git commit + 精确 patch SHA-256 标识，记录在 `agentic-fixed/revision.json`；这不是当前工作区状态。旧 `agentic/` 目录不移动、不覆盖；当轮付费预算仍累计原 `usage.jsonl`。
 
 ```powershell
 pnpm --filter @ai-chat/rag-eval exec tsx src/prepare-source-fix.ts

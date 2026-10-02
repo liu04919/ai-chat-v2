@@ -405,7 +405,7 @@ describe("OpenAI Responses Chat Adapter", () => {
   it("使用 Responses API，并把 SDK stream part 映射为内部协议", async () => {
     let capturedRequest: Request | undefined;
     const model = createOpenAIResponsesChatModel({
-      baseUrl: "https://maomiapi.com/v1/",
+      baseUrl: "https://relay.example.com/v1/",
       apiKey: "test-api-key",
       modelId: "gpt-5.6-sol",
       fetch: async (input, init) => {
@@ -467,7 +467,7 @@ describe("OpenAI Responses Chat Adapter", () => {
       },
     ]);
     expect(capturedRequest).toBeDefined();
-    expect(capturedRequest?.url).toBe("https://maomiapi.com/v1/responses");
+    expect(capturedRequest?.url).toBe("https://relay.example.com/v1/responses");
     expect(capturedRequest?.method).toBe("POST");
     expect(capturedRequest?.headers.get("authorization")).toBe(
       "Bearer test-api-key",
@@ -558,7 +558,7 @@ describe("OpenAI Responses Chat Adapter", () => {
 
   it("把 SDK stream error 抛给 Worker 编排层", async () => {
     const model = createOpenAIResponsesChatModel({
-      baseUrl: "https://maomiapi.com/v1",
+      baseUrl: "https://relay.example.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-5.6-sol",
       fetch: async () =>
@@ -595,7 +595,7 @@ describe("OpenAI Responses Chat Adapter", () => {
       results: [{ title: "Redis", url: "https://redis.io/" }],
     }));
     const model = createOpenAIResponsesChatModel({
-      baseUrl: "https://maomiapi.com/v1",
+      baseUrl: "https://relay.example.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-5.6-sol",
       fetch: async (input, init) => {
@@ -676,7 +676,7 @@ describe("OpenAI Responses Chat Adapter", () => {
   it("下一轮会把已落库的 Tool Call 与 Tool Result 重建进上下文", async () => {
     let capturedRequest: Request | undefined;
     const model = createOpenAIResponsesChatModel({
-      baseUrl: "https://maomiapi.com/v1",
+      baseUrl: "https://relay.example.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-5.6-sol",
       fetch: async (input, init) => {

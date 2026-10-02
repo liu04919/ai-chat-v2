@@ -1,8 +1,23 @@
 # AI Chat V2
 
-AI Chat V2 是对本地 `D:\code\Next\ai-chat` 的正式重构。项目保留流式聊天、断线恢复、Tool/MCP、RAG、文件处理、分享与 Image Pipeline 等能力，并重新建立清晰、可测试、可解释的领域、协议和运行时边界。
+面向个人学习与求职展示的全栈 AI 对话应用。基于 Next.js / React 构建交互界面，独立 Worker 执行模型与工具调用，支持流式续传、Agentic RAG、文件直传、图片生成与编辑、会话分享及长历史摘要。
 
-架构决定见 [AI_CHAT_V2_ARCHITECTURE_BRIEF.md](./AI_CHAT_V2_ARCHITECTURE_BRIEF.md)。
+项目从 V1 重构而来，重点是把消息持久化、生成任务、实时事件和浏览器状态分开，并处理切换会话、刷新、停止与失败时的状态衔接。当前采用单机部署，不以生产级高可用或高并发为目标。
+
+技术栈：TypeScript、Next.js、React、AI SDK、TanStack Query / Virtual、Zustand、shadcn/ui、Tailwind CSS、Drizzle、PostgreSQL、Redis / BullMQ、Cloudflare R2。
+
+## 阅读入口
+
+| 想了解什么 | 入口 |
+| --- | --- |
+| 当前架构、一次请求的流转、代码阅读顺序 | [架构导读](docs/ARCHITECTURE.md) |
+| 桌面演示步骤与预期结果 | [演示脚本](docs/DEMO.md) |
+| 简历项目描述与面试追问 | [求职材料](docs/INTERVIEW.md) |
+| 持续维护的架构约束与取舍 | [架构约束](AI_CHAT_V2_ARCHITECTURE_BRIEF.md) |
+| 首次部署与后续发布 | [单机部署](deploy/README.md) / [CI 与源码发布](deploy/CI_CD.md) |
+| 检索消融、传统 RAG 与 Agentic 实验 | [检索评测](evals/retrieval/README.md) / [RAG 评测](evals/rag/README.md) / [Agentic 对照结论](evals/rag/reports/agentic-v1/agentic-fixed/findings.md) |
+
+下面保留运行方式和各模块的具体行为，便于对照源码。
 
 ## Workspace
 
@@ -31,10 +46,18 @@ packages/model-context 数据库/Worker 共用的模型历史投影与 token 计
 
 需要 Node.js 24.5+、pnpm 10 和 Docker Desktop。本项目 PostgreSQL 使用宿主机 `5433`，避免占用 monitor-platform 的 `5432`。
 
-```bash
+首次启动（PowerShell，在仓库根目录执行；已有 `.env.local` 时不要覆盖）：
+
+```powershell
 pnpm install
+if (!(Test-Path apps/web/.env.local)) { Copy-Item apps/web/.env.example apps/web/.env.local }
+if (!(Test-Path apps/worker/.env.local)) { Copy-Item apps/worker/.env.example apps/worker/.env.local }
+# 先填写下述环境配置，再继续。占位密钥不能用于真实调用。
+docker compose build postgres
 pnpm dev
 ```
+
+打开 `http://localhost:3000`。Web 配置认证密钥；两端配置一致的数据库、Redis 和 R2；Worker 另外配置聊天渠道。图片、知识库、联网搜索与 MCP 按需配置。R2 直传需要允许浏览器 Origin 的 CORS 规则，具体见[部署说明](deploy/README.md)。
 
 `pnpm dev` 会等待 Docker PostgreSQL/Redis 健康、执行数据库迁移，再并行启动 Web 与 Worker。需要单独调试时仍可使用 `pnpm dev:web` 或 `pnpm dev:worker`。
 
@@ -109,7 +132,7 @@ pnpm --filter @ai-chat/worker knowledge delete <ownerId> <baseId> <documentId>
 - UTF-8 TXT/Markdown、文本型 PDF，文件不超过 10 MB，PDF 不超过 200 页；不做 OCR。
 - 使用 `@langchain/textsplitters` 的递归切块器，优先按段落、换行、中文标点拆分，再回退到字符。目标上限 800 个 UTF-16 码元，重叠预算 100（不保证每块正好重叠 100）；不跨 PDF 页，最多 1000 块。薄适配只处理 Unicode 码点回退和原文位置，不重新实现递归算法。保留页码和提取文本内的位置；不是 token 切块，也没有标题/表格结构解析。
 - Embedding 每批 10 条，每批 60 秒超时，不自动重试。使用百炼 OpenAI 兼容接口，未启用 DashScope 原生接口的 query/document 区分。
-- 按账户、知识库、ready 状态和 Embedding 模型过滤，语义与 BM25 各取 30 条，RRF（常数 60）合并去重后保留全部候选（最多 60 条），精排选前 6 条。结果中的 `score` 保留 RRF 分数，`rerankScore` 是精排分数，两者不混加，也不能当作回答正确的概率。以上是当前基线参数，尚未针对上传文件调参。
+- 按账户、知识库、ready 状态和 Embedding 模型过滤，语义与 BM25 各取 30 条，RRF（常数 60）合并去重后保留全部候选（最多 60 条），精排选前 6 条。结果中的 `score` 保留 RRF 分数，`rerankScore` 是精排分数，两者不混加，也不能当作回答正确的概率。曾在传统 RAG 基线上用 CMRC 文本做小规模参数对比，未据此修改默认值；这不是任意上传文件的最优参数，见[参数实验报告](evals/rag/reports/cmrc2018-v1/report.md)。
 - 精排单次请求超时 60 秒，不自动重试，不静默回退 RRF。响应校验数量、索引唯一性与范围、分数有效性；通过索引回填原 chunk 的来源，不信任上游返回的正文或 ID。空候选不发送请求。更换精排模型不需要重新 Embedding 文档。
 - 查询先取得允许访问的文档 ID，把该过滤放进 chunk 的 Top K 查询。向量直接按余弦距离排序，BM25 直接按索引打分排序；只物化已取出的候选，不预先物化全部 chunk。向量查询在事务内设置 `SET LOCAL hnsw.iterative_scan = strict_order`，补充过滤后的候选；受扫描上限约束，并非保证召回齐全。正式查询不强制索引，执行计划由 PostgreSQL 选择。
 - BM25 继续使用共享索引的语料统计，不是每个知识库独立计算 IDF。分块变更只影响新上传的文档；已有文档若要采用新策略，需要重新上传，不自动改写已有向量。
@@ -126,7 +149,7 @@ pnpm exec vitest run packages/db/src/rag-extensions.integration.test.ts
 
 评测入口位于 [evals/retrieval](evals/retrieval/README.md)，不再放在 Worker 的业务 CLI 中。使用独立 PostgreSQL 数据库、相同业务 schema/检索 SQL/Embedding/RRF/精排实现，公开数据不会混入用户知识库或影响业务 BM25 统计。
 
-四组对照为纯向量、纯 BM25、混合 RRF、混合 RRF＋精排，指标统一交给 Python `ranx` 计算。数据下载、固定抽题、预算记录、断点续跑和报告命令见评测目录；旧 `knowledge compare/evaluate` 已移除。这是检索层消融实验，不是最终回答或 Agentic RAG 评测。
+初始四组对照为纯向量、纯 BM25、混合 RRF、混合 RRF＋精排，另有纯向量＋精排与混合＋精排的补测，指标统一交给 Python `ranx` 计算。数据下载、固定抽题、预算记录、断点续跑和报告命令见评测目录；旧 `knowledge compare/evaluate` 已移除。这是检索层消融实验，不是最终回答或 Agentic RAG 评测。
 
 ## Tool 与联网搜索
 
@@ -176,7 +199,7 @@ Chat 在 Worker 内处理长历史，沿用 `LLM_MODEL` 配置的 Sol / Response
 
 `conversation_summaries` 保存一份滚动替换的摘要、版本、覆盖到的消息 ID/sequence、生成模型和计数元数据。摘要模型在数据库事务外调用；保存时按会话 → Generation 加锁，并复查取消标记、版本和完整轮次边界。原始 `messages` 不改写、不删除，网页、分享与历史分页保持原样。最新回答的重新生成不触及摘要覆盖范围；删除会话会级联删除摘要。
 
-计数、摘要和实际模型历史使用共享投影：跳过旧知识库原文/调用结果与思考展示，保留普通回答；其他未完成的工具调用补上“结果未知”。附件在摘要中只留 ID/文件名及已知描述，不猜测内容，不保存签名 URL。摘要以低可信度历史背景发送，不提升为系统指令，也不对外暴露为 SSE 或聊天消息。模型不能凭摘要自动读回已覆盖原文，精确细节可能丢失。
+计数、摘要和实际模型历史使用共享投影：跳过旧知识库调用/结果与引用原文，保留普通回答，可见思考转换为带标注的普通助手文本；其他未完成的工具调用补上“结果未知”。附件在摘要中只留 ID/文件名及已知描述，不猜测内容，不保存签名 URL。摘要以低可信度历史背景发送，不提升为系统指令，也不对外暴露为 SSE 或聊天消息。模型不能凭摘要自动读回已覆盖原文，精确细节可能丢失。
 
 验证只包含离线假模型、模拟 Responses SSE，以及隔离测试数据库/队列的集成测试，没有做摘要质量评测或真实模型跑分。
 

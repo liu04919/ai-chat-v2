@@ -29,9 +29,3 @@ export function getGenerationCancellationInfrastructure() {
 
   return { cancellationPublisher, eventWriter };
 }
-
-export async function closeGenerationCancellationInfrastructure(): Promise<void> {
-  await Promise.all([cancellationPublisher?.close(), eventWriter?.close()]);
-  cancellationPublisher = undefined;
-  eventWriter = undefined;
-}

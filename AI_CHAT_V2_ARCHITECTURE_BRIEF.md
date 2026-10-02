@@ -188,8 +188,8 @@ POST 不运行模型，不把生成生命周期绑在 HTTP 请求上。
 
 服务器围绕 `userMessageId` 执行最小幂等：
 
-- 相同 ID、相同 Message parts：返回第一次创建的 Generation，不重复写入或 enqueue
-- 相同 ID、不同 Message parts：返回冲突
+- 相同 ID、相同目标、Message parts 与执行配置：返回第一次创建的 Generation，不重复写入；若状态仍为 queued，则使用同一 generationId 作为 Job ID 再次尝试入队，由 BullMQ 去重
+- 相同 ID、不同目标、Message parts 或执行配置：返回冲突
 - 不同 ID、Conversation 已有 Active Generation：返回 `409 ACTIVE_GENERATION` 和 `activeGenerationId`
 
 `generationId` 必须贯穿 PostgreSQL、BullMQ job、Worker、Redis event、Assistant Message 关联和日志。BullMQ 使用它作为 `jobId`；Worker 开始前确认 Generation 仍为 `queued`，并保证一个 Generation 最多提交一条最终 Assistant Message。
@@ -393,7 +393,7 @@ Conversation 使用可空 `pinnedAt` 表达置顶状态和置顶先后顺序。�
 
 Chat 与 Image 共享账户、Conversation 外壳和基础设施，但拥有独立业务管线。图片生成不得作为 Chat Worker 中不断扩张的条件分支。
 
-Image 管线通过独立配置的 OpenAI Images 兼容服务调用 `gpt-image-2`：无参考图调用 `/images/generations`，一张参考图调用 multipart `/images/edits`。只允许一张参考图片，不接受 PDF 作为 Image 模式输入。
+Image 管线通过独立配置的 OpenAI Images 兼容服务调用图片模型，当前 `IMAGE_MODEL` 为 `gpt-image-2.5`：无参考图调用 `/images/generations`，一张参考图调用 multipart `/images/edits`。只允许一张参考图片，不接受 PDF 作为 Image 模式输入。
 
 Chat/Image 各自构建上下文。Image Context Builder 将本轮之前的有序可见文字与本轮指令组成 prompt；本轮上传图优先，否则延续最近一张 Assistant 生成图，不默认携带所有历史图片。参考图从自有 R2 读取，不依赖供应商保存上下文。
 
@@ -436,7 +436,7 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 - Route Handler 保持短小，但不为每个操作机械创建 controller/service/repository/interface
 - 只在存在真实替换点或测试边界时抽象接口
 - 新增依赖前说明用途，优先使用成熟基础设施，不重写 BullMQ、AI SDK 或认证系统
-- 数据库 schema 必须能通过 migration 从空库复现，并以数据库约束保证关键不变量；当前开发数据均可丢弃，schema 变更不承担历史数据兼容、迁移或双写，必要时直接重建数据库与 migration 基线
+- 数据库 schema 必须能通过 migration 从空库复现，并以数据库约束保证关键不变量；经开发者明确同意丢弃的开发数据可以重建数据库与 migration 基线，不为这类数据维护兼容或双写。此许可不适用于服务器数据；部署环境的破坏性变更须单独确认，保留备份并检查迁移及旧版本兼容性
 - 修改跨边界协议时，同一轮更新 Schema、类型、fixtures、contract tests 和消费者
 - 关键领域规则、EventStore、LLM Adapter 与完整主链需要相应层级的测试
 - 日志使用 `generationId` 等稳定关联 ID，不记录密钥或不必要的完整敏感输入
@@ -474,12 +474,11 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 25. 图片与文件统一使用 Attachment；二进制存入私有 Cloudflare R2，PostgreSQL 与 Message 只保存稳定引用和元数据
 26. 模型服务按无状态 Provider 使用；每次 Generation 重组上下文并重新签名所需 Attachment，不依赖 `previous_response_id` 或第三方 file ID
 
-## 14. 尚未拍板的问题
+## 14. 部署现状与后续调整
 
-这些问题在真实代码需要它们时讨论，不预先排期：
+部署已确定为单机 Docker Compose：Caddy、Web、Worker、PostgreSQL 和 Redis 独立容器，文件使用私有 R2；网站仅绑定服务器回环地址，通过 SSH 隧道访问。GitHub Actions 检查通过后上传源码，由服务器构建并发布，当前采用短暂停机更新。操作与配置分别见 [部署说明](deploy/README.md) 和 [CI/CD](deploy/CI_CD.md)。
 
-1. 最终部署拓扑与部署环境的服务配置
-2. 新数据或真实负载下是否需要继续调整检索参数、coalescing 阈值与 Worker 并发；当前已有默认实现，不再视为未完成架构
+是否继续调整检索参数、coalescing 阈值与 Worker 并发，由新数据或真实负载决定；当前已有默认实现，不再视为未完成架构，不预先排期。
 
 ## 15. 协作规则
 

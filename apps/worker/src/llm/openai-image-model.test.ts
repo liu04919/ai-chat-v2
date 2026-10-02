@@ -34,7 +34,7 @@ describe("OpenAI Images Image Adapter", () => {
   it("无参考图时调用文生图端点，并返回解码后的图片", async () => {
     let capturedRequest: Request | undefined;
     const model = createOpenAIImageModel({
-      baseUrl: "https://maomiapi.com/v1/",
+      baseUrl: "https://relay.example.com/v1/",
       apiKey: "test-api-key",
       modelId: "gpt-image-2.5",
       fetch: async (input, init) => {
@@ -47,7 +47,7 @@ describe("OpenAI Images Image Adapter", () => {
 
     expect(image).toEqual({ data: pngBytes, mediaType: "image/png" });
     expect(capturedRequest?.url).toBe(
-      "https://maomiapi.com/v1/images/generations",
+      "https://relay.example.com/v1/images/generations",
     );
     expect(capturedRequest?.method).toBe("POST");
     expect(capturedRequest?.headers.get("authorization")).toBe(
@@ -63,7 +63,7 @@ describe("OpenAI Images Image Adapter", () => {
   it("有一张参考图时调用 multipart 编辑端点", async () => {
     let capturedRequest: Request | undefined;
     const model = createOpenAIImageModel({
-      baseUrl: "https://maomiapi.com/v1",
+      baseUrl: "https://relay.example.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-image-2.5",
       fetch: async (input, init) => {
@@ -78,7 +78,7 @@ describe("OpenAI Images Image Adapter", () => {
     });
 
     expect(image).toEqual({ data: pngBytes, mediaType: "image/png" });
-    expect(capturedRequest?.url).toBe("https://maomiapi.com/v1/images/edits");
+    expect(capturedRequest?.url).toBe("https://relay.example.com/v1/images/edits");
     expect(capturedRequest?.method).toBe("POST");
     expect(capturedRequest?.headers.get("content-type")).toMatch(
       /^multipart\/form-data; boundary=/,
@@ -100,7 +100,7 @@ describe("OpenAI Images Image Adapter", () => {
   it("把 OpenAI Images 的错误响应交给上层处理", async () => {
     let requestCount = 0;
     const model = createOpenAIImageModel({
-      baseUrl: "https://maomiapi.com/v1",
+      baseUrl: "https://relay.example.com/v1",
       apiKey: "test-api-key",
       modelId: "gpt-image-2.5",
       fetch: async () => {

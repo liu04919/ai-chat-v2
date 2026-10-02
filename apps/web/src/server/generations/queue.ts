@@ -70,8 +70,3 @@ export function getGenerationQueueProducer(): GenerationQueueProducer {
   });
   return applicationGenerationQueue;
 }
-
-export async function closeGenerationQueueProducer(): Promise<void> {
-  await applicationGenerationQueue?.close();
-  applicationGenerationQueue = undefined;
-}

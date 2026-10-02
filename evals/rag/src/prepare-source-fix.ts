@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { comparisonRoot, repo } from "./paths";
 import { sha256 } from "./dataset";
 
+// 历史实验专用：须恢复原基线与来源上限补丁，不是当前主分支的评测入口。
 // 修复版完整重跑，不覆盖旧版的 43 次成功、7 次失败及其评分记录。
 const source = join(comparisonRoot, "agentic");
 const dest = join(comparisonRoot, "agentic-fixed");
