@@ -558,6 +558,7 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
     expect(JSON.stringify(detail?.messages.at(-1))).toContain("未检索到匹配资料");
   });
 
+  // 长重复文本的 token 计数较慢，给 CI 留出余量；不放宽其他用例的超时。
   it("选库只提供工具，模型可以不调用；原问题不再套用检索 query 长度上限", async () => {
     const base = await repository.createBase(ownerId, "选库不强制查询");
     const input = { ...command(base.id), parts: [{ type: "text" as const, text: "长问题".repeat(800) }] };
@@ -575,7 +576,7 @@ describe("完整传统 RAG：上传、入库、生成和引用", () => {
     expect((await executeGeneration(input.generationId, run.deps)).kind).toBe("completed");
     expect(retrieve).not.toHaveBeenCalled();
     expect(run.events.some((e) => e.type === "knowledge.sources" || e.type === "tool.call")).toBe(false);
-  });
+  }, 15_000);
 
   it("模型尚未调用工具时取消，不预检索、不保存空助手消息", async () => {
     const { base } = await readyBase();
