@@ -47,7 +47,7 @@ const shareRecord = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("Conversation Share services", () => {
-  it("查询和创建只返回公开 URL，不返回快照正文", async () => {
+  it.each(["https://chat.example.com", "http://localhost:3001"])("查询和创建使用站点地址 %s 返回公开 URL，不返回快照正文", async (origin) => {
     vi.mocked(getConversationShareRecordForOwner).mockResolvedValue({
       kind: "found",
       share: shareRecord,
@@ -61,12 +61,12 @@ describe("Conversation Share services", () => {
       getConversationShareForOwner(
         "owner-1",
         "conversation-1",
-        "https://chat.example.com",
+        origin,
       ),
     ).resolves.toEqual({
       share: {
         conversationId: "conversation-1",
-        url: `https://chat.example.com/share/${shareRecord.token}`,
+        url: `${origin}/share/${shareRecord.token}`,
         createdAt: now.toISOString(),
       },
     });
@@ -74,9 +74,13 @@ describe("Conversation Share services", () => {
       createConversationShareForOwner(
         "owner-1",
         "conversation-1",
-        "https://chat.example.com",
+        origin,
       ),
-    ).resolves.not.toHaveProperty("snapshot");
+    ).resolves.toEqual({
+      conversationId: "conversation-1",
+      url: `${origin}/share/${shareRecord.token}`,
+      createdAt: now.toISOString(),
+    });
   });
 
   it("把 active 和空会话映射为明确的 409", async () => {

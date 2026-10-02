@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getCurrentSession } from "@/server/auth/session";
 import {
@@ -37,6 +37,7 @@ const share = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("BETTER_AUTH_URL", "https://chat.example.com");
   vi.mocked(getCurrentSession).mockResolvedValue({
     user: { id: "owner-1" },
   } as Awaited<ReturnType<typeof getCurrentSession>>);
@@ -47,9 +48,12 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("Conversation Share API", () => {
   it("未登录不能查询、创建或停止分享", async () => {
     vi.mocked(getCurrentSession).mockResolvedValue(null);
+    vi.stubEnv("BETTER_AUTH_URL", undefined);
 
     expect((await GET(request, context)).status).toBe(401);
     expect((await POST(request, context)).status).toBe(401);
@@ -57,7 +61,7 @@ describe("Conversation Share API", () => {
     expect(getConversationShareForOwner).not.toHaveBeenCalled();
   });
 
-  it("查询当前状态时限定 owner 并使用请求 origin", async () => {
+  it("查询当前状态时限定 owner 并使用配置的站点 origin", async () => {
     const response = await GET(request, context);
 
     expect(response.status).toBe(200);
@@ -67,6 +71,40 @@ describe("Conversation Share API", () => {
       "conversation-1",
       "https://chat.example.com",
     );
+  });
+
+  it.each([
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://chat.example.com",
+  ])("容器内部请求的查询和创建都使用外部地址 %s", async (origin) => {
+    vi.stubEnv("BETTER_AUTH_URL", `${origin}/`);
+    const internalRequest = new Request(
+      "http://0.0.0.0:3000/api/conversations/conversation-1/share",
+      { headers: { "X-Forwarded-Host": "untrusted.example.com" } },
+    );
+
+    expect((await GET(internalRequest, context)).status).toBe(200);
+    expect((await POST(internalRequest, context)).status).toBe(201);
+    for (const service of [getConversationShareForOwner, createConversationShareForOwner]) {
+      expect(service).toHaveBeenCalledWith("owner-1", "conversation-1", origin);
+    }
+  });
+
+  it.each([undefined, ""])("站点地址缺失（%s）时明确报错，不回退到请求地址", async (value) => {
+    vi.stubEnv("BETTER_AUTH_URL", value);
+
+    await expect(GET(request, context)).rejects.toThrow("缺少 BETTER_AUTH_URL");
+    await expect(POST(request, context)).rejects.toThrow("缺少 BETTER_AUTH_URL");
+    expect(getConversationShareForOwner).not.toHaveBeenCalled();
+    expect(createConversationShareForOwner).not.toHaveBeenCalled();
+  });
+
+  it("停止分享不依赖站点地址配置", async () => {
+    vi.stubEnv("BETTER_AUTH_URL", undefined);
+
+    expect((await DELETE(request, context)).status).toBe(200);
+    expect(deleteConversationShareForOwner).toHaveBeenCalledWith("owner-1", "conversation-1");
   });
 
   it("创建返回 201，停止分享返回 Conversation ID", async () => {
