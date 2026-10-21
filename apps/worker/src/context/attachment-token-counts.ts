@@ -13,7 +13,7 @@ import type { ObjectStorage } from "@ai-chat/storage";
 
 export const ATTACHMENT_TOKEN_VERSION = `${TOKENIZER_ID}:sol-auto-image-patches-pdf-high-v1`;
 
-/** Sol 的 auto=original：32×32 patch，尺寸至多 65535，乘 1.2 向上取整。 */
+/** Sol 附件的本地预算估算：32×32 patch，乘 1.2 向上取整，不作为服务端账单计数。 */
 export function countSolImageTokens(width: number, height: number): number {
   if (
     ![width, height].every((value) => Number.isSafeInteger(value) && value > 0)
@@ -99,7 +99,8 @@ export function createAttachmentTokenCounter(dependencies: {
       ),
     );
     if (!needed.size) return counts;
-    if (dependencies.modelId !== "gpt-5.6-sol")
+    // 6.1 沿用当前的本地估算策略；中转的实际计费口径不由这里推断。
+    if (!["gpt-5.6-sol", "gpt-6.1-sol"].includes(dependencies.modelId))
       throw new Error(
         "ATTACHMENT_TOKEN_MODEL_UNSUPPORTED: 需要为当前模型配置多模态计数规则",
       );

@@ -1,6 +1,11 @@
+import { Sparkles } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AuthBackground } from "@/components/auth/auth-background";
 import { getCurrentSession } from "@/server/auth/session";
+
+import styles from "./auth-scene.module.css";
 
 export default async function AuthLayout({
   children,
@@ -12,20 +17,21 @@ export default async function AuthLayout({
   }
 
   return (
-    <main className="grid min-h-svh min-w-0 lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="hidden bg-primary p-12 text-primary-foreground lg:flex lg:flex-col lg:justify-between">
-        <div className="text-lg font-semibold tracking-tight">AI Chat V2</div>
-        <div className="max-w-xl">
-          <p className="text-4xl font-semibold leading-tight tracking-tight">
-            和 AI 一起，把想法聊清楚。
-          </p>
-        </div>
-        <div aria-hidden="true" />
-      </section>
-
-      <section className="flex min-w-0 items-center justify-center px-6 py-12 sm:px-10">
-        {children}
-      </section>
+    <main className={styles.scene}>
+      <AuthBackground />
+      <header className={styles.header}>
+        <Link href="/login" className={styles.brand} aria-label="AI Chat 登录页">
+          <span className={styles.brandMark}>
+            <Sparkles size={19} strokeWidth={1.6} aria-hidden="true" />
+          </span>
+          <span>
+            AI Chat
+            <span className={styles.brandCaption}>留一点空间，给想象。</span>
+          </span>
+        </Link>
+      </header>
+      <section className={styles.content}>{children}</section>
+      <footer className={styles.footer}>每一段好对话，都从一个想法开始。</footer>
     </main>
   );
 }

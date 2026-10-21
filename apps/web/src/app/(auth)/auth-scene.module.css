@@ -1,0 +1,87 @@
+.scene {
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  overflow: clip;
+  color: #393647;
+  background: #ece9f1;
+}
+
+.header {
+  position: absolute;
+  top: 30px;
+  left: 38px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.brand:focus-visible {
+  outline: 2px solid #827195;
+  outline-offset: 6px;
+}
+
+.brandMark {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 65%);
+  border-radius: 13px;
+  background: rgb(255 253 247 / 70%);
+  backdrop-filter: blur(8px);
+}
+
+.brandCaption {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 450;
+  letter-spacing: 0.1em;
+}
+
+.content {
+  width: 420px;
+  margin-left: 53%;
+  padding-top: clamp(90px, 12svh, 150px);
+  padding-bottom: 80px;
+  animation: arrive 500ms ease-out both;
+}
+
+.footer {
+  position: absolute;
+  right: 35px;
+  bottom: 25px;
+  color: #645d73;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1100px) {
+  .content { width: 390px; margin-left: 52%; }
+}
+
+@media (max-width: 850px) {
+  .content { width: min(420px, calc(100% - 40px)); margin-inline: auto; }
+  .header { top: 20px; left: 22px; }
+}
+
+@media (max-height: 800px) and (min-width: 851px) {
+  .content { padding-top: 75px; padding-bottom: 55px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content { animation: none; }
+}

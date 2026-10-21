@@ -1,9 +1,35 @@
 {
-	# 外部传输由 SSH 隧道加密；这里不申请域名证书。
 	admin off
-	auto_https off
+	auto_https disable_redirects
+	default_sni {$APP_HOST}
+	servers {
+		protocols h1 h2
+	}
 }
 
 :80 {
+	# AI Chat 自己的挑战由 Caddy 自动处理；其余挑战文件交给共享目录。
+	handle /.well-known/acme-challenge/* {
+		root * /srv/external-acme
+		file_server
+	}
+	handle {
+		redir https://{$APP_HOST}{uri} 308
+	}
+}
+
+https://{$APP_HOST} {
+	# IP 证书必须使用 shortlived profile；Caddy 自动申请、续期并热更新。
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+			profile shortlived
+			disable_tlsalpn_challenge
+		}
+	}
+	reverse_proxy web:3000
+}
+
+:8080 {
 	reverse_proxy web:3000
 }

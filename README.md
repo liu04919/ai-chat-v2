@@ -42,7 +42,7 @@ packages/model-context 数据库/Worker 共用的模型历史投影与 token 计
 
 ## 本地运行
 
-服务器部署见 [deploy/README.md](./deploy/README.md)：生产 Compose 与本地环境分开，使用 Docker + Caddy，并通过 SSH 隧道访问，不需要域名。
+服务器部署见 [deploy/README.md](./deploy/README.md)：生产 Compose 与本地环境分开，使用 Docker + Caddy，通过公网 IP 的 HTTPS 入口访问，不需要域名或 SSH 隧道。
 
 需要 Node.js 24.5+、pnpm 10 和 Docker Desktop。本项目 PostgreSQL 使用宿主机 `5433`，避免占用 monitor-platform 的 `5432`。
 
@@ -63,9 +63,15 @@ pnpm dev
 
 Web 与 Worker 的环境变量分别参考各自的 `.env.example`。真实密钥写入对应的 `.env.local`，这些文件不会进入 Git。
 
+登录/注册页共用 `components/auth/auth-background.tsx`：首屏保留静态图，空闲时加载用户提供的 WebGL 动态壁纸。原图与闭眼/花瓣补图作为独立静态资源参与构建，不把 Base64 塞进页面。`background/` 内分别保留网格绑定、着色器、动作、粒子、绘制和生命周期；动画不通过 React 每帧更新，最高约 30 fps。左下角可暂停，后台隐藏时停止绘制；减少动态效果时不加载大纹理，资源或 WebGL 失败时回退原图，离开认证布局后清理事件、rAF 与 GPU 资源。
+
 本机开发的聊天渠道使用 Codex Proxy：先启动 Proxy 并确认账户已登录，再运行 `pnpm dev`。Worker 的 `LLM_BASE_URL` 为 `http://127.0.0.1:8080/v1`，`LLM_API_KEY` 填 Proxy 创建的本地客户端密钥，模型仍为 `gpt-5.6-sol`。修改配置后重启 Worker；`pnpm dev` 不会自动启动 Proxy。图片、Embedding 和 Rerank 继续使用各自的独立渠道。部署到其他机器时需配置该机器可访问的服务地址，不能直接沿用本机回环地址。
 
-Worker 的 `dev` / `start` 命令在 Node 启动时读取 `.env.local` 并启用原生环境代理：配置 `HTTP_PROXY` / `HTTPS_PROXY` 时走代理，不配置则直连；`NO_PROXY` 用于绕过本机地址。代理连接失败时不自动切换直连重发。修改代理配置后重启 Worker，已有系统环境变量优先于 `.env.local`。
+Web / Worker 的 `dev` 共用 `scripts/dev.mjs`：先读取各自的 `.env.local`（已有系统环境变量优先），再探测配置的 `HTTP_PROXY` / `HTTPS_PROXY` 端口，单个探测最多等待 1 秒。配置的代理端口全部可连接时启用原生环境代理；未配置、地址无效或有端口不可连接时，仅让本次开发进程直连，不修改系统代理或配置文件。`NO_PROXY` 用于绕过本机地址，建议保留示例中的 `localhost,127.0.0.1,::1`。
+
+代理只在启动时判断一次：运行中开关代理后需要重启；端口可连接不保证上游网络畅通。浏览器能打开 Google 不代表 Web 后端能访问 Google 的授权接口，直连时 Google 仍可能不可用。业务请求失败后不会切换线路重发，避免重复生成或上传。
+
+自动探测只用于本地 `dev`。Worker 的 `start` / `knowledge` 仍在 Node 启动时读取 `.env.local` 并启用环境代理（未配置则直连），生产 Docker 启动不变，不要把本机代理地址带入服务器部署配置。
 
 图片 Worker 使用独立的 `IMAGE_BASE_URL`、`IMAGE_MODEL`、`IMAGE_API_KEY`，不复用聊天渠道凭证。本地图片与部署配置均使用新中转 `https://api.a6api.com/v1`，模型为 `gpt-image-2.5`；本地聊天和摘要仍走 Codex Proxy。密钥只写入各环境的私有配置，不提交 Git。未配置时图片任务会明确失败，Chat 不受影响。图片会话支持发送、参考图续改、停止、生成骨架与大图预览；刷新或切换会话后由服务端状态恢复。骨架仅用于展示，不写入 Assistant 消息。
 

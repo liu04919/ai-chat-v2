@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "knowledge": "tsx --env-file-if-exists=.env.local --use-env-proxy src/knowledge/cli.ts",
-    "dev": "tsx watch --env-file-if-exists=.env.local --use-env-proxy src/index.ts",
+    "dev": "node ../../scripts/dev.mjs worker",
     "start": "tsx --env-file-if-exists=.env.local --use-env-proxy src/index.ts",
     "typecheck": "tsc --noEmit"
   },

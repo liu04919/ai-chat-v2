@@ -65,8 +65,12 @@ services:
     init: true
     environment:
       <<: *app-environment
-      BETTER_AUTH_URL: ${APP_ORIGIN:-http://localhost:3001}
+      BETTER_AUTH_URL: https://${APP_HOST:?set APP_HOST}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -87,7 +91,7 @@ services:
     environment:
       <<: *app-environment
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.a6api.com/v1}
-      LLM_MODEL: ${LLM_MODEL:-gpt-5.6-sol}
+      LLM_MODEL: ${LLM_MODEL:-gpt-6.1-sol}
       LLM_API_KEY: ${LLM_API_KEY:?set LLM_API_KEY}
       IMAGE_BASE_URL: ${IMAGE_BASE_URL:-https://api.a6api.com/v1}
       IMAGE_MODEL: ${IMAGE_MODEL:-gpt-image-2.5}
@@ -107,17 +111,28 @@ services:
 
   caddy:
     <<: *service
-    image: ${CADDY_IMAGE:-caddy:2.10-alpine}
-    # 仅服务器回环地址可访问；公网访问走 SSH 隧道，不开放网站端口。
+    image: ${CADDY_IMAGE:-caddy:2.11.7-alpine}
+    environment:
+      APP_HOST: ${APP_HOST:?set APP_HOST}
+    # 公网 HTTPS；回环 HTTP 端口仅供诊断，不是正常登录入口。
     ports:
-      - "127.0.0.1:${APP_PORT:-8080}:80"
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+      # 兼容同机其他项目的 HTTP-01 续期；只共享公开挑战文件，不共享私钥。
+      - type: bind
+        source: ${EXTERNAL_ACME_ROOT:?set EXTERNAL_ACME_ROOT}
+        target: /srv/external-acme
+        read_only: true
+        bind:
+          create_host_path: false
     # running 不等于已经监听；让发布的 --wait 等代理链路真正可用。
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/login"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/login"]
       interval: 5s
       timeout: 3s
       start_period: 5s

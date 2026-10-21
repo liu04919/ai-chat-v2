@@ -2,6 +2,8 @@ import { authSchema, getDatabase } from "@ai-chat/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
+import { getSocialProviders } from "./social-providers";
+
 export const auth = betterAuth({
   appName: "AI Chat",
   baseURL: process.env.BETTER_AUTH_URL,
@@ -13,4 +15,5 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  socialProviders: getSocialProviders(),
 });

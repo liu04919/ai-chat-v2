@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 只用假 Docker 测试发布编排，不接触任何真实容器、密钥或数据库。
+# 只用假 Docker/curl 测试发布编排，不接触真实容器、网络、密钥或数据库。
 source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 test_dir="$(mktemp -d "${TMPDIR:-/tmp}/ai-chat-deploy-test.XXXXXX")"
 trap 'rm -rf -- "$test_dir"' EXIT
@@ -38,10 +38,19 @@ case " $* " in
     echo 'Knowledge Worker 已开始消费文档入库任务'
     echo '@ai-chat/worker 已开始消费 Generation job'
     ;;
+  *' exec -T caddy printenv APP_HOST '*) echo '192.0.2.1' ;;
   *' exec -T caddy '*) [[ "${FAIL_PROXY:-0}" != 1 ]] ;;
 esac
 SH
-chmod +x "$test_dir/bin/sudo" "$test_dir/bin/docker"
+cat > "$test_dir/bin/curl" <<'SH'
+#!/usr/bin/env bash
+set -eu
+printf 'curl %s\n' "$*" >> "$DEPLOY_TEST_LOG"
+[[ " $* " == *' https://192.0.2.1/login '* ]]
+[[ " $* " != *' --insecure '* && " $* " != *' -k '* ]]
+[[ "${FAIL_TLS:-0}" != 1 ]]
+SH
+chmod +x "$test_dir/bin/sudo" "$test_dir/bin/docker" "$test_dir/bin/curl"
 export PATH="$test_dir/bin:$PATH"
 export DEPLOY_TEST_LOG="$test_dir/docker.log"
 activate=(bash "$release_dir/deploy/activate.sh" "$revision")
@@ -111,6 +120,12 @@ fi
 grep -qx 'releases/previous' "$app_dir/deploy/current-release"
 
 : > "$DEPLOY_TEST_LOG"
+if FAIL_TLS=1 "${activate[@]}" > "$test_dir/tls.log" 2>&1; then
+  echo 'Untrusted or unavailable public HTTPS was accepted' >&2; exit 1
+fi
+grep -qx 'releases/previous' "$app_dir/deploy/current-release"
+
+: > "$DEPLOY_TEST_LOG"
 rm -- "$release_dir/images.env"
 "${activate[@]}" > "$test_dir/success.log" 2>&1
 grep -qx "releases/$revision-1-1" "$app_dir/deploy/current-release"
@@ -126,4 +141,4 @@ if grep -q '^build ' "$DEPLOY_TEST_LOG"; then
   echo 'Rebuilt an existing release' >&2; exit 1
 fi
 grep -qx 'releases/previous' "$app_dir/deploy/previous-release"
-echo 'PASS: revision, checksum, image overrides, build/missing-image/migration/proxy/worker failures, success order and release reuse'
+echo 'PASS: revision, checksum, image overrides, build/missing-image/migration/proxy/worker/TLS failures, success order and release reuse'

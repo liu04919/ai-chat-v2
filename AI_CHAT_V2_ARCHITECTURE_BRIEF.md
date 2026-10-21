@@ -476,7 +476,7 @@ Web、API 与 SSE 保持同源。认证使用 Better Auth 的 email/password 和
 
 ## 14. 部署现状与后续调整
 
-部署已确定为单机 Docker Compose：Caddy、Web、Worker、PostgreSQL 和 Redis 独立容器，文件使用私有 R2；网站仅绑定服务器回环地址，通过 SSH 隧道访问。GitHub Actions 检查通过后上传源码，由服务器构建并发布，当前采用短暂停机更新。操作与配置分别见 [部署说明](deploy/README.md) 和 [CI/CD](deploy/CI_CD.md)。
+部署已确定为单机 Docker Compose：Caddy、Web、Worker、PostgreSQL 和 Redis 独立容器，文件使用私有 R2；Caddy 在 80/443 提供公网 IP HTTPS 与 HTTP 跳转，自动管理短期 IP 证书，应用与数据库不直接暴露公网。GitHub Actions 检查通过后上传源码，由服务器构建并发布，当前采用短暂停机更新。操作与配置分别见 [部署说明](deploy/README.md) 和 [CI/CD](deploy/CI_CD.md)。
 
 是否继续调整检索参数、coalescing 阈值与 Worker 并发，由新数据或真实负载决定；当前已有默认实现，不再视为未完成架构，不预先排期。
 

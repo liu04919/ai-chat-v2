@@ -61,7 +61,12 @@ for ((attempt = 0; attempt < 30; attempt++)); do
 done
 [[ "$ready" == true ]] || { echo 'Worker readiness timed out' >&2; exit 1; }
 # 从 Caddy 容器内请求，检查代理链路；不依赖宿主机端口配置。
-"${compose[@]}" exec -T caddy wget -q -O /dev/null http://127.0.0.1/login
+"${compose[@]}" exec -T caddy wget -q -O /dev/null http://127.0.0.1:8080/login
+# HTTP 健康检查通过还不等于公网 TLS 可用；校验证书和正式入口。
+# 首次签发可能需要一点时间，所有请求均校验证书，不使用 --insecure。
+app_host="$("${compose[@]}" exec -T caddy printenv APP_HOST)"
+curl --noproxy '*' --fail --silent --show-error --retry 12 --retry-delay 5 \
+  --retry-all-errors --connect-timeout 5 --max-time 15 "https://$app_host/login" > /dev/null
 printf 'Application switch and health checks finished in %s seconds\n' "$((SECONDS - activation_started))"
 
 # 仅成功后记录版本。保留旧镜像/发布目录，回退需先确认数据库向后兼容。

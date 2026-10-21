@@ -1,0 +1,31 @@
+.artwork {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+}
+
+.image { object-fit: cover; object-position: 42% center; }
+.animation, .animation canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.animation { opacity: 0; transition: opacity 450ms ease; }
+.animation[data-ready="true"] { opacity: 1; }
+
+.toggle {
+  position: absolute;
+  left: 30px;
+  bottom: 22px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 70%);
+  border-radius: 50%;
+  background: rgb(255 253 255 / 58%);
+  color: #766685;
+  cursor: pointer;
+}
+.toggle:hover { background: rgb(255 255 255 / 85%); }
+.toggle:focus-visible { outline: 2px solid #88759e; outline-offset: 4px; }
+
+@media (max-width: 850px) { .artwork { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .animation { transition: none; } }

@@ -46,7 +46,7 @@ function execution(): ClaimedGenerationExecution {
     ],
   };
 }
-function setup(etag = '"v1"') {
+function setup(etag = '"v1"', modelId = "gpt-5.6-sol") {
   const storage = {
     headObject: vi.fn(async () => ({
       etag,
@@ -62,7 +62,7 @@ function setup(etag = '"v1"') {
     inspect,
     save,
     count: createAttachmentTokenCounter({
-      modelId: "gpt-5.6-sol",
+      modelId,
       storage,
       inspect,
       save,
@@ -71,6 +71,24 @@ function setup(etag = '"v1"') {
 }
 
 describe("附件本地计数缓存", () => {
+  it.each(["gpt-5.6-sol", "gpt-6.1-sol"])(
+    "%s 可以复用相同口径的附件估算缓存",
+    async (modelId) => {
+      const { storage, count } = setup('"v1"', modelId);
+      expect((await count(execution(), signal())).get("a")).toBe(308);
+      expect(storage.readObject).not.toHaveBeenCalled();
+    },
+  );
+
+  it("未配置计数策略的模型在下载附件之前明确报错", async () => {
+    const { storage, count } = setup('"v1"', "unsupported-model");
+    await expect(count(execution(), signal())).rejects.toThrow(
+      "ATTACHMENT_TOKEN_MODEL_UNSUPPORTED",
+    );
+    expect(storage.headObject).not.toHaveBeenCalled();
+    expect(storage.readObject).not.toHaveBeenCalled();
+  });
+
   it("图片按尺寸计数，不再所有图片固定 16k", async () => {
     expect(countSolImageTokens(512, 512)).toBe(308);
     expect(countSolImageTokens(1024, 1024)).toBe(1229);

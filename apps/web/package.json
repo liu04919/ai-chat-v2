@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node ../../scripts/dev.mjs web",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"

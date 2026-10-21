@@ -45,7 +45,7 @@ GitHub Settings → Secrets and variables → Actions 只需以下 **Secrets**�
 2. 获得发布锁，串行构建 Web/Worker；构建失败不会进入停止旧服务的步骤，但构建本身仍可能争用资源。
 3. 两个镜像都成功后写入本版本 `images.env`，镜像标签包含完整版本目录名，避免不同发布互相覆盖。已记录版本重试时直接复用镜像，镜像缺失则报错，不自动重建旧版本。
 4. 校验 Compose，确认原有 PG/Redis 健康，停止 Caddy、Web、Worker，用新 Worker 镜像执行迁移。
-5. 启动新应用，等待 Web、Caddy `/login` 健康以及 Worker 两个消费者就绪；容器刚进入 running 不代表代理已经开始监听。
+5. 启动新应用，等待 Web、Caddy `/login` 健康以及 Worker 两个消费者就绪，并请求正式 HTTPS 入口校验证书；容器刚进入 running 不代表代理已经开始监听。
 6. 仅成功后更新 `deploy/current-release` 和 `deploy/previous-release`，保留旧镜像及目录。
 
 这是短暂停机发布，不是零停机。迁移或启动失败会让工作流失败，可能需要人工恢复；不自动回滚数据库。Worker 就绪检查只证明消费者启动，不代表所有外部模型和存储都已通过真实调用。
@@ -62,10 +62,12 @@ sudo docker compose -p ai-chat-production --env-file deploy/.env --env-file "$re
 
 仅当数据库结构与旧代码兼容时才回退，不自动降级 schema。保留原目录与本地镜像，运行 `bash <旧目录>/deploy/activate.sh <旧提交号>` 复用旧镜像。首次 Actions 发布前的基线记录为 `.`，需按 README 使用根目录原有镜像恢复。
 
+跨越访问入口变更回退时，Compose 与服务器环境变量也要配套恢复。旧 SSH 版本使用 `APP_ORIGIN`，公网 HTTPS 版本使用 `APP_HOST` / `EXTERNAL_ACME_ROOT`；不能只切换代码却沿用不兼容的入口配置。不要为回退删除证书或数据库数据卷。
+
 不会自动 prune 镜像、删除发布目录或数据卷。构建缓存也占磁盘空间，可用 `docker system df` 查看；清理需确认不会影响当前/上一版本。数据库备份单独管理。
 
 ## 验证边界
 
-`bash deploy/activate.test.sh` 用假 Docker 验证非法提交号、源码校验失败、异常镜像覆盖、构建失败不主动停服、已记录镜像缺失、迁移/代理/Worker 失败，以及发布顺序和版本复用。真正的 Actions、SSH 上传、服务器构建和上线结果只能通过实际工作流确认。
+`bash deploy/activate.test.sh` 用假 Docker/curl 验证非法提交号、源码校验失败、异常镜像覆盖、构建失败不主动停服、已记录镜像缺失、迁移/代理/Worker/公网 TLS 失败，以及发布顺序和版本复用。真正的 Actions、SSH 上传、服务器构建和上线结果只能通过实际工作流确认。服务器需预先配置公网 HTTPS 环境变量及 Caddy 镜像，见[部署说明](README.md)；证书未签发或不受信任时，不记录为发布成功。
 
 参考：[手动触发工作流](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)、[复用工作流](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)、[Docker 构建缓存](https://docs.docker.com/build/cache/optimize/)。
