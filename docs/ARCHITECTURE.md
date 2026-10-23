@@ -15,8 +15,9 @@
 1. Web 根据登录身份校验请求，在事务中保存用户消息、Generation 及本轮工具选择。外部模型调用不占用这个事务。
 2. 事务提交后，Web 用 `generationId` 作为 BullMQ Job ID 入队。Worker 领取任务，读取历史、装配工具、检查上下文预算。
 3. Worker 调用模型，合并相邻文本增量，把统一的 GenerationEvent 写入 Redis Streams；Web 按游标读取并通过 SSE 转发。
-4. 浏览器按帧批量更新流式投影。完成、失败或停止时刷新数据库历史，成功对账后由历史消息接管展示。
-5. Worker 把已有输出和 Generation 终态在同一数据库事务中定稿。完全没有输出时，不人为创建空助手消息。
+4. 生成过程中，浏览器按帧批量更新流式投影，内容与已应用的事件游标一起提交。
+5. 完成、失败或停止时，Worker 先把已有输出和 Generation 终态在同一数据库事务中定稿，再发布对应的终态事件。完全没有输出时，不人为创建空助手消息。
+6. 浏览器收到终态事件后刷新数据库历史；成功对账后由历史消息接管展示并清理投影，刷新失败则保留已有投影。这一顺序避免前端读到尚未落库的结果，见 [execute-chat-generation.ts](../apps/worker/src/generation/execute-chat-generation.ts)。
 
 浏览器断开 SSE 不等于取消任务；“停止生成”是独立命令。数据库与入队也不是跨系统原子事务：入队失败返回明确错误，已保存的 queued 任务可通过相同命令重新尝试入队；没有 Outbox 或后台自动补偿。参见 [create.ts](../apps/web/src/server/generations/create.ts)、[command.ts](../packages/db/src/generations/command.ts)。
 
@@ -56,6 +57,12 @@ Generation 是一次执行，Message 是留下来的内容。重新生成可以�
 [共享历史投影](../packages/model-context/src/history.ts) 同时供计数与模型请求使用。消息保存时预计算文本/协议 token，附件根据实际内容生成派生计数缓存。旧知识库原文与调用结果不重复回放；可见思考作为有标注的普通历史文本保留，不伪装为模型原生推理状态。
 
 [上下文准备](../apps/worker/src/context/prepare-chat-context.ts) 在预算触发时摘要较早的完整轮次，保留近期原文和当前问题。原始消息不删除，摘要只是派生数据。当前 200k 触发、60k 总输入目标、8k 摘要软目标是工程配置，不是通用最优比例；重试与安全预算细节见 [README](../README.md)。
+
+## 登录页与认证入口
+
+登录/注册页共用 [auth-background.tsx](../apps/web/src/components/auth/auth-background.tsx)，以静态图兜底，按需加载 WebGL 动态背景。动画的暂停、降级和资源清理说明见 [README 的本地运行部分](../README.md#本地运行)，不把它当作聊天流式渲染的一部分。
+
+认证使用 Better Auth，保留邮箱登录和 Google / GitHub 按钮；是否能发起第三方登录取决于服务端凭据配置，按钮存在不代表授权流程已经验证通过。环境变量、回调地址及线上 IP 入口的限制统一见[部署说明的第三方登录部分](../deploy/README.md)，避免在多份文档重复维护配置。
 
 ## 按这个顺序读源码
 
