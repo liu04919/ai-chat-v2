@@ -46,7 +46,7 @@ Generation 是一次执行，Message 是留下来的内容。重新生成可以�
 
 知识库文件走“Web 签名 → 浏览器 PUT R2 → Web 核验完成 → Worker 解析、切块、向量化 → 事务发布 ready”，不是把大文件先传给 Web 再转发。
 
-[工具解析器](../apps/worker/src/tools/generation-tool-resolver.ts) 根据本轮快照统一装配联网搜索、MCP 和知识库搜索。业务当前只有 Agentic 路径：模型决定何时调用 `search_knowledge`，而非每次问答先固定检索并注入上下文。
+[工具解析器](../apps/worker/src/tools/generation-tool-resolver.ts) 根据本轮快照统一装配联网搜索、MCP 和知识库搜索。联网开关同时提供 DeepSeek 的 `web_search` 和 `web_fetch`：模型可先看搜索摘要，再按需读取网页正文；不自动抓取所有结果，具体限制见 [README](../README.md#tool-与联网搜索)。业务当前只有 Agentic 路径：模型决定何时调用 `search_knowledge`，而非每次问答先固定检索并注入上下文。
 
 一次知识库检索内部仍是确定的流水线：带账户/知识库过滤的向量与 BM25 候选 → RRF 合并 → Rerank → 资料片段。授权范围绑定在服务端闭包，模型只提供 query。每轮至多三次知识库调用，每次六条；来源按 chunk 去重并稳定编号，以快照保存，刷新后不依赖重新检索。
 

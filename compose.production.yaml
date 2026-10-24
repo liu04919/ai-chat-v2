@@ -102,7 +102,7 @@ services:
       EMBEDDING_DIMENSIONS: "1024"
       RERANK_BASE_URL: ${RERANK_BASE_URL:?set RERANK_BASE_URL}
       RERANK_MODEL: ${RERANK_MODEL:-qwen3.7-text-rerank}
-      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

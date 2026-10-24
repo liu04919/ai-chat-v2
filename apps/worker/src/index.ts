@@ -63,7 +63,7 @@ const prepareContext = createChatContextPreparer({
 });
 const toolResolver = createGenerationToolResolver({
   registry: createConfiguredMcpServerRegistry(process.env),
-  tavilyApiKey: process.env.TAVILY_API_KEY,
+  deepseekApiKey: process.env.DEEPSEEK_API_KEY,
   knowledgeRetriever: retrieveChatKnowledge,
 });
 // 图片渠道使用独立凭证；尚未配置时只让图片任务明确失败，不影响 Chat。

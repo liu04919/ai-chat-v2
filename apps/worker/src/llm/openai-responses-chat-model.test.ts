@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChatModelMessage, ChatModelStreamPart } from "./chat-model";
 import { createOpenAIResponsesChatModel } from "./openai-responses-chat-model";
 import { createKnowledgeSearchTool } from "../tools/knowledge-search-tool";
+import { createMcpServerRegistry } from "@ai-chat/mcp";
+import { createGenerationToolResolver } from "../tools/generation-tool-resolver";
 
 function sseEvent(value: unknown): string {
   return `data: ${JSON.stringify(value)}\n\n`;
@@ -114,7 +116,11 @@ function responseCompleted(): string {
   });
 }
 
-function createToolCallStream(): string {
+function createToolCallStream(
+  toolName = "web_search",
+  input: Record<string, unknown> = { query: "Redis latest" },
+  callId = "call_search",
+): string {
   return [
     sseEvent({
       type: "response.created",
@@ -131,8 +137,8 @@ function createToolCallStream(): string {
       item: {
         type: "function_call",
         id: "function_item",
-        call_id: "call_search",
-        name: "web_search",
+        call_id: callId,
+        name: toolName,
         arguments: "",
       },
     }),
@@ -140,13 +146,13 @@ function createToolCallStream(): string {
       type: "response.function_call_arguments.delta",
       item_id: "function_item",
       output_index: 0,
-      delta: "{\"query\":\"Redis latest\"}",
+      delta: JSON.stringify(input),
     }),
     sseEvent({
       type: "response.function_call_arguments.done",
       item_id: "function_item",
       output_index: 0,
-      arguments: "{\"query\":\"Redis latest\"}",
+      arguments: JSON.stringify(input),
     }),
     sseEvent({
       type: "response.output_item.done",
@@ -154,9 +160,9 @@ function createToolCallStream(): string {
       item: {
         type: "function_call",
         id: "function_item",
-        call_id: "call_search",
-        name: "web_search",
-        arguments: "{\"query\":\"Redis latest\"}",
+        call_id: callId,
+        name: toolName,
+        arguments: JSON.stringify(input),
         status: "completed",
       },
     }),
@@ -198,6 +204,88 @@ function createFinalAnswerStream(): string {
 }
 
 describe("OpenAI Responses Chat Adapter", () => {
+  it("Sol 的同一工具循环先搜索、再抓取，正文交回模型后继续输出", async () => {
+    const requests: Request[] = [];
+    const webFetch = vi.fn<typeof fetch>(async (input) => Response.json(String(input).endsWith("/search")
+      ? { results: [{ title: "Redis", url: "https://redis.io/docs/", summary: "搜索摘要", snippet: "短摘要", date: null }] }
+      : { title: "Redis 文档", content: "# 文档\n读取到的正文" }));
+    const resolved = await createGenerationToolResolver({
+      registry: createMcpServerRegistry([]), deepseekApiKey: "test", deepseekFetch: webFetch,
+    }).resolve({ webSearch: true, mcpToolIds: [] }, { ownerId: "owner", knowledgeBaseId: null, signal: new AbortController().signal });
+    const streams = [
+      createToolCallStream("web_search", { query: "Redis docs", maxResults: 1 }),
+      createToolCallStream("web_fetch", { url: "https://redis.io/docs/" }, "call_fetch"),
+      createFinalAnswerStream(),
+    ];
+    const model = createOpenAIResponsesChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test-sol",
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        return new Response(streams[requests.length - 1], { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    const parts: ChatModelStreamPart[] = [];
+    for await (const part of model.stream({
+      reasoningEffort: "low", instructions: resolved.instructions, tools: resolved.tools, activeTools: resolved.activeTools,
+      messages: [{ role: "user", parts: [{ type: "text", text: "搜索 Redis 文档并打开网页阅读。" }] }],
+    })) parts.push(part);
+    expect(parts.filter((part) => part.type === "tool-call").map((part) => part.toolName)).toEqual(["web_search", "web_fetch"]);
+    const results = parts.filter((part) => part.type === "tool-result");
+    expect(results).toHaveLength(2);
+    expect(results.every((part) => !part.isError)).toBe(true);
+    expect(parts).toContainEqual({ type: "text", partId: "message_final", delta: "查询完成。" });
+    expect(webFetch.mock.calls.map(([input]) => input)).toEqual(["https://api.deepseek.com/v1/tools/search", "https://api.deepseek.com/v1/tools/fetch"]);
+    expect(requests).toHaveLength(3);
+    const finalRequest = await requests[2]!.json() as { input: unknown };
+    expect(JSON.stringify(finalRequest.input)).toContain("读取到的正文");
+    expect(JSON.stringify(finalRequest)).not.toContain("Bearer");
+    await resolved.close();
+  });
+
+  it("抓取失败作为工具结果交回模型，不直接终止整轮回答", async () => {
+    const requests: Request[] = [];
+    const resolved = await createGenerationToolResolver({
+      registry: createMcpServerRegistry([]),
+      deepseekApiKey: "test",
+      deepseekFetch: async () => new Response("private upstream details", { status: 404 }),
+    }).resolve(
+      { webSearch: true, mcpToolIds: [] },
+      { ownerId: "owner", knowledgeBaseId: null, signal: new AbortController().signal },
+    );
+    const model = createOpenAIResponsesChatModel({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test",
+      modelId: "test-sol",
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        return new Response(
+          requests.length === 1
+            ? createToolCallStream("web_fetch", { url: "https://example.com/missing" }, "call_fetch")
+            : createFinalAnswerStream(),
+          { headers: { "content-type": "text/event-stream" } },
+        );
+      },
+    });
+    const parts: ChatModelStreamPart[] = [];
+    for await (const part of model.stream({
+      reasoningEffort: "low",
+      instructions: resolved.instructions,
+      tools: resolved.tools,
+      activeTools: resolved.activeTools,
+      messages: [{ role: "user", parts: [{ type: "text", text: "阅读这个网页。" }] }],
+    })) {
+      parts.push(part);
+    }
+    expect(parts).toContainEqual(expect.objectContaining({
+      type: "tool-result", toolCallId: "call_fetch", isError: true,
+    }));
+    expect(parts).toContainEqual({ type: "text", partId: "message_final", delta: "查询完成。" });
+    expect(requests).toHaveLength(2);
+    const retryBody = await requests[1]!.text();
+    expect(retryBody).toContain("DeepSeek fetch 失败（HTTP 404）");
+    expect(retryBody).not.toContain("private upstream details");
+    await resolved.close();
+  });
+
   it("历史摘要放在原始消息前，作为背景而非高优先级指令", async () => {
     const requests: Request[] = [];
     const model = createOpenAIResponsesChatModel({ baseUrl: "https://example.test/v1", apiKey: "test", modelId: "test",

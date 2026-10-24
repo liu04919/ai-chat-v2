@@ -119,8 +119,8 @@ const fakeChatModel: ChatModel = {
     });
 
     if (latestUserText(request).includes("工具调用")) {
-      if (!request.tools?.web_search) {
-        throw new Error("测试 Generation 没有收到 web_search Tool");
+      if (!request.tools?.web_search || !request.tools?.web_fetch) {
+        throw new Error("测试 Generation 没有收到 web_search 和 web_fetch Tool");
       }
       yield {
         type: "tool-call",
@@ -134,6 +134,20 @@ const fakeChatModel: ChatModel = {
         partId: "tool-result:search-1",
         toolCallId: "search-1",
         output: { results: [{ title: "Redis", url: "https://redis.io/" }] },
+        isError: false,
+      };
+      yield {
+        type: "tool-call",
+        partId: "tool-call:fetch-1",
+        toolCallId: "fetch-1",
+        toolName: "web_fetch",
+        input: { url: "https://redis.io/" },
+      };
+      yield {
+        type: "tool-result",
+        partId: "tool-result:fetch-1",
+        toolCallId: "fetch-1",
+        output: { url: "https://redis.io/", title: "Redis", content: "# Redis", truncated: false },
         isError: false,
       };
       yield { type: "text", partId: "tool-answer", delta: "查询完成" };
@@ -257,10 +271,15 @@ const worker = createBullMqGenerationWorker({
                     inputSchema: z.object({ query: z.string() }),
                     execute: async ({ query }) => ({ query, results: [] }),
                   }),
+                  web_fetch: tool({
+                    description: "测试网页抓取",
+                    inputSchema: z.object({ url: z.string() }),
+                    execute: async ({ url }) => ({ url, title: "Redis", content: "# Redis", truncated: false }),
+                  }),
                 }
               : undefined,
             toPublicToolName: (runtimeName) => runtimeName,
-            activeTools: () => selection.webSearch ? ["web_search"] : [],
+            activeTools: () => selection.webSearch ? ["web_search", "web_fetch"] : [],
             takeSources: () => [],
             close: async () => {},
           };
@@ -561,7 +580,7 @@ describe("Chat Generation Worker 主链", () => {
     ).toHaveLength(2);
   });
 
-  it("把 Tool 事件写入 Redis，并按原顺序持久化到 Assistant Message", async () => {
+  it("把搜索、抓取 Tool 事件写入 Redis，并按原顺序持久化到 Assistant Message", async () => {
     const generationId = `worker-tool-generation-${randomUUID()}`;
     const conversationId = `worker-tool-conversation-${randomUUID()}`;
     await createQueuedGeneration({
@@ -577,6 +596,7 @@ describe("Chat Generation Worker 主链", () => {
 
     expect(Object.keys(capturedRequests.at(-1)?.tools ?? {})).toEqual([
       "web_search",
+      "web_fetch",
     ]);
     expect(
       (await eventReader.read({ generationId })).map((entry) => entry.event),
@@ -594,6 +614,20 @@ describe("Chat Generation Worker 主链", () => {
         generationId,
         partId: "tool-result:search-1",
         toolCallId: "search-1",
+        isError: false,
+      },
+      {
+        type: "tool.call",
+        generationId,
+        partId: "tool-call:fetch-1",
+        toolCallId: "fetch-1",
+        toolName: "web_fetch",
+      },
+      {
+        type: "tool.result",
+        generationId,
+        partId: "tool-result:fetch-1",
+        toolCallId: "fetch-1",
         isError: false,
       },
       {
@@ -628,6 +662,20 @@ describe("Chat Generation Worker 主链", () => {
           output: {
             results: [{ title: "Redis", url: "https://redis.io/" }],
           },
+          isError: false,
+        },
+        {
+          id: "tool-call:fetch-1",
+          type: "tool-call",
+          toolCallId: "fetch-1",
+          toolName: "web_fetch",
+          input: { url: "https://redis.io/" },
+        },
+        {
+          id: "tool-result:fetch-1",
+          type: "tool-result",
+          toolCallId: "fetch-1",
+          output: { url: "https://redis.io/", title: "Redis", content: "# Redis", truncated: false },
           isError: false,
         },
         { id: "tool-answer", type: "text", text: "查询完成" },

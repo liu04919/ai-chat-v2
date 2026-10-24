@@ -10,7 +10,9 @@ import {
   parseMcpToolId,
   toMcpRuntimeToolName,
 } from "@ai-chat/mcp/tool-names";
-import { createTavilyWebSearchTool } from "./web-search-tool";
+import { createDeepSeekWebSearchTool } from "./web-search-tool";
+import { createDeepSeekWebFetchTool } from "./web-fetch-tool";
+import { WEB_TOOL_INSTRUCTIONS } from "./deepseek-web-client";
 import type { ChatKnowledgeRetriever } from "../knowledge/chat-knowledge-retriever";
 import {
   createKnowledgeSearchTool,
@@ -48,8 +50,8 @@ type RuntimeMcpClient = {
 
 export function createGenerationToolResolver(options: {
   registry: McpServerRegistry;
-  tavilyApiKey?: string;
-  tavilyFetch?: typeof fetch;
+  deepseekApiKey?: string;
+  deepseekFetch?: typeof fetch;
   knowledgeRetriever?: ChatKnowledgeRetriever;
   mcpClientFactory?: (
     server: ReturnType<McpServerRegistry["get"]>,
@@ -97,15 +99,19 @@ export function createGenerationToolResolver(options: {
         }
 
         if (selection.webSearch) {
-          if (!options.tavilyApiKey?.trim()) {
-            throw new Error("联网搜索已启用，但 Worker 未配置 TAVILY_API_KEY");
+          if (!options.deepseekApiKey?.trim()) {
+            throw new Error("联网搜索已启用，但 Worker 未配置 DEEPSEEK_API_KEY");
           }
 
-          tools.web_search = createTavilyWebSearchTool({
-            apiKey: options.tavilyApiKey,
-            ...(options.tavilyFetch ? { fetch: options.tavilyFetch } : {}),
-          });
+          const webOptions = {
+            apiKey: options.deepseekApiKey,
+            signal: context.signal,
+            ...(options.deepseekFetch ? { fetch: options.deepseekFetch } : {}),
+          };
+          tools.web_search = createDeepSeekWebSearchTool(webOptions);
+          tools.web_fetch = createDeepSeekWebFetchTool(webOptions);
           publicNames.set("web_search", "web_search");
+          publicNames.set("web_fetch", "web_fetch");
         }
 
         const selectionsByServer = new Map<string, string[]>();
@@ -142,7 +148,10 @@ export function createGenerationToolResolver(options: {
 
         return {
           tools: Object.keys(tools).length > 0 ? tools : undefined,
-          instructions: knowledge ? KNOWLEDGE_TOOL_INSTRUCTIONS : undefined,
+          instructions: [
+            knowledge ? KNOWLEDGE_TOOL_INSTRUCTIONS : undefined,
+            selection.webSearch ? WEB_TOOL_INSTRUCTIONS : undefined,
+          ].filter(Boolean).join("\n\n") || undefined,
           activeTools() {
             return Object.keys(tools).filter(
               (name) => name !== KNOWLEDGE_SEARCH_TOOL_NAME || knowledge?.canSearch(),
