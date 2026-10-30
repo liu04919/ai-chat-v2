@@ -125,7 +125,7 @@ describe("OpenAI Images Image Adapter", () => {
       usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
     }, { headers: { "content-length": "1", "content-encoding": "gzip" } }));
     const model = createOpenAIImageModel({
-      baseUrl: "https://api.a6api.com/v1",
+      baseUrl: "https://api.a6api.vip/v1",
       apiKey: "test-api-key",
       modelId: "gpt-image-2.5",
       fetch: apiFetch,
@@ -145,7 +145,7 @@ describe("OpenAI Images Image Adapter", () => {
 
   it("同时有 base64 和 URL 时直接使用 base64，不重复下载", async () => {
     const model = createOpenAIImageModel({
-      baseUrl: "https://api.a6api.com/v1",
+      baseUrl: "https://api.a6api.vip/v1",
       apiKey: "test-api-key",
       modelId: "gpt-image-2.5",
       fetch: async () => Response.json({ data: [{ b64_json: pngBase64, url: "https://images.example.com/result.png" }] }),
@@ -158,7 +158,7 @@ describe("OpenAI Images Image Adapter", () => {
     downloadImageMock.mockRejectedValue(new Error("image download failed"));
     const apiFetch = vi.fn(async () => Response.json({ data: [{ url: "https://images.example.com/result.png" }] }));
     const model = createOpenAIImageModel({
-      baseUrl: "https://api.a6api.com/v1",
+      baseUrl: "https://api.a6api.vip/v1",
       apiKey: "test-api-key",
       modelId: "gpt-image-2.5",
       fetch: apiFetch,
@@ -174,7 +174,7 @@ describe("OpenAI Images Image Adapter", () => {
       abortSignal.throwIfAborted();
     });
     const model = createOpenAIImageModel({
-      baseUrl: "https://api.a6api.com/v1",
+      baseUrl: "https://api.a6api.vip/v1",
       apiKey: "test-api-key",
       modelId: "gpt-image-2.5",
       fetch: async () => Response.json({ data: [{ url: "https://images.example.com/result.png" }] }),
@@ -185,7 +185,7 @@ describe("OpenAI Images Image Adapter", () => {
   it.each(["http://127.0.0.1/image.png", "http://169.254.169.254/latest/meta-data", "file:///etc/passwd"])("拒绝不安全的图片 URL：%s", async (url) => {
     // 不 mock 下载结果，验证 SDK 的真实 URL 防护在联网前拒绝这些地址。
     const model = createOpenAIImageModel({
-      baseUrl: "https://api.a6api.com/v1",
+      baseUrl: "https://api.a6api.vip/v1",
       apiKey: "test-api-key",
       modelId: "gpt-image-2.5",
       fetch: async () => Response.json({ data: [{ url }] }),

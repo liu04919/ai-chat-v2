@@ -73,7 +73,7 @@ Web / Worker 的 `dev` 共用 `scripts/dev.mjs`：先读取各自的 `.env.local
 
 自动探测只用于本地 `dev`。Worker 的 `start` / `knowledge` 仍在 Node 启动时读取 `.env.local` 并启用环境代理（未配置则直连），生产 Docker 启动不变，不要把本机代理地址带入服务器部署配置。
 
-图片 Worker 使用独立的 `IMAGE_BASE_URL`、`IMAGE_MODEL`、`IMAGE_API_KEY`，不复用聊天渠道凭证。本地图片与部署配置均使用新中转 `https://api.a6api.com/v1`，模型为 `gpt-image-2.5`；本地聊天和摘要仍走 Codex Proxy。密钥只写入各环境的私有配置，不提交 Git。未配置时图片任务会明确失败，Chat 不受影响。图片会话支持发送、参考图续改、停止、生成骨架与大图预览；刷新或切换会话后由服务端状态恢复。骨架仅用于展示，不写入 Assistant 消息。
+图片 Worker 使用独立的 `IMAGE_BASE_URL`、`IMAGE_MODEL`、`IMAGE_API_KEY`，不复用聊天渠道凭证。本地图片与部署配置均使用 A6API 中转 `https://api.a6api.vip/v1`，模型为 `gpt-image-2.5`；本地聊天和摘要仍走 Codex Proxy。密钥只写入各环境的私有配置，不提交 Git。未配置时图片任务会明确失败，Chat 不受影响。图片会话支持发送、参考图续改、停止、生成骨架与大图预览；刷新或切换会话后由服务端状态恢复。骨架仅用于展示，不写入 Assistant 消息。
 
 附件读取校验登录身份与归属后签发短期 R2 下载地址，不保存签名 URL。会话详情中的 `activeGeneration` 用于发现正在执行的任务，`latestGeneration` 用于恢复最近一次失败或停止的状态。
 
