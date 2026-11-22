@@ -78,8 +78,8 @@ describe("切换会话时的 SSE 生命周期", () => {
     const first = mount();
     const source = currentSource();
     source.emit(delta("你"), "100-0");
-    expect(projection()?.lastEventId).toBeNull();
-    flushFrames();
+    expect(projection()?.lastEventId).toBe("100-0");
+    expect(frames.size).toBe(0);
     source.emit(delta("好"), "100-1");
     first.cleanup();
     expect(source.close).toHaveBeenCalled();
@@ -93,6 +93,8 @@ describe("切换会话时的 SSE 生命周期", () => {
     source.onerror?.();
     resumed.emit(delta("你"), "100-0");
     resumed.emit(delta("好"), "100-1");
+    expect(projection()).toMatchObject({ lastEventId: "100-0", parts: [{ text: "你" }] });
+    expect(frames.size).toBe(1);
     flushFrames();
     expect(projection()).toMatchObject({ status: "running", lastEventId: "100-1", parts: [{ text: "你好" }] });
   });
@@ -104,9 +106,23 @@ describe("切换会话时的 SSE 生命周期", () => {
     source.onerror?.();
     source.onopen?.();
     source.emit(delta("好"), "100-1");
+    expect(projection()).toMatchObject({ lastEventId: "100-0", parts: [{ text: "你" }] });
     flushFrames();
     expect(FakeEventSource.instances).toHaveLength(1);
     expect(projection()).toMatchObject({ lastEventId: "100-1", parts: [{ text: "你好" }] });
+  });
+
+  it("已有开始事件但还没有正文或思考时，续传的首段立即提交", () => {
+    const first = mount();
+    currentSource().emit({ type: "generation.started", generationId: "g1" }, "100-0");
+    flushFrames();
+    first.cleanup();
+
+    mount();
+    expect(currentSource().url).toBe("/api/generations/g1/events?after=100-0");
+    currentSource().emit(delta("首段"), "100-1");
+    expect(projection()).toMatchObject({ lastEventId: "100-1", parts: [{ text: "首段" }] });
+    expect(frames.size).toBe(0);
   });
 
   it("最新详情没有活跃任务时清理旧快照，不再打开 SSE", () => {
@@ -135,10 +151,12 @@ describe("切换会话时的 SSE 生命周期", () => {
   it.each(["completed", "failed", "cancelled"] as const)("%s 立即提交最后一批内容与游标，再同步历史", (status) => {
     const { onTerminal } = mount();
     const source = currentSource();
-    source.emit(delta("最后内容"), "100-0");
-    source.emit({ type: `generation.${status}`, generationId: "g1" }, "100-1");
+    source.emit(delta("开头"), "100-0");
+    source.emit(delta("和结尾"), "100-1");
+    expect(frames.size).toBe(1);
+    source.emit({ type: `generation.${status}`, generationId: "g1" }, "100-2");
     expect(frames.size).toBe(0);
-    expect(projection()).toMatchObject({ status, lastEventId: "100-1", parts: [{ text: "最后内容" }] });
+    expect(projection()).toMatchObject({ status, lastEventId: "100-2", parts: [{ text: "开头和结尾" }] });
     expect(onTerminal).toHaveBeenCalledExactlyOnceWith({ type: `generation.${status}`, generationId: "g1" });
     expect(source.close).toHaveBeenCalledOnce();
   });

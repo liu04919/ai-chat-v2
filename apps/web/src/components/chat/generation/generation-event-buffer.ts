@@ -17,7 +17,10 @@ const browserFrameScheduler: FrameScheduler = {
 
 export function createGenerationEventBuffer(
   flush: (entries: readonly GenerationEventEntry[]) => void,
-  scheduler: FrameScheduler = browserFrameScheduler,
+  {
+    scheduler = browserFrameScheduler,
+    hasContent = false,
+  }: { scheduler?: FrameScheduler; hasContent?: boolean } = {},
 ): GenerationEventBuffer {
   let queuedEvents: GenerationEventEntry[] = [];
   let frameHandle: number | null = null;
@@ -43,12 +46,18 @@ export function createGenerationEventBuffer(
 
       queuedEvents.push(entry);
       const { event } = entry;
+      const isFirstContent =
+        !hasContent &&
+        (event.type === "text.delta" || event.type === "reasoning.delta");
+      if (isFirstContent) hasContent = true;
+
       if (
+        isFirstContent ||
         event.type === "generation.completed" ||
         event.type === "generation.failed" ||
         event.type === "generation.cancelled"
       ) {
-        // 终态不能被路由卸载或详情刷新丢弃；此前的 delta 仍按顺序一起交付。
+        // 首段和终态都带上已排队的事件，按游标顺序一起交付。
         if (frameHandle !== null) scheduler.cancel(frameHandle);
         flushFrame();
         return;

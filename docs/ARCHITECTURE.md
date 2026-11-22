@@ -34,7 +34,7 @@ Generation 是一次执行，Message 是留下来的内容。重新生成可以�
 ## 流式续传与渲染优化
 
 - Worker 的 [delta-coalescer.ts](../apps/worker/src/generation/delta-coalescer.ts) 首个有效增量直接输出；之后合并同类型、同 part 的相邻增量，默认延迟阈值 40 ms、字符阈值 128。遇到工具事件、结束或错误先刷新已有增量，不跨事件边界拼接。这些是合并策略，不是严格实时调度保证。
-- 浏览器的 [generation-event-buffer.ts](../apps/web/src/components/chat/generation/generation-event-buffer.ts) 用 `requestAnimationFrame` 收集一帧中的事件，再一次提交状态；终态立即刷新队列。减少状态提交不等于同等比例减少 React Commit，后者需要 Profiler 实测。
+- 浏览器的 [generation-event-buffer.ts](../apps/web/src/components/chat/generation/generation-event-buffer.ts) 收到首段正文或思考增量时，连同已排队的事件一起提交。后续事件用 `requestAnimationFrame` 按帧提交，终态立即刷新队列。续传时根据缓存的投影判断首段是否已提交。减少状态提交不等于同等比例减少 React Commit，后者需要 Profiler 实测。
 - [projection store](../apps/web/src/components/chat/generation/generation-projection-store.ts) 同时保存内容和已应用的 `lastEventId`，按 Redis ID 去重。不能先推进游标再应用内容，否则离开页面时可能跳过未显示的增量。
 - 切走关闭连接但保留投影；回来先读取最新详情，同一活跃任务才从缓存游标续传。原生重连使用 `Last-Event-ID`；整页刷新丢失内存投影，运行中任务从事件起点回放，而不是重新调用模型。
 - 投影最多保留最近访问的 5 个会话，淘汰内容与游标，不停止服务端任务。不是持久化到 localStorage，也不是按字节限制内存。

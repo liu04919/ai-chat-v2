@@ -61,23 +61,31 @@ export function useGenerationEventStream({
     const source = new EventSource(
       `/api/generations/${encodeURIComponent(generationId)}/events${search}`,
     );
-    const buffer = createGenerationEventBuffer((entries) => {
-      if (disposed) return;
-      useGenerationProjectionStore
-        .getState()
-        .apply(conversationId, generationId, entries);
+    // 恢复已有输出的会话时，后续增量继续按帧提交。
+    const hasContent = cached.parts.some(
+      (part) =>
+        (part.type === "text" || part.type === "reasoning") && part.text.length > 0,
+    );
+    const buffer = createGenerationEventBuffer(
+      (entries) => {
+        if (disposed) return;
+        useGenerationProjectionStore
+          .getState()
+          .apply(conversationId, generationId, entries);
 
-      const terminalEvent = entries.map((entry) => entry.event).findLast(
-        (event): event is TerminalGenerationEvent =>
-          event.type === "generation.completed" ||
-          event.type === "generation.failed" ||
-          event.type === "generation.cancelled",
-      );
+        const terminalEvent = entries.map((entry) => entry.event).findLast(
+          (event): event is TerminalGenerationEvent =>
+            event.type === "generation.completed" ||
+            event.type === "generation.failed" ||
+            event.type === "generation.cancelled",
+        );
 
-      if (terminalEvent) {
-        onTerminalEvent(terminalEvent);
-      }
-    });
+        if (terminalEvent) {
+          onTerminalEvent(terminalEvent);
+        }
+      },
+      { hasContent },
+    );
 
     source.onopen = () => {
       if (disposed) return;
