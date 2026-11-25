@@ -6,6 +6,12 @@ import {
   type GenerationEventReader,
 } from "@ai-chat/event-store";
 
+import {
+  GENERATION_TERMINAL_SIGNAL,
+  generationTerminalStatusSchema,
+  type GenerationTerminalStatus,
+} from "../../lib/generation-stream";
+
 const START_CURSOR = "0-0" as GenerationEventCursor;
 const DEFAULT_READ_LIMIT = 100;
 const DEFAULT_BLOCK_MS = 15_000;
@@ -23,10 +29,6 @@ export type GenerationEventStreamDependencies = {
   blockMs?: number;
 };
 
-function isTerminalStatus(status: GenerationStatusDto): boolean {
-  return status === "completed" || status === "failed" || status === "cancelled";
-}
-
 function isTerminalEntry(entry: GenerationEventEntry): boolean {
   return (
     entry.event.type === "generation.completed" ||
@@ -43,6 +45,16 @@ function encodeEvent(entry: GenerationEventEntry): Uint8Array {
 
 function encodeHeartbeat(): Uint8Array {
   return encoder.encode(": keep-alive\n\n");
+}
+
+function encodeTerminalSignal(
+  generationId: string,
+  status: GenerationTerminalStatus,
+): Uint8Array {
+  // 这是数据库终态通知，没有可供续传的 Redis 事件 ID。
+  return encoder.encode(
+    `event: ${GENERATION_TERMINAL_SIGNAL}\ndata: ${JSON.stringify({ generationId, status })}\n\n`,
+  );
 }
 
 function positiveInteger(value: number, name: string): number {
@@ -66,7 +78,8 @@ function createApplicationReader(): GenerationEventReader {
 function createEventStream(input: {
   generationId: string;
   afterCursor?: GenerationEventCursor;
-  terminalAtOpen: boolean;
+  terminalStatusAtOpen: GenerationTerminalStatus | undefined;
+  readTerminalStatus: () => Promise<GenerationTerminalStatus | undefined>;
   reader: GenerationEventReader;
   readLimit: number;
   blockMs: number;
@@ -115,7 +128,13 @@ function createEventStream(input: {
             }
           }
 
-          if (abortController.signal.aborted || input.terminalAtOpen) {
+          if (abortController.signal.aborted) {
+            return;
+          }
+          if (input.terminalStatusAtOpen) {
+            controller.enqueue(
+              encodeTerminalSignal(input.generationId, input.terminalStatusAtOpen),
+            );
             return;
           }
 
@@ -128,6 +147,13 @@ function createEventStream(input: {
             });
 
             if (entries.length === 0) {
+              if (abortController.signal.aborted) return;
+              const status = await input.readTerminalStatus();
+              if (abortController.signal.aborted) return;
+              if (status) {
+                controller.enqueue(encodeTerminalSignal(input.generationId, status));
+                return;
+              }
               controller.enqueue(encodeHeartbeat());
               continue;
             }
@@ -173,9 +199,8 @@ export async function openGenerationEventStreamForOwner(
   afterCursor: GenerationEventCursor | undefined,
   dependencies: GenerationEventStreamDependencies = {},
 ): Promise<ReadableStream<Uint8Array> | null> {
-  const generation = await (
-    dependencies.findGeneration ?? getGenerationRecordForOwner
-  )(ownerId, generationId);
+  const findGeneration = dependencies.findGeneration ?? getGenerationRecordForOwner;
+  const generation = await findGeneration(ownerId, generationId);
 
   if (!generation) {
     return null;
@@ -184,7 +209,13 @@ export async function openGenerationEventStreamForOwner(
   return createEventStream({
     generationId,
     ...(afterCursor ? { afterCursor } : {}),
-    terminalAtOpen: isTerminalStatus(generation.status),
+    terminalStatusAtOpen: generationTerminalStatusSchema.safeParse(
+      generation.status,
+    ).data,
+    async readTerminalStatus() {
+      const current = await findGeneration(ownerId, generationId);
+      return generationTerminalStatusSchema.safeParse(current?.status).data;
+    },
     reader: (dependencies.createReader ?? createApplicationReader)(),
     readLimit: positiveInteger(
       dependencies.readLimit ?? DEFAULT_READ_LIMIT,

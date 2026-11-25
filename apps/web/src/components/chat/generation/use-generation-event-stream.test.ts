@@ -1,6 +1,9 @@
 import type { GenerationEventDto } from "@ai-chat/contracts";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { GENERATION_TERMINAL_SIGNAL } from "../../../lib/generation-stream";
+
 import { useGenerationEventStream } from "./use-generation-event-stream";
 import { useGenerationProjectionStore } from "./generation-projection-store";
 
@@ -11,13 +14,16 @@ vi.mock("react", async (importOriginal) => ({
   useEffectEvent: (callback: unknown) => callback,
 }));
 
-class FakeEventSource {
+class FakeEventSource extends EventTarget {
   static instances: FakeEventSource[] = [];
   onopen: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onmessage: ((message: { data: string; lastEventId: string }) => void) | null = null;
   close = vi.fn();
-  constructor(readonly url: string) { FakeEventSource.instances.push(this); }
+  constructor(readonly url: string) {
+    super();
+    FakeEventSource.instances.push(this);
+  }
   emit(event: GenerationEventDto, cursor: string) {
     this.onmessage?.({ data: JSON.stringify(event), lastEventId: cursor });
   }
@@ -159,6 +165,34 @@ describe("切换会话时的 SSE 生命周期", () => {
     expect(projection()).toMatchObject({ status, lastEventId: "100-2", parts: [{ text: "开头和结尾" }] });
     expect(onTerminal).toHaveBeenCalledExactlyOnceWith({ type: `generation.${status}`, generationId: "g1" });
     expect(source.close).toHaveBeenCalledOnce();
+  });
+
+  it("收到数据库终态通知时先提交待渲染内容，再关流同步历史", () => {
+    const onTerminal = vi.fn(() => {
+      expect(projection()).toMatchObject({
+        status: "completed",
+        lastEventId: "100-1",
+        parts: [{ text: "开头和结尾" }],
+      });
+      expect(currentSource().close).toHaveBeenCalledOnce();
+    });
+    mount({ onTerminal });
+    const source = currentSource();
+    source.emit(delta("开头"), "100-0");
+    source.emit(delta("和结尾"), "100-1");
+    expect(frames.size).toBe(1);
+
+    source.dispatchEvent(new MessageEvent(GENERATION_TERMINAL_SIGNAL, {
+      data: JSON.stringify({ generationId: "g1", status: "completed" }),
+    }));
+    source.onerror?.();
+    source.emit(delta("迟到"), "100-2");
+
+    expect(frames.size).toBe(0);
+    expect(onTerminal).toHaveBeenCalledExactlyOnceWith({
+      type: "generation.completed", generationId: "g1",
+    });
+    expect(projection()?.status).toBe("completed");
   });
 
   it("缓存已是终态但历史未接管时，只重试对账，不从终态游标后空等", () => {

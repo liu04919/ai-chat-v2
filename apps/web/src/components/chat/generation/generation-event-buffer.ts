@@ -7,6 +7,7 @@ export type FrameScheduler = {
 
 export type GenerationEventBuffer = {
   enqueue(entry: GenerationEventEntry): void;
+  flushPending(): void;
   dispose(): void;
 };
 
@@ -38,6 +39,11 @@ export function createGenerationEventBuffer(
     flush(events);
   };
 
+  const flushPending = () => {
+    if (frameHandle !== null) scheduler.cancel(frameHandle);
+    flushFrame();
+  };
+
   return {
     enqueue(entry) {
       if (disposed) {
@@ -58,12 +64,13 @@ export function createGenerationEventBuffer(
         event.type === "generation.cancelled"
       ) {
         // 首段和终态都带上已排队的事件，按游标顺序一起交付。
-        if (frameHandle !== null) scheduler.cancel(frameHandle);
-        flushFrame();
+        flushPending();
         return;
       }
       frameHandle ??= scheduler.request(flushFrame);
     },
+
+    flushPending,
 
     dispose() {
       disposed = true;

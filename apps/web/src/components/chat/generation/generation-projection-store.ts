@@ -5,6 +5,8 @@ import type { GenerationEventEntry } from "@ai-chat/event-store";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
+import type { GenerationTerminalStatus } from "../../../lib/generation-stream";
+
 import {
   createGenerationProjection,
   reduceGenerationEvents,
@@ -43,6 +45,11 @@ type GenerationProjectionState = {
     conversationId: string,
     generationId: string,
     entries: readonly GenerationEventEntry[],
+  ): void;
+  setTerminal(
+    conversationId: string,
+    generationId: string,
+    status: GenerationTerminalStatus,
   ): void;
   setReconnecting(conversationId: string, generationId: string): void;
   setConnected(conversationId: string, generationId: string): void;
@@ -123,6 +130,15 @@ export const useGenerationProjectionStore =
                 : cursor,
             };
             state.projections[conversationId] = projection;
+          }
+        });
+      },
+
+      setTerminal(conversationId, generationId, status) {
+        set((state) => {
+          const projection = state.projections[conversationId];
+          if (projection?.generationId === generationId) {
+            projection.status = status;
           }
         });
       },

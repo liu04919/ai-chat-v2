@@ -7,6 +7,11 @@ import {
 } from "@ai-chat/contracts";
 import { useEffect, useEffectEvent } from "react";
 
+import {
+  GENERATION_TERMINAL_SIGNAL,
+  generationTerminalSignalSchema,
+} from "../../../lib/generation-stream";
+
 import { createGenerationEventBuffer } from "./generation-event-buffer";
 import { useGenerationProjectionStore } from "./generation-projection-store";
 
@@ -81,11 +86,24 @@ export function useGenerationEventStream({
         );
 
         if (terminalEvent) {
+          closeStream();
           onTerminalEvent(terminalEvent);
         }
       },
       { hasContent },
     );
+
+    function closeStream() {
+      if (disposed) return;
+      disposed = true;
+      source.close();
+      buffer.dispose();
+    }
+
+    const failStream = () => {
+      closeStream();
+      store.setConnectionError(conversationId, generationId);
+    };
 
     source.onopen = () => {
       if (disposed) return;
@@ -101,11 +119,7 @@ export function useGenerationEventStream({
       try {
         body = JSON.parse(message.data);
       } catch {
-        source.close();
-        buffer.dispose();
-        useGenerationProjectionStore
-          .getState()
-          .setConnectionError(conversationId, generationId);
+        failStream();
         return;
       }
 
@@ -117,24 +131,34 @@ export function useGenerationEventStream({
         !parsedEvent.success ||
         parsedEvent.data.generationId !== generationId
       ) {
-        source.close();
-        buffer.dispose();
-        useGenerationProjectionStore
-          .getState()
-          .setConnectionError(conversationId, generationId);
+        failStream();
         return;
       }
 
       buffer.enqueue({ cursor: cursor.data, event: parsedEvent.data });
-
-      if (
-        parsedEvent.data.type === "generation.completed" ||
-        parsedEvent.data.type === "generation.failed" ||
-        parsedEvent.data.type === "generation.cancelled"
-      ) {
-        source.close();
-      }
     };
+
+    source.addEventListener(GENERATION_TERMINAL_SIGNAL, (message) => {
+      if (disposed || !(message instanceof MessageEvent)) return;
+      let body: unknown;
+      try {
+        body = JSON.parse(message.data);
+      } catch {
+        failStream();
+        return;
+      }
+
+      const signal = generationTerminalSignalSchema.safeParse(body);
+      if (!signal.success || signal.data.generationId !== generationId) {
+        failStream();
+        return;
+      }
+
+      buffer.flushPending();
+      store.setTerminal(conversationId, generationId, signal.data.status);
+      closeStream();
+      onTerminalEvent({ type: `generation.${signal.data.status}`, generationId });
+    });
 
     source.onerror = () => {
       if (disposed) return;
@@ -143,10 +167,6 @@ export function useGenerationEventStream({
         .setReconnecting(conversationId, generationId);
     };
 
-    return () => {
-      disposed = true;
-      source.close();
-      buffer.dispose();
-    };
+    return closeStream;
   }, [conversationId, generationId, enabled]);
 }
